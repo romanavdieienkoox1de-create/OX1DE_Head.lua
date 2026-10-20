@@ -84,7 +84,7 @@ panel.Name = 'WideMenu'
 panel.Visible = true
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Position = UDim2.fromScale(0.5, 0.5)
-panel.Size = UDim2.fromOffset(720, 400)
+panel.Size = UDim2.fromOffset(820, 470)
 panel.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 panel.BorderSizePixel = 0
 panel.ZIndex = 10
@@ -99,13 +99,13 @@ heading.TextXAlignment = Enum.TextXAlignment.Left
 heading.Font = Enum.Font.GothamBold
 heading.TextSize = 22
 local subtitle = text(panel, 'НАСТРОЙКИ  /  ПРАВЫЙ SHIFT — МЕНЮ', 14, 26)
-subtitle.Position = UDim2.fromOffset(172, 14)
-subtitle.Size = UDim2.fromOffset(385, 26)
+subtitle.Position = UDim2.fromOffset(192, 14)
+subtitle.Size = UDim2.fromOffset(390, 26)
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.TextColor3 = dim
 subtitle.TextSize = 11
 local close = Instance.new('TextButton', panel)
-close.Position = UDim2.fromOffset(670, 12)
+close.Position = UDim2.fromOffset(772, 12)
 close.Size = UDim2.fromOffset(36, 34)
 close.Text = '×'
 close.TextSize = 24
@@ -133,8 +133,8 @@ connect(UIS.InputChanged,function(input)
     local camera=workspace.CurrentCamera
     if not camera then return end
     local viewport=camera.ViewportSize
-    local halfWidth=360*scale.Scale
-    local halfHeight=200*scale.Scale
+    local halfWidth=410*scale.Scale
+    local halfHeight=235*scale.Scale
     local centerX=menuPosition.X.Scale*viewport.X+menuPosition.X.Offset+delta.X
     local centerY=menuPosition.Y.Scale*viewport.Y+menuPosition.Y.Offset+delta.Y
     panel.Position=UDim2.fromOffset(
@@ -145,34 +145,37 @@ connect(UIS.InputEnded,function(input)
     if input == menuDrag then menuDrag=nil end
 end)
 local divider = Instance.new('Frame', panel)
-divider.Position = UDim2.fromOffset(154, 56)
-divider.Size = UDim2.fromOffset(1, 320)
+divider.Position = UDim2.fromOffset(174, 56)
+divider.Size = UDim2.fromOffset(1, 390)
 divider.BorderSizePixel = 0
 divider.BackgroundColor3 = Color3.fromRGB(48, 48, 48)
 local navigation = Instance.new('ScrollingFrame',panel)
 navigation.Position=UDim2.fromOffset(12,64)
-navigation.Size=UDim2.fromOffset(134,238)
+navigation.Size=UDim2.fromOffset(154,336)
 navigation.BackgroundTransparency=1
 navigation.BorderSizePixel=0
-navigation.ScrollBarThickness=2
+navigation.ScrollBarThickness=0
 navigation.ScrollBarImageColor3=dim
 navigation.ScrollingDirection=Enum.ScrollingDirection.Y
+navigation.ScrollingEnabled=false
 local pages, tabs = {}, {}
 local toggleRefreshers = {}
 local function addPage(title, y)
     local page = Instance.new('Frame', panel)
-    page.Position = UDim2.fromOffset(168, 58)
-    page.Size = UDim2.fromOffset(534, 272)
+    page.Position = UDim2.fromOffset(188, 64)
+    page.Size = UDim2.fromOffset(534, 288)
+    local contentScale=Instance.new('UIScale',page)
+    contentScale.Scale=1.15
     page.BackgroundTransparency = 1
     page.Visible = false
     table.insert(pages, page)
     local tab = Instance.new('TextButton', navigation)
     tab.Position = UDim2.fromOffset(2, (#pages-1)*46)
     navigation.CanvasSize=UDim2.fromOffset(0,#pages*46)
-    tab.Size = UDim2.fromOffset(126, 40)
+    tab.Size = UDim2.fromOffset(146, 42)
     tab.Text = title
     tab.TextColor3 = dim
-    tab.TextSize = 14
+    tab.TextSize = 15
     tab.Font = Enum.Font.GothamBold
     tab.BorderSizePixel = 0
     round(tab)
@@ -197,8 +200,8 @@ local buildingsPage = addPage('ESP построек', 0)
 local miscPage = addPage('Прочее', 0)
 selectVisuals()
 local info = text(panel, 'ESP: 15 Hz\nRight Shift — меню', 256, 70)
-info.Position = UDim2.fromOffset(14, 310)
-info.Size = UDim2.fromOffset(126, 42)
+info.Position = UDim2.fromOffset(14, 412)
+info.Size = UDim2.fromOffset(146, 42)
 info.TextColor3 = dim
 info.TextSize = 11
 local function toggle(parent, title, key, y)
@@ -400,13 +403,24 @@ local function actionButton(title,y,callback)
     round(button)
     connect(button.Activated,callback)
 end
-actionButton('Выключить все функции',0,function()
+local function disableEverything()
     for key,value in pairs(cfg) do
         if type(value)=='boolean' then cfg[key]=false end
     end
     if stopFreecam then stopFreecam() end
     for _,refresh in ipairs(toggleRefreshers) do refresh() end
-end)
+end
+actionButton('Выключить все функции',0,disableEverything)
+local quickOff=Instance.new('TextButton',panel)
+quickOff.Position=UDim2.fromOffset(632,12)
+quickOff.Size=UDim2.fromOffset(126,34)
+quickOff.Text='Всё ВЫКЛ'
+quickOff.TextColor3=Color3.fromRGB(12,12,12)
+quickOff.BackgroundColor3=accent
+quickOff.Font=Enum.Font.GothamBold
+quickOff.TextSize=13
+round(quickOff)
+connect(quickOff.Activated,disableEverything)
 actionButton('Убрать диагностические надписи',52,function()
     for _,name in ipairs({'OX1DE_Check','OX1DELoaderStatus'}) do
         local diagnostic=playerGui:FindFirstChild(name)
@@ -416,8 +430,8 @@ end)
 local miscHint=text(miscPage,'Правый Shift — открыть или скрыть меню.\nНастройки включаются вручную после каждого запуска.',112,90)
 miscHint.TextColor3=dim
 local status = text(panel, 'Включи аим и закрой меню. Упреждение по умолчанию OFF.', 318, 42)
-status.Position = UDim2.fromOffset(170, 342)
-status.Size = UDim2.fromOffset(530, 42)
+status.Position = UDim2.fromOffset(190, 420)
+status.Size = UDim2.fromOffset(610, 36)
 status.TextXAlignment = Enum.TextXAlignment.Left
 status.TextColor3 = dim
 status.TextSize = 12
@@ -445,7 +459,7 @@ local function updateCircle()
         lastViewport = viewport
         local center = viewport/2
         fovCircle.Position = UDim2.fromOffset(center.X, center.Y)
-        scale.Scale = math.min(1, math.max(0.1, (viewport.X-24)/720), math.max(0.1, (viewport.Y-40)/400))
+        scale.Scale = math.min(1, math.max(0.1, (viewport.X-24)/820), math.max(0.1, (viewport.Y-40)/470))
     end
     if cfg.fov ~= lastFov then
         lastFov = cfg.fov
