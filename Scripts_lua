@@ -11,8 +11,9 @@ if not me then
     me = Players.LocalPlayer
 end
 assert(me, 'LocalPlayer unavailable: run on the client')
-local cfg = {esp=true, names=true, skeleton=true, aim=false, walls=true, fov=50, distance=100, aimDistance=100, circle=true, stone=true, sulfur=true, metal=true, nitrate=true, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false}
+local cfg = {esp=true, names=true, skeleton=true, aim=false, walls=true, fov=50, distance=100, aimDistance=100, circle=true, stone=true, sulfur=true, metal=true, nitrate=true, cupboard=true, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false, freecam=false, cameraSpeed=50}
 local alive, tracked, connections = true, {}, {}
+local stopFreecam
 local folder = Instance.new('Folder', workspace)
 folder.Name = 'BriskTools'
 local gui = Instance.new('ScreenGui')
@@ -31,6 +32,9 @@ gui.Parent = playerGui
 _G.BriskToolsStop = function()
     alive = false
     cfg.aim = false
+    cfg.freecam = false
+    pcall(function() RunService:UnbindFromRenderStep('OX1DEFreecam') end)
+    if stopFreecam then stopFreecam() end
     pcall(function() RunService:UnbindFromRenderStep('OX1DECameraAim') end)
     for _, connection in ipairs(connections) do connection:Disconnect() end
     for _, entry in pairs(tracked) do
@@ -146,10 +150,11 @@ local visuals, selectVisuals = addPage('ESP', 66)
 local aimPage = addPage('Наведение', 114)
 local resourcesPage = addPage('Ресурсы', 162)
 local ballisticsPage = addPage('Упреждение', 210)
+local cameraPage = addPage('Камера', 258)
 selectVisuals()
-local info = text(panel, '15 Hz ESP\nRight Shift\nоткрыть / скрыть', 256, 70)
-info.Position = UDim2.fromOffset(14, 256)
-info.Size = UDim2.fromOffset(126, 70)
+local info = text(panel, 'ESP: 15 Hz\nRight Shift — меню', 256, 70)
+info.Position = UDim2.fromOffset(14, 310)
+info.Size = UDim2.fromOffset(126, 42)
 info.TextColor3 = dim
 info.TextSize = 11
 local function toggle(parent, title, key, y)
@@ -208,11 +213,12 @@ toggle(visuals, 'Подсветка игроков', 'esp', 0)
 toggle(visuals, 'Ники / HP / расстояние', 'names', 46)
 toggle(visuals, 'Скелет • до 150 м', 'skeleton', 92)
 numberBox(visuals, 'Дальность ESP • метры', 'distance', 138)
-local visualHint = text(visuals, 'Красный — препятствие. Зелёный — виден.\nСкелеты: до 20 игроков. Масштаб: 1 stud ≈ 0.28 м.', 186, 54)
+toggle(visuals, 'Шкаф • фиолетовый', 'cupboard', 184)
+local visualHint = text(visuals, 'Дальность шкафа — во вкладке «Ресурсы».', 226, 24)
 visualHint.TextColor3 = dim
 visualHint.TextSize = 12
 toggle(aimPage, 'Аим прямо в голову', 'aim', 0)
-toggle(aimPage, 'Только при удержании ПКМ', 'holdAim', 46)
+toggle(aimPage, 'Проверять стены', 'walls', 46)
 toggle(aimPage, 'Показывать круг FOV', 'circle', 92)
 local fovLabel = text(aimPage, '', 136, 24)
 fovLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -262,10 +268,14 @@ toggle(ballisticsPage, 'Упреждение движения', 'predict', 0)
 numberBox(ballisticsPage, 'Скорость пули • studs/с', 'bulletSpeed', 46, 0, 10000)
 numberBox(ballisticsPage, 'Доп. упреждение • мс', 'leadMs', 92, 0, 500)
 numberBox(ballisticsPage, 'Падение пули • studs/с²', 'bulletGravity', 138, 0, 1000)
-toggle(ballisticsPage, 'Проверка пути упреждения', 'walls', 184)
+toggle(ballisticsPage, 'Только при удержании ПКМ', 'holdAim', 184)
 local ballisticHint = text(ballisticsPage, 'Упреждение OFF: прицел строго на голове.', 226, 24)
 ballisticHint.TextColor3 = dim
 ballisticHint.TextSize = 11
+toggle(cameraPage, 'Свободная камера', 'freecam', 0)
+numberBox(cameraPage, 'Скорость • studs/с', 'cameraSpeed', 46, 1, 500)
+local cameraHint = text(cameraPage, 'W / A / S / D — движение\nQ / E — вниз / вверх\nShift — скорость ×3\nУдерживать ПКМ — поворот\nЗакрой меню, чтобы начать полёт.\nПерсонаж остаётся на месте.', 96, 148)
+cameraHint.TextColor3 = dim
 local status = text(panel, 'Включи аим и закрой меню. Упреждение по умолчанию OFF.', 318, 42)
 status.Position = UDim2.fromOffset(170, 318)
 status.Size = UDim2.fromOffset(450, 42)
@@ -307,6 +317,7 @@ connect(RunService.RenderStepped, updateCircle)
 -- Resource detection is heuristic; no game-specific object names are known.
 local CollectionService = game:GetService('CollectionService')
 local resourceKinds = {
+    cupboard = {title='Шкаф', color=Color3.fromRGB(197, 130, 255)},
     stone = {title='Камень', color=Color3.fromRGB(200, 205, 218)},
     sulfur = {title='Сера', color=Color3.fromRGB(255, 255, 255)},
     nitrate = {title='Селитра', color=Color3.fromRGB(255, 255, 255)},
@@ -331,6 +342,8 @@ local function identifyName(value)
     end
 end
 local function identifyResource(object)
+    if object.Name == 'Flag' and object.Parent
+        and object.Parent.Name == 'PlacedDeployables' then return 'cupboard' end
     -- Typed metadata takes precedence over a generic model name.
     for _, key in ipairs({'ResourceType','OreType','Resource','NodeType'}) do
         local kind = identifyName(object:GetAttribute(key))
@@ -447,15 +460,24 @@ connect(RunService.Heartbeat, function(dt)
             end
             local distance = (entry.part.Position-origin).Magnitude*0.28
             if not nested and distance <= cfg.resourceDistance then
-                local _, visible = camera:WorldToViewportPoint(entry.part.Position)
-                if visible then table.insert(nearby, {object=object, entry=entry, distance=distance}) end
+                -- Keep the nearest markers independent of the camera angle.
+                -- Roblox handles clipping; a model can be visible with its pivot offscreen.
+                table.insert(nearby, {object=object, entry=entry, distance=distance})
             end
         end
     end
     table.sort(nearby, function(a,b) return a.distance < b.distance end)
     local selected = {}
-    for index = 1, math.min(24, #nearby) do
-        local item = nearby[index]
+    local oreCount, cupboardCount = 0, 0
+    for _, item in ipairs(nearby) do
+        local isCupboard = item.entry.kind == 'cupboard'
+        if isCupboard then
+            if cupboardCount >= 8 then continue end
+            cupboardCount = cupboardCount + 1
+        else
+            if oreCount >= 24 then continue end
+            oreCount = oreCount + 1
+        end
         local object, entry = item.object, item.entry
         selected[object] = true
         local marker = markers[object]
@@ -559,14 +581,14 @@ connect(RunService.Heartbeat,function(dt)
             local _, inside = camera:WorldToViewportPoint(head.Position)
             onScreen = inside
         end
-        show = show and onScreen
-        if show and now >= e.nextVisibility and rayBudget > 0 then
+        -- Do not disable a whole character just because its head leaves the viewport.
+        if show and onScreen and now >= e.nextVisibility and rayBudget > 0 then
             e.visible = clearPath(camera.CFrame.Position,head)
             e.nextVisibility = now + 0.2
             rayBudget = rayBudget - 1
         end
         local visible=show and e.visible
-        local drawSkeleton=show and cfg.skeleton and meters<=150 and skeletonBudget>0
+        local drawSkeleton=show and onScreen and cfg.skeleton and meters<=150 and skeletonBudget>0
         if drawSkeleton then skeletonBudget=skeletonBudget-1 end
         local color=visible and Color3.fromRGB(60,255,100) or Color3.fromRGB(255,65,65)
         e.highlight.Enabled=show
@@ -648,7 +670,7 @@ local function chooseHead(camera)
     end
     table.sort(candidatesForAim,function(a,b) return a.pixels < b.pixels end)
     for _, candidate in ipairs(candidatesForAim) do
-        if clearPath(camera.CFrame.Position,candidate.head) then return candidate.head end
+        if not cfg.walls or clearPath(camera.CFrame.Position,candidate.head) then return candidate.head end
     end
 end
 local touchHeld = false
@@ -679,8 +701,9 @@ end
 RunService:BindToRenderStep('OX1DECameraAim',Enum.RenderPriority.Last.Value+1,function()
     local camera = workspace.CurrentCamera
     local holding = touchHeld or UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    if not alive or not cfg.aim or (cfg.holdAim and not holding) or panel.Visible or UIS:GetFocusedTextBox() or not camera then
-        if not cfg.aim then aimStatus('Аим выключен.')
+    if not alive or cfg.freecam or not cfg.aim or (cfg.holdAim and not holding) or panel.Visible or UIS:GetFocusedTextBox() or not camera then
+        if cfg.freecam then aimStatus('Свободная камера: WASD, Q/E, Shift, ПКМ.')
+        elseif not cfg.aim then aimStatus('Аим выключен.')
         elseif panel.Visible then aimStatus('Аим включён. Закрой меню: Right Shift или ×.')
         elseif cfg.holdAim and not holding then aimStatus('Удерживай ПКМ или кнопку HOLD AIM.')
         else aimStatus('Наведение приостановлено.') end
@@ -730,10 +753,78 @@ RunService:BindToRenderStep('OX1DECameraAim',Enum.RenderPriority.Last.Value+1,fu
     camera.CFrame=CFrame.lookAt(origin,point)
     aimStatus((cfg.predict and 'С упреждением: ' or 'На голове: ') .. head.Parent.Name)
 end)
+-- Free camera affects only local view, not server streaming.
+local cameraActions = game:GetService('ContextActionService')
+local freecamState
+stopFreecam = function()
+    if not freecamState then return end
+    local saved = freecamState
+    freecamState = nil
+    cameraActions:UnbindAction('OX1DEFreecamMovement')
+    UIS.MouseBehavior = saved.mouse
+    UIS.MouseIconEnabled = saved.icon
+    local camera = saved.camera
+    if camera and camera.Parent then
+        camera.CameraType = saved.cameraType
+        if saved.subject and saved.subject.Parent then camera.CameraSubject = saved.subject end
+        camera.CFrame = saved.cframe
+        camera.Focus = saved.focus
+    end
+end
+local function keyDown(key)
+    return UIS:IsKeyDown(key) and 1 or 0
+end
+RunService:BindToRenderStep('OX1DEFreecam',Enum.RenderPriority.Last.Value+2,function(dt)
+    local camera = workspace.CurrentCamera
+    if not alive or not cfg.freecam or not camera then stopFreecam(); return end
+    if freecamState and freecamState.camera ~= camera then stopFreecam() end
+    if not freecamState then
+        cameraActions:BindActionAtPriority('OX1DEFreecamMovement',function()
+            return Enum.ContextActionResult.Sink
+        end,false,Enum.ContextActionPriority.High.Value+10,
+            Enum.PlayerActions.CharacterForward,Enum.PlayerActions.CharacterBackward,
+            Enum.PlayerActions.CharacterLeft,Enum.PlayerActions.CharacterRight,
+            Enum.PlayerActions.CharacterJump)
+        me:Move(Vector3.new(0,0,0),false)
+        local pitch,yaw = camera.CFrame:ToOrientation()
+        freecamState = {
+            camera=camera, cameraType=camera.CameraType,
+            subject=camera.CameraSubject, cframe=camera.CFrame, focus=camera.Focus,
+            mouse=UIS.MouseBehavior, icon=UIS.MouseIconEnabled,
+            position=camera.CFrame.Position, pitch=pitch, yaw=yaw,
+        }
+    end
+    local saved = freecamState
+    camera.CameraType = Enum.CameraType.Scriptable
+    local paused = panel.Visible or UIS:GetFocusedTextBox() ~= nil
+    local rotating = not paused and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+    UIS.MouseBehavior = rotating and Enum.MouseBehavior.LockCenter or Enum.MouseBehavior.Default
+    UIS.MouseIconEnabled = not rotating and saved.icon
+    if rotating then
+        local delta = UIS:GetMouseDelta()
+        saved.yaw = saved.yaw - delta.X*0.003
+        saved.pitch = math.clamp(saved.pitch-delta.Y*0.003, -math.pi/2+0.01, math.pi/2-0.01)
+    end
+    local rotation = CFrame.fromOrientation(saved.pitch,saved.yaw,0)
+    if not paused then
+        local movement = rotation.RightVector*(keyDown(Enum.KeyCode.D)-keyDown(Enum.KeyCode.A))
+            +rotation.LookVector*(keyDown(Enum.KeyCode.W)-keyDown(Enum.KeyCode.S))
+            +Vector3.new(0,keyDown(Enum.KeyCode.E)-keyDown(Enum.KeyCode.Q),0)
+        if movement.Magnitude>1 then movement=movement.Unit end
+        local fast = UIS:IsKeyDown(Enum.KeyCode.LeftShift)
+        saved.position=saved.position+movement*cfg.cameraSpeed*(fast and 3 or 1)*math.min(dt,0.1)
+    end
+    camera.CFrame=CFrame.new(saved.position)*rotation
+    camera.Focus=CFrame.new(saved.position+rotation.LookVector*20)
+end)
+
 updateCircle()
 _G.BriskToolsStop=function()
     alive=false
     cfg.aim=false
+    cfg.freecam=false
+    RunService:UnbindFromRenderStep('OX1DEFreecam')
+    if stopFreecam then stopFreecam() end
     RunService:UnbindFromRenderStep('OX1DECameraAim')
     for _,c in ipairs(connections) do c:Disconnect() end
     for player in pairs(tracked) do clear(player) end
