@@ -478,4 +478,236 @@ local function clear(player)
     for _,o in ipairs(e.objects) do o:Destroy() end
     tracked[player]=nil
 end
-local function setup(player,ch
+local function setup(player,char)
+    clear(player)
+    local e={char=char,objects={},lines={},joints={},connections={},visible=false,nextVisibility=0}
+    tracked[player]=e
+    local function keep(o) table.insert(e.objects,o); return o end
+    e.highlight=keep(Instance.new('Highlight',folder))
+    e.highlight.Adornee=char
+    e.highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+    e.highlight.FillTransparency=0.85
+    e.tag=keep(Instance.new('BillboardGui',gui))
+    e.tag.Size=UDim2.fromOffset(270,48)
+    e.tag.StudsOffset=Vector3.new(0,2.5,0)
+    e.tag.AlwaysOnTop=true
+    e.label=text(e.tag,'',0,48)
+    e.label.TextStrokeTransparency=0
+    local function addJoint(o)
+        if o:IsA('Motor6D') then e.joints[o]=true end
+    end
+    -- Scan once; streaming and accessories are handled by events.
+    table.insert(e.connections,char.DescendantAdded:Connect(addJoint))
+    table.insert(e.connections,char.DescendantRemoving:Connect(function(o)
+        e.joints[o]=nil
+        local line=e.lines[o]
+        if line then line:Destroy(); e.lines[o]=nil end
+    end))
+    for _,o in ipairs(char:GetDescendants()) do addJoint(o) end
+    return e
+end
+connect(Players.PlayerRemoving,clear)
+local elapsed = 0
+connect(RunService.Heartbeat,function(dt)
+    elapsed = elapsed + dt
+    if elapsed < 1/15 then return end
+    elapsed = 0
+    local now = os.clock()
+    local rayBudget, skeletonBudget = 4, 20
+    local camera=workspace.CurrentCamera
+    if not camera then return end
+    local root=me.Character and me.Character:FindFirstChild('HumanoidRootPart')
+    local origin=root and root.Position or camera.CFrame.Position
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player==me then continue end
+        local char=player.Character
+        if not char then clear(player); continue end
+        local e=tracked[player]
+        if not e or e.char~=char then e=setup(player,char) end
+        local head=char:FindFirstChild('Head')
+        local hum=char:FindFirstChildOfClass('Humanoid')
+        local target=char:FindFirstChild('HumanoidRootPart') or head
+        local meters=target and (target.Position-origin).Magnitude*0.28 or math.huge
+        local show=cfg.esp and head~=nil and hum~=nil and hum.Health>0 and meters<=cfg.distance
+        local onScreen = false
+        if show then
+            local _, inside = camera:WorldToViewportPoint(head.Position)
+            onScreen = inside
+        end
+        show = show and onScreen
+        if show and now >= e.nextVisibility and rayBudget > 0 then
+            e.visible = clearPath(camera.CFrame.Position,head)
+            e.nextVisibility = now + 0.2
+            rayBudget = rayBudget - 1
+        end
+        local visible=show and e.visible
+        local drawSkeleton=show and cfg.skeleton and meters<=150 and skeletonBudget>0
+        if drawSkeleton then skeletonBudget=skeletonBudget-1 end
+        local color=visible and Color3.fromRGB(60,255,100) or Color3.fromRGB(255,65,65)
+        e.highlight.Enabled=show
+        e.highlight.FillColor=color
+        e.highlight.OutlineColor=color
+        e.tag.Adornee=head
+        e.tag.Enabled=show and cfg.names
+        e.label.TextColor3=color
+        if target and hum then
+            local value=string.format('%s (@%s)\nHP: %d / %d | %d м',player.DisplayName,player.Name,math.ceil(hum.Health),math.ceil(hum.MaxHealth),math.round(meters))
+            if e.label.Text~=value then e.label.Text=value end
+        end
+        if drawSkeleton then
+            for joint in pairs(e.joints) do
+                local a,b=joint.Part0,joint.Part1
+                if not a or not b or a.Name=='HumanoidRootPart' or b.Name=='HumanoidRootPart' then continue end
+                if not e.lines[joint] then
+                    local line=Instance.new('LineHandleAdornment',folder)
+                    line.Adornee=workspace.Terrain
+                    line.AlwaysOnTop=true
+                    line.ZIndex=5
+                    line.Thickness=2
+                    e.lines[joint]=line
+                    table.insert(e.objects,line)
+                end
+            end
+        end
+        for joint,line in pairs(e.lines) do
+            local a,b=joint.Part0,joint.Part1
+            if not joint:IsDescendantOf(char) or not a or not b then
+                line:Destroy(); e.lines[joint]=nil
+            else
+                local length=(b.Position-a.Position).Magnitude
+                line.Visible=drawSkeleton and length>0.01
+                line.Color3=color
+                if line.Visible then line.Length=length; line.CFrame=CFrame.lookAt(a.Position,b.Position) end
+            end
+        end
+    end
+end)
+-- Ordinary camera aim. No metamethod hooks and no automatic firing.
+local function interceptTime(relative, velocity, speed)
+    if speed <= 0 then return 0 end
+    local a = velocity:Dot(velocity) - speed*speed
+    local b = 2*relative:Dot(velocity)
+    local c = relative:Dot(relative)
+    if math.abs(a) < 0.000001 then
+        if math.abs(b) < 0.000001 then return nil end
+        local t = -c/b
+        return t > 0 and t or nil
+    end
+    local discriminant = b*b - 4*a*c
+    if discriminant < 0 then return nil end
+    local root = math.sqrt(discriminant)
+    local t1, t2 = (-b-root)/(2*a), (-b+root)/(2*a)
+    if t1 > 0 and t2 > 0 then return math.min(t1,t2) end
+    if t1 > 0 then return t1 end
+    if t2 > 0 then return t2 end
+end
+local function chooseHead(camera)
+    local center = camera.ViewportSize/2
+    local ownRoot = me.Character and me.Character:FindFirstChild('HumanoidRootPart')
+    local origin = ownRoot and ownRoot.Position or camera.CFrame.Position
+    local candidatesForAim = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player == me then continue end
+        local char = player.Character
+        local head = char and char:FindFirstChild('Head')
+        local hum = char and char:FindFirstChildOfClass('Humanoid')
+        if not head or not hum or hum.Health <= 0 then continue end
+        local root = char:FindFirstChild('HumanoidRootPart') or head
+        local distance = (root.Position-origin).Magnitude*0.28
+        if distance > math.min(cfg.aimDistance, cfg.distance) then continue end
+        local point, onScreen = camera:WorldToViewportPoint(head.Position)
+        local pixels = (Vector2.new(point.X,point.Y)-center).Magnitude
+        if onScreen and pixels <= cfg.fov then
+            table.insert(candidatesForAim,{head=head,pixels=pixels})
+        end
+    end
+    table.sort(candidatesForAim,function(a,b) return a.pixels < b.pixels end)
+    for _, candidate in ipairs(candidatesForAim) do
+        if clearPath(camera.CFrame.Position,candidate.head) then return candidate.head end
+    end
+end
+local touchHeld = false
+local touchAimButton = Instance.new('TextButton',gui)
+touchAimButton.AnchorPoint = Vector2.new(1,1)
+touchAimButton.Position = UDim2.new(1,-20,1,-120)
+touchAimButton.Size = UDim2.fromOffset(85,44)
+touchAimButton.Text = 'HOLD AIM'
+touchAimButton.Font = Enum.Font.GothamBold
+touchAimButton.TextSize = 12
+touchAimButton.TextColor3 = Color3.new(1,1,1)
+touchAimButton.BackgroundColor3 = Color3.fromRGB(44,55,89)
+touchAimButton.Visible = UIS.TouchEnabled
+touchAimButton.ZIndex = 10
+round(touchAimButton)
+local activeTouch
+connect(touchAimButton.InputBegan,function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then activeTouch=input; touchHeld=true end
+end)
+connect(UIS.InputEnded,function(input)
+    if input == activeTouch then activeTouch=nil; touchHeld=false end
+end)
+connect(UIS.WindowFocusReleased,function() activeTouch=nil; touchHeld=false end)
+local selectedHead, nextSelection = nil, 0
+RunService:BindToRenderStep('OX1DECameraAim',Enum.RenderPriority.Camera.Value+1,function()
+    local camera = workspace.CurrentCamera
+    local holding = touchHeld or UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+    if not alive or not cfg.aim or not holding or panel.Visible or UIS:GetFocusedTextBox() or not camera then
+        selectedHead=nil
+        nextSelection=0
+        return
+    end
+    local now = os.clock()
+    if now >= nextSelection then
+        selectedHead=chooseHead(camera)
+        nextSelection=now+0.05
+    end
+    local head=selectedHead
+    if not head or not head:IsDescendantOf(workspace) then return end
+    local hum=head.Parent:FindFirstChildOfClass('Humanoid')
+    if not hum or hum.Health<=0 then selectedHead=nil; return end
+    local origin=camera.CFrame.Position
+    local velocity=head.AssemblyLinearVelocity
+    local delay=cfg.leadMs/1000
+    local relative=head.Position+velocity*delay-origin
+    local flight=interceptTime(relative,velocity,cfg.bulletSpeed)
+    if flight == nil or flight > 3 then return end
+    local point=head.Position+velocity*(delay+flight)
+        +Vector3.new(0,0.5*cfg.bulletGravity*flight*flight,0)
+    if (point-origin).Magnitude<0.001 then return end
+    if cfg.walls then
+        local params=RaycastParams.new()
+        params.FilterType=Enum.RaycastFilterType.Exclude
+        local excluded={folder,camera,head.Parent}
+        if me.Character then table.insert(excluded,me.Character) end
+        params.FilterDescendantsInstances=excluded
+        params.IgnoreWater=true
+        if rawRaycast(workspace,origin,point-origin,params) then return end
+    end
+    camera.CFrame=CFrame.lookAt(origin,point)
+end)
+updateCircle()
+_G.BriskToolsStop=function()
+    alive=false
+    cfg.aim=false
+    RunService:UnbindFromRenderStep('OX1DECameraAim')
+    for _,c in ipairs(connections) do c:Disconnect() end
+    for player in pairs(tracked) do clear(player) end
+    folder:Destroy()
+    gui:Destroy()
+    _G.BriskToolsStop=nil
+end
+
+end, function(message)
+    return debug.traceback(tostring(message), 2)
+end)
+if not startupOK then
+    warn('[OX1DE startup] ' .. tostring(startupError))
+    pcall(function()
+        game:GetService('StarterGui'):SetCore('SendNotification', {
+            Title = 'OX1DE: ошибка запуска',
+            Text = tostring(startupError):sub(1, 180),
+            Duration = 20,
+        })
+    end)
+    error(startupError, 0)
+end
