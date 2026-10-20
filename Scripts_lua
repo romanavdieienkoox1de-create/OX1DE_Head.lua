@@ -12,7 +12,7 @@ if not me then
 end
 assert(me, 'LocalPlayer unavailable: run on the client')
 local cfg = {
-    aim=false, target='Head', aimDistance=100, fov=50, walls=false,
+    aim=false, target='Head', aimDistance=100, fov=50, walls=false, checkPlayer=false,
     names=false, distance=100, hp=false, weapon=false,
     stone=false, metal=false, nitrate=false, cupboard=false,
     freecam=false, cameraSpeed=50,
@@ -235,6 +235,7 @@ local function toggle(parent, title, key, y)
         refresh()
     end)
     refresh()
+    return button, indicator
 end
 -- Shared drag handlers for all numeric settings (mouse and touch).
 local activeSlider, activeSliderInput
@@ -322,25 +323,53 @@ local function numberBox(parent, title, key, y, minimum, maximum)
     refresh()
 end
 
-toggle(aimPage,'Aim','aim',0)
+local aimRow,aimIndicator=toggle(aimPage,'Aim','aim',0)
+aimIndicator.Position=UDim2.new(1,-90,0,7)
+-- A separate sibling button prevents selecting a body part from toggling Aim.
 local targetButton=Instance.new('TextButton',aimPage)
-targetButton.Position=UDim2.fromOffset(0,46)
-targetButton.Size=UDim2.new(1,0,0,42)
-targetButton.BackgroundColor3=Color3.fromRGB(29,29,29)
+targetButton.Position=UDim2.new(1,-204,0,7)
+targetButton.Size=UDim2.fromOffset(104,28)
+targetButton.BackgroundColor3=Color3.fromRGB(48,48,48)
 targetButton.TextColor3=accent
 targetButton.Font=Enum.Font.GothamBold
-targetButton.TextSize=14
+targetButton.TextSize=13
+targetButton.ZIndex=3
 round(targetButton)
-local function refreshTarget() targetButton.Text='Target: '..cfg.target..'   /   нажми для смены' end
-connect(targetButton.Activated,function()
-    cfg.target=cfg.target=='Head' and 'Body' or 'Head'
-    refreshTarget()
-end)
+local targetMenu=Instance.new('Frame',aimPage)
+targetMenu.Position=UDim2.new(1,-204,0,39)
+targetMenu.Size=UDim2.fromOffset(104,76)
+targetMenu.BackgroundColor3=Color3.fromRGB(38,38,38)
+targetMenu.BorderSizePixel=0
+targetMenu.Visible=false
+targetMenu.ZIndex=5
+round(targetMenu)
+local function refreshTarget() targetButton.Text=cfg.target..'  ▾' end
+for index,name in ipairs({'Head','Body'}) do
+    local option=Instance.new('TextButton',targetMenu)
+    option.Position=UDim2.fromOffset(4,4+(index-1)*36)
+    option.Size=UDim2.new(1,-8,0,32)
+    option.BackgroundColor3=Color3.fromRGB(48,48,48)
+    option.TextColor3=accent
+    option.Font=Enum.Font.GothamBold
+    option.TextSize=13
+    option.Text=name
+    option.ZIndex=6
+    round(option)
+    connect(option.Activated,function()
+        cfg.target=name
+        refreshTarget()
+        targetMenu.Visible=false
+    end)
+end
+connect(targetButton.Activated,function() targetMenu.Visible=not targetMenu.Visible end)
+connect(panel:GetPropertyChangedSignal('Visible'),function() targetMenu.Visible=false end)
+connect(aimPage:GetPropertyChangedSignal('Visible'),function() targetMenu.Visible=false end)
 refreshTarget()
-numberBox(aimPage,'Aim Distance • метры','aimDistance',92,0,1000)
-numberBox(aimPage,'FOV • пиксели','fov',138,0,100)
-toggle(aimPage,'Wall Check','walls',184)
-local aimHint=text(aimPage,'Закрой меню для наведения. FOV или дальность 0: цель не выбирается.',232,40)
+numberBox(aimPage,'Aim Distance • метры','aimDistance',46,0,1000)
+numberBox(aimPage,'FOV • пиксели','fov',92,0,100)
+toggle(aimPage,'Wall Check','walls',138)
+toggle(aimPage,'Check Player','checkPlayer',184)
+local aimHint=text(aimPage,'Check Player: зелёный — подходит для Aim; красный — нет. Дальность подсветки: ESP Distance.',232,40)
 aimHint.TextColor3=dim
 
 toggle(visuals,'Ник игрока','names',0)
@@ -603,6 +632,35 @@ local function clearPath(origin, head)
     local hit=rawRaycast(workspace,origin,head.Position-origin,p)
     return not hit or hit.Instance:IsDescendantOf(head.Parent)
 end
+local function targetPart(char)
+    if cfg.target=='Head' then return char:FindFirstChild('Head') end
+    return char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('HumanoidRootPart')
+end
+-- One eligibility rule for Check Player coloring and camera target selection.
+local function eligibleTarget(camera,char,origin)
+    if cfg.aimDistance<=0 or cfg.fov<=0 then return end
+    local part=targetPart(char)
+    local hum=char:FindFirstChildOfClass('Humanoid')
+    if not part or not hum or hum.Health<=0 then return end
+    local root=char:FindFirstChild('HumanoidRootPart') or part
+    if (root.Position-origin).Magnitude*0.28>cfg.aimDistance then return end
+    local point,onScreen=camera:WorldToViewportPoint(part.Position)
+    local pixels=(Vector2.new(point.X,point.Y)-camera.ViewportSize/2).Magnitude
+    if not onScreen or pixels>cfg.fov then return end
+    if cfg.walls and not clearPath(camera.CFrame.Position,part) then return end
+    return part,pixels
+end
+local function chooseTarget(camera)
+    local ownRoot=me.Character and me.Character:FindFirstChild('HumanoidRootPart')
+    local origin=ownRoot and ownRoot.Position or camera.CFrame.Position
+    local best,bestPixels=nil,math.huge
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player==me or not player.Character then continue end
+        local part,pixels=eligibleTarget(camera,player.Character,origin)
+        if part and pixels<bestPixels then best,bestPixels=part,pixels end
+    end
+    return best
+end
 local function clear(player)
     local entry=tracked[player]
     if not entry then return end
@@ -618,7 +676,12 @@ local function setup(player,char)
     local label=text(tag,'',0,100)
     label.TextStrokeTransparency=0
     label.TextSize=13
-    local entry={char=char,tag=tag,label=label,objects={tag},connections={}}
+    local highlight=Instance.new('Highlight',folder)
+    highlight.Adornee=char
+    highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.FillTransparency=0.8
+    highlight.Enabled=false
+    local entry={char=char,tag=tag,label=label,highlight=highlight,objects={tag,highlight},connections={}}
     tracked[player]=entry
     return entry
 end
@@ -655,6 +718,18 @@ connect(RunService.Heartbeat,function(dt)
         local hum=char:FindFirstChildOfClass('Humanoid')
         local meters=root and (root.Position-origin).Magnitude*0.28 or math.huge
         local show=enabled and cfg.distance>0 and meters<=cfg.distance and head~=nil and hum~=nil and hum.Health>0
+        local checkShow=cfg.checkPlayer and cfg.distance>0 and meters<=cfg.distance
+            and root~=nil and hum~=nil and hum.Health>0
+        entry.highlight.Enabled=checkShow
+        if checkShow then
+            local canAim=eligibleTarget(camera,char,origin)~=nil
+            local color=canAim and Color3.fromRGB(60,255,100) or Color3.fromRGB(255,65,65)
+            entry.highlight.FillColor=color
+            entry.highlight.OutlineColor=color
+            entry.label.TextColor3=color
+        else
+            entry.label.TextColor3=Color3.fromRGB(240,240,240)
+        end
         entry.tag.Adornee=head
         entry.tag.Enabled=show
         if not show then continue end
@@ -667,33 +742,6 @@ connect(RunService.Heartbeat,function(dt)
         if entry.label.Text~=value then entry.label.Text=value end
     end
 end)
-local function targetPart(char)
-    if cfg.target=='Head' then return char:FindFirstChild('Head') end
-    return char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('HumanoidRootPart')
-end
-local function chooseTarget(camera)
-    if cfg.aimDistance<=0 or cfg.fov<=0 then return end
-    local ownRoot=me.Character and me.Character:FindFirstChild('HumanoidRootPart')
-    local origin=ownRoot and ownRoot.Position or camera.CFrame.Position
-    local center=camera.ViewportSize/2
-    local choices={}
-    for _,player in ipairs(Players:GetPlayers()) do
-        if player==me then continue end
-        local char=player.Character
-        local part=char and targetPart(char)
-        local hum=char and char:FindFirstChildOfClass('Humanoid')
-        if not part or not hum or hum.Health<=0 then continue end
-        local root=char:FindFirstChild('HumanoidRootPart') or part
-        if (root.Position-origin).Magnitude*0.28>cfg.aimDistance then continue end
-        local projected,onScreen=camera:WorldToViewportPoint(part.Position)
-        local pixels=(Vector2.new(projected.X,projected.Y)-center).Magnitude
-        if onScreen and pixels<=cfg.fov then table.insert(choices,{part=part,pixels=pixels}) end
-    end
-    table.sort(choices,function(a,b) return a.pixels<b.pixels end)
-    for _,choice in ipairs(choices) do
-        if not cfg.walls or clearPath(camera.CFrame.Position,choice.part) then return choice.part end
-    end
-end
 local selectedPart,nextSelection,lastTargetMode,lastWalls
 nextSelection=0
 local function aimStatus(value)
