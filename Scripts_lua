@@ -376,7 +376,7 @@ toggle(resourcesPage, 'Камень', 'stone', 0)
 toggle(resourcesPage, 'Сера', 'nitrate', 46)
 toggle(resourcesPage, 'Металл', 'metal', 92)
 numberBox(resourcesPage, 'Дальность ресурсов • метры', 'resourceDistance', 138)
-local resourceHint = text(resourcesPage, 'До 24 ближайших меток ресурсов.', 226, 24)
+local resourceHint = text(resourcesPage, 'До 24 ближайших меток каждого вида.', 226, 24)
 resourceHint.TextColor3 = dim
 resourceHint.TextSize = 12
 toggle(ballisticsPage, 'Упреждение движения', 'predict', 0)
@@ -581,6 +581,13 @@ connect(workspace.DescendantRemoving, function(object)
     queued[object] = nil
     removeMarker(object)
 end)
+local function reserveMarkerSlot(counts, kind)
+    local limit = kind == 'cupboard' and 8 or (kind == 'buildings' and 12 or 24)
+    local count = counts[kind] or 0
+    if count >= limit then return false end
+    counts[kind] = count + 1
+    return true
+end
 local resourceElapsed = 0
 connect(RunService.Heartbeat, function(dt)
     for _ = 1, 120 do
@@ -630,19 +637,9 @@ connect(RunService.Heartbeat, function(dt)
     end
     table.sort(nearby, function(a,b) return a.distance < b.distance end)
     local selected = {}
-    local oreCount, cupboardCount, buildingCount = 0, 0, 0
+    local countsByKind = {}
     for _, item in ipairs(nearby) do
-        local isCupboard = item.entry.kind == 'cupboard'
-        if isCupboard then
-            if cupboardCount >= 8 then continue end
-            cupboardCount = cupboardCount + 1
-        elseif item.entry.kind=='buildings' then
-            if buildingCount>=12 then continue end
-            buildingCount=buildingCount+1
-        else
-            if oreCount >= 24 then continue end
-            oreCount = oreCount + 1
-        end
+        if not reserveMarkerSlot(countsByKind, item.entry.kind) then continue end
         local object, entry = item.object, item.entry
         selected[object] = true
         local marker = markers[object]
