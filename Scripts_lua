@@ -11,7 +11,7 @@ if not me then
     me = Players.LocalPlayer
 end
 assert(me, 'LocalPlayer unavailable: run on the client')
-local cfg = {esp=true, names=true, skeleton=true, aim=false, walls=true, fov=50, distance=100, aimDistance=100, circle=true, stone=true, sulfur=true, metal=true, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false}
+local cfg = {esp=true, names=true, skeleton=true, aim=false, walls=true, fov=50, distance=100, aimDistance=100, circle=true, stone=true, sulfur=true, metal=true, nitrate=true, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false}
 local alive, tracked, connections = true, {}, {}
 local folder = Instance.new('Folder', workspace)
 folder.Name = 'BriskTools'
@@ -254,7 +254,8 @@ toggle(resourcesPage, 'Камень • серый', 'stone', 0)
 toggle(resourcesPage, 'Сера • белый', 'sulfur', 46)
 toggle(resourcesPage, 'Металл • жёлтый', 'metal', 92)
 numberBox(resourcesPage, 'Дальность ресурсов • метры', 'resourceDistance', 138)
-local resourceHint = text(resourcesPage, 'Распознавание по именам, тегам и атрибутам.\nОдновременно до 24 ближайших меток.', 184, 58)
+toggle(resourcesPage, 'Селитра • белый', 'nitrate', 184)
+local resourceHint = text(resourcesPage, 'До 24 ближайших меток ресурсов.', 226, 24)
 resourceHint.TextColor3 = dim
 resourceHint.TextSize = 12
 toggle(ballisticsPage, 'Упреждение движения', 'predict', 0)
@@ -308,10 +309,12 @@ local CollectionService = game:GetService('CollectionService')
 local resourceKinds = {
     stone = {title='Камень', color=Color3.fromRGB(200, 205, 218)},
     sulfur = {title='Сера', color=Color3.fromRGB(255, 255, 255)},
+    nitrate = {title='Селитра', color=Color3.fromRGB(255, 255, 255)},
     metal = {title='Металл', color=Color3.fromRGB(255, 216, 70)},
 }
 local aliases = {
     stone={'stone','stoneore','stonenode','rock','rocknode','камень'},
+    nitrate={'nitrate','nitrateore','nitratenode','saltpeter','saltpetre','селитра'},
     sulfur={'sulfur','sulphur','sulfurore','sulphurore','sulfurnode','сера'},
     metal={'metal','metalore','metalnode','iron','ironore','металл','метал'},
 }
