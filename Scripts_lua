@@ -11,7 +11,7 @@ if not me then
     me = Players.LocalPlayer
 end
 assert(me, 'LocalPlayer unavailable: run on the client')
-local cfg = {esp=true, names=true, skeleton=true, aim=false, walls=true, fov=50, distance=100, aimDistance=100, circle=true, stone=true, sulfur=true, metal=true, nitrate=true, cupboard=true, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false, freecam=false, cameraSpeed=50}
+local cfg = {esp=false, names=false, skeleton=false, aim=false, walls=false, fov=50, distance=100, aimDistance=100, circle=false, stone=false, sulfur=false, metal=false, nitrate=false, cupboard=false, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false, freecam=false, cameraSpeed=50, buildings=false, buildingDistance=300}
 local alive, tracked, connections = true, {}, {}
 local stopFreecam
 local folder = Instance.new('Folder', workspace)
@@ -149,7 +149,16 @@ divider.Position = UDim2.fromOffset(154, 56)
 divider.Size = UDim2.fromOffset(1, 320)
 divider.BorderSizePixel = 0
 divider.BackgroundColor3 = Color3.fromRGB(48, 48, 48)
+local navigation = Instance.new('ScrollingFrame',panel)
+navigation.Position=UDim2.fromOffset(12,64)
+navigation.Size=UDim2.fromOffset(134,238)
+navigation.BackgroundTransparency=1
+navigation.BorderSizePixel=0
+navigation.ScrollBarThickness=2
+navigation.ScrollBarImageColor3=dim
+navigation.ScrollingDirection=Enum.ScrollingDirection.Y
 local pages, tabs = {}, {}
+local toggleRefreshers = {}
 local function addPage(title, y)
     local page = Instance.new('Frame', panel)
     page.Position = UDim2.fromOffset(168, 58)
@@ -157,8 +166,9 @@ local function addPage(title, y)
     page.BackgroundTransparency = 1
     page.Visible = false
     table.insert(pages, page)
-    local tab = Instance.new('TextButton', panel)
-    tab.Position = UDim2.fromOffset(14, y)
+    local tab = Instance.new('TextButton', navigation)
+    tab.Position = UDim2.fromOffset(2, (#pages-1)*46)
+    navigation.CanvasSize=UDim2.fromOffset(0,#pages*46)
     tab.Size = UDim2.fromOffset(126, 40)
     tab.Text = title
     tab.TextColor3 = dim
@@ -178,11 +188,13 @@ local function addPage(title, y)
     connect(tab.Activated, select)
     return page, select
 end
-local visuals, selectVisuals = addPage('ESP', 66)
-local aimPage = addPage('Наведение', 114)
-local resourcesPage = addPage('Ресурсы', 162)
+local visuals, selectVisuals = addPage('ESP игроков', 66)
+local aimPage = addPage('Аим', 114)
+local resourcesPage = addPage('ESP руды', 162)
 local ballisticsPage = addPage('Упреждение', 210)
 local cameraPage = addPage('Камера', 258)
+local buildingsPage = addPage('ESP построек', 0)
+local miscPage = addPage('Прочее', 0)
 selectVisuals()
 local info = text(panel, 'ESP: 15 Hz\nRight Shift — меню', 256, 70)
 info.Position = UDim2.fromOffset(14, 310)
@@ -217,6 +229,7 @@ local function toggle(parent, title, key, y)
         cfg[key] = not cfg[key]
         refresh()
     end)
+    table.insert(toggleRefreshers,refresh)
     refresh()
 end
 -- Shared drag handlers for all numeric settings (mouse and touch).
@@ -235,7 +248,7 @@ connect(UIS.WindowFocusReleased,function() activeSlider=nil; activeSliderInput=n
 local function numberBox(parent, title, key, y, minimum, maximum)
     minimum,maximum=minimum or 1,maximum or 100000
     -- A curved distance scale gives more precision near the player.
-    local exponent=(key=='distance' or key=='aimDistance' or key=='resourceDistance') and 3
+    local exponent=(key=='distance' or key=='aimDistance' or key=='resourceDistance' or key=='buildingDistance') and 3
         or (key=='bulletSpeed' and 2 or 1)
     local row = Instance.new('Frame', parent)
     row.Position = UDim2.fromOffset(0, y)
@@ -309,8 +322,12 @@ toggle(visuals, 'Подсветка игроков', 'esp', 0)
 toggle(visuals, 'Ники / HP / расстояние', 'names', 46)
 toggle(visuals, 'Скелет • до 150 м', 'skeleton', 92)
 numberBox(visuals, 'Дальность ESP • метры', 'distance', 138)
-toggle(visuals, 'Шкаф • фиолетовый', 'cupboard', 184)
-local visualHint = text(visuals, 'Дальность шкафа — во вкладке «Ресурсы».', 226, 24)
+toggle(buildingsPage, 'Шкаф • фиолетовый', 'cupboard', 0)
+toggle(buildingsPage, 'Другие постройки • тест', 'buildings', 46)
+numberBox(buildingsPage, 'Дальность построек • метры', 'buildingDistance', 92)
+local buildingHint=text(buildingsPage,'Шкаф распознаётся по точному имени Flag.\nОстальные постройки — по именам в папках построек; совместимость не проверена.',142,100)
+buildingHint.TextColor3=dim
+local visualHint = text(visuals, 'Все функции выключены при запуске.', 190, 40)
 visualHint.TextColor3 = dim
 visualHint.TextSize = 12
 toggle(aimPage, 'Аим прямо в голову', 'aim', 0)
@@ -372,6 +389,33 @@ toggle(cameraPage, 'Свободная камера', 'freecam', 0)
 numberBox(cameraPage, 'Скорость • studs/с', 'cameraSpeed', 46, 1, 500)
 local cameraHint = text(cameraPage, 'W / A / S / D — движение\nQ / E — вниз / вверх\nShift — скорость ×3\nУдерживать ПКМ — поворот\nЗакрой меню, чтобы начать полёт.\nПерсонаж остаётся на месте.', 96, 148)
 cameraHint.TextColor3 = dim
+local function actionButton(title,y,callback)
+    local button=Instance.new('TextButton',miscPage)
+    button.Position=UDim2.fromOffset(0,y)
+    button.Size=UDim2.new(1,0,0,42)
+    button.Text=title
+    button.TextColor3=accent
+    button.BackgroundColor3=Color3.fromRGB(29,29,29)
+    button.Font=Enum.Font.GothamBold
+    button.TextSize=14
+    round(button)
+    connect(button.Activated,callback)
+end
+actionButton('Выключить все функции',0,function()
+    for key,value in pairs(cfg) do
+        if type(value)=='boolean' then cfg[key]=false end
+    end
+    if stopFreecam then stopFreecam() end
+    for _,refresh in ipairs(toggleRefreshers) do refresh() end
+end)
+actionButton('Убрать диагностические надписи',52,function()
+    for _,name in ipairs({'OX1DE_Check','OX1DELoaderStatus'}) do
+        local diagnostic=playerGui:FindFirstChild(name)
+        if diagnostic then diagnostic:Destroy() end
+    end
+end)
+local miscHint=text(miscPage,'Правый Shift — открыть или скрыть меню.\nНастройки включаются вручную после каждого запуска.',112,90)
+miscHint.TextColor3=dim
 local status = text(panel, 'Включи аим и закрой меню. Упреждение по умолчанию OFF.', 318, 42)
 status.Position = UDim2.fromOffset(170, 342)
 status.Size = UDim2.fromOffset(530, 42)
@@ -413,6 +457,7 @@ connect(RunService.RenderStepped, updateCircle)
 -- Resource detection is heuristic; no game-specific object names are known.
 local CollectionService = game:GetService('CollectionService')
 local resourceKinds = {
+    buildings = {title='Постройка', color=Color3.fromRGB(220,220,220)},
     cupboard = {title='Шкаф', color=Color3.fromRGB(197, 130, 255)},
     stone = {title='Камень', color=Color3.fromRGB(200, 205, 218)},
     sulfur = {title='Сера', color=Color3.fromRGB(255, 255, 255)},
@@ -440,6 +485,14 @@ end
 local function identifyResource(object)
     if object.Name == 'Flag' and object.Parent
         and object.Parent.Name == 'PlacedDeployables' then return 'cupboard' end
+    local container=object.Parent and object.Parent.Name
+    if container=='PlacedDeployables' or container=='PlacedBuildings' or container=='PlacedStructures' then
+        local name=object.Name:gsub('(%l)(%u)','%1 %2'):lower()
+        local buildingNames={wall=true,foundation=true,floor=true,roof=true,ceiling=true,door=true,doorway=true,window=true,stairs=true,house=true}
+        for token in name:gmatch('[^%s_%-%d%.]+') do
+            if buildingNames[token] then return 'buildings' end
+        end
+    end
     -- Typed metadata takes precedence over a generic model name.
     for _, key in ipairs({'ResourceType','OreType','Resource','NodeType'}) do
         local kind = identifyName(object:GetAttribute(key))
@@ -555,7 +608,9 @@ connect(RunService.Heartbeat, function(dt)
                 ancestor = ancestor.Parent
             end
             local distance = (entry.part.Position-origin).Magnitude*0.28
-            if not nested and distance <= cfg.resourceDistance then
+            local isBuilding=entry.kind=='cupboard' or entry.kind=='buildings'
+            local maxDistance=isBuilding and cfg.buildingDistance or cfg.resourceDistance
+            if not nested and distance <= maxDistance then
                 -- Keep the nearest markers independent of the camera angle.
                 -- Roblox handles clipping; a model can be visible with its pivot offscreen.
                 table.insert(nearby, {object=object, entry=entry, distance=distance})
@@ -564,12 +619,15 @@ connect(RunService.Heartbeat, function(dt)
     end
     table.sort(nearby, function(a,b) return a.distance < b.distance end)
     local selected = {}
-    local oreCount, cupboardCount = 0, 0
+    local oreCount, cupboardCount, buildingCount = 0, 0, 0
     for _, item in ipairs(nearby) do
         local isCupboard = item.entry.kind == 'cupboard'
         if isCupboard then
             if cupboardCount >= 8 then continue end
             cupboardCount = cupboardCount + 1
+        elseif item.entry.kind=='buildings' then
+            if buildingCount>=12 then continue end
+            buildingCount=buildingCount+1
         else
             if oreCount >= 24 then continue end
             oreCount = oreCount + 1
