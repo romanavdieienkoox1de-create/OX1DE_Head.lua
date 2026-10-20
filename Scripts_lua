@@ -1,5 +1,5 @@
 local startupOK, startupError = xpcall(function()
--- ESP / ordinary camera aim with configurable prediction. Not tested in Brisk Survival.
+-- Camera aim, player labels, ore ESP, cupboard ESP and free camera. Game integration unverified.
 if _G.BriskToolsStop then pcall(_G.BriskToolsStop) end
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
@@ -11,7 +11,13 @@ if not me then
     me = Players.LocalPlayer
 end
 assert(me, 'LocalPlayer unavailable: run on the client')
-local cfg = {esp=false, names=false, skeleton=false, aim=false, walls=false, fov=50, distance=100, aimDistance=100, circle=false, stone=false, metal=false, nitrate=false, cupboard=false, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false, freecam=false, cameraSpeed=50, buildings=false, buildingDistance=300}
+local cfg = {
+    aim=false, target='Head', aimDistance=100, fov=50, walls=false,
+    names=false, distance=100, hp=false, weapon=false,
+    stone=false, metal=false, nitrate=false, cupboard=false,
+    freecam=false, cameraSpeed=50,
+}
+local RESOURCE_DISTANCE = 100000
 local alive, tracked, connections = true, {}, {}
 local stopFreecam
 local folder = Instance.new('Folder', workspace)
@@ -159,7 +165,6 @@ navigation.ScrollBarImageColor3=dim
 navigation.ScrollingDirection=Enum.ScrollingDirection.Y
 navigation.ScrollingEnabled=false
 local pages, tabs = {}, {}
-local toggleRefreshers = {}
 local function addPage(title, y)
     local page = Instance.new('Frame', panel)
     page.Position = UDim2.fromOffset(188, 64)
@@ -191,19 +196,16 @@ local function addPage(title, y)
     connect(tab.Activated, select)
     return page, select
 end
-local visuals, selectVisuals = addPage('ESP игроков', 66)
-local aimPage = addPage('Аим', 114)
-local resourcesPage = addPage('ESP руды', 162)
-local ballisticsPage = addPage('Упреждение', 210)
-local cameraPage = addPage('Камера', 258)
-local buildingsPage = addPage('ESP построек', 0)
-local miscPage = addPage('Прочее', 0)
-selectVisuals()
-local info = text(panel, 'ESP: 15 Hz\nRight Shift — меню', 256, 70)
-info.Position = UDim2.fromOffset(14, 412)
-info.Size = UDim2.fromOffset(146, 42)
-info.TextColor3 = dim
-info.TextSize = 11
+local aimPage, selectAim = addPage('AIM',0)
+local visuals = addPage('ESP игроков',0)
+local resourcesPage = addPage('ESP руда',0)
+local housesPage = addPage('ESP дома',0)
+selectAim()
+local info=text(panel,'Правый Shift — меню\nВсе функции изначально ВЫКЛ',410,44)
+info.Position=UDim2.fromOffset(14,410)
+info.Size=UDim2.fromOffset(146,44)
+info.TextSize=11
+info.TextColor3=dim
 local function toggle(parent, title, key, y)
     local button = Instance.new('TextButton', parent)
     button.Position = UDim2.fromOffset(0, y)
@@ -232,7 +234,6 @@ local function toggle(parent, title, key, y)
         cfg[key] = not cfg[key]
         refresh()
     end)
-    table.insert(toggleRefreshers,refresh)
     refresh()
 end
 -- Shared drag handlers for all numeric settings (mouse and touch).
@@ -251,8 +252,7 @@ connect(UIS.WindowFocusReleased,function() activeSlider=nil; activeSliderInput=n
 local function numberBox(parent, title, key, y, minimum, maximum)
     minimum,maximum=minimum or 1,maximum or 100000
     -- A curved distance scale gives more precision near the player.
-    local exponent=(key=='distance' or key=='aimDistance' or key=='resourceDistance' or key=='buildingDistance') and 3
-        or (key=='bulletSpeed' and 2 or 1)
+    local exponent=1
     local row = Instance.new('Frame', parent)
     row.Position = UDim2.fromOffset(0, y)
     row.Size = UDim2.new(1, 0, 0, 42)
@@ -321,156 +321,88 @@ local function numberBox(parent, title, key, y, minimum, maximum)
     end)
     refresh()
 end
-toggle(visuals, 'Подсветка игроков', 'esp', 0)
-toggle(visuals, 'Ники / HP / расстояние', 'names', 46)
-toggle(visuals, 'Скелет • до 150 м', 'skeleton', 92)
-numberBox(visuals, 'Дальность ESP • метры', 'distance', 138)
-toggle(buildingsPage, 'Шкаф', 'cupboard', 0)
-toggle(buildingsPage, 'Другие постройки • тест', 'buildings', 46)
-numberBox(buildingsPage, 'Дальность построек • метры', 'buildingDistance', 92)
-local buildingHint=text(buildingsPage,'Шкаф распознаётся по точному имени Flag.\nОстальные постройки — по именам в папках построек; совместимость не проверена.',142,100)
-buildingHint.TextColor3=dim
-local visualHint = text(visuals, 'Все функции выключены при запуске.', 190, 40)
-visualHint.TextColor3 = dim
-visualHint.TextSize = 12
-toggle(aimPage, 'Аим прямо в голову', 'aim', 0)
-toggle(aimPage, 'Проверять стены', 'walls', 46)
-toggle(aimPage, 'Показывать круг FOV', 'circle', 92)
-local fovLabel = text(aimPage, '', 136, 24)
-fovLabel.TextXAlignment = Enum.TextXAlignment.Left
-local bar = Instance.new('TextButton', aimPage)
-bar.Position = UDim2.fromOffset(12, 168)
-bar.Size = UDim2.new(1, -24, 0, 18)
-bar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-bar.Text = ''
-bar.AutoButtonColor = false
-round(bar)
-local fill = Instance.new('Frame', bar)
-fill.BackgroundColor3 = accent
-fill.BorderSizePixel = 0
-round(fill)
-local function refreshFov()
-    fovLabel.Text = 'FOV  /  ' .. cfg.fov .. ' px'
-    fill.Size = UDim2.fromScale((cfg.fov-10)/90, 1)
-end
-local dragging, touch = false, nil
-local function setFov(x)
-    if bar.AbsoluteSize.X <= 0 then return end
-    cfg.fov = math.round(10 + 90 * math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X, 0, 1))
-    refreshFov()
-end
-connect(bar.InputBegan, function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging=true; setFov(input.Position.X)
-    elseif input.UserInputType == Enum.UserInputType.Touch then touch=input; setFov(input.Position.X) end
+
+toggle(aimPage,'Aim','aim',0)
+local targetButton=Instance.new('TextButton',aimPage)
+targetButton.Position=UDim2.fromOffset(0,46)
+targetButton.Size=UDim2.new(1,0,0,42)
+targetButton.BackgroundColor3=Color3.fromRGB(29,29,29)
+targetButton.TextColor3=accent
+targetButton.Font=Enum.Font.GothamBold
+targetButton.TextSize=14
+round(targetButton)
+local function refreshTarget() targetButton.Text='Target: '..cfg.target..'   /   нажми для смены' end
+connect(targetButton.Activated,function()
+    cfg.target=cfg.target=='Head' and 'Body' or 'Head'
+    refreshTarget()
 end)
-connect(UIS.InputChanged, function(input)
-    if input == touch or (dragging and input.UserInputType == Enum.UserInputType.MouseMovement) then setFov(input.Position.X) end
-end)
-connect(UIS.InputEnded, function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging=false end
-    if input == touch then touch=nil end
-end)
-refreshFov()
-numberBox(aimPage, 'Дальность наведения • метры', 'aimDistance', 200)
-toggle(resourcesPage, 'Камень', 'stone', 0)
-toggle(resourcesPage, 'Сера', 'nitrate', 46)
-toggle(resourcesPage, 'Металл', 'metal', 92)
-numberBox(resourcesPage, 'Дальность ресурсов • метры', 'resourceDistance', 138)
-local resourceHint = text(resourcesPage, 'До 24 ближайших меток каждого вида.', 226, 24)
-resourceHint.TextColor3 = dim
-resourceHint.TextSize = 12
-toggle(ballisticsPage, 'Упреждение движения', 'predict', 0)
-numberBox(ballisticsPage, 'Скорость пули • studs/с', 'bulletSpeed', 46, 0, 10000)
-numberBox(ballisticsPage, 'Доп. упреждение • мс', 'leadMs', 92, 0, 500)
-numberBox(ballisticsPage, 'Падение пули • studs/с²', 'bulletGravity', 138, 0, 1000)
-toggle(ballisticsPage, 'Только при удержании ПКМ', 'holdAim', 184)
-local ballisticHint = text(ballisticsPage, 'Упреждение OFF: прицел строго на голове.', 226, 24)
-ballisticHint.TextColor3 = dim
-ballisticHint.TextSize = 11
-toggle(cameraPage, 'Свободная камера', 'freecam', 0)
-numberBox(cameraPage, 'Скорость • studs/с', 'cameraSpeed', 46, 1, 500)
-local cameraHint = text(cameraPage, 'W / A / S / D — движение\nQ / E — вниз / вверх\nShift — скорость ×3\nУдерживать ПКМ — поворот\nЗакрой меню, чтобы начать полёт.\nПерсонаж остаётся на месте.', 96, 148)
-cameraHint.TextColor3 = dim
-local function actionButton(title,y,callback)
-    local button=Instance.new('TextButton',miscPage)
-    button.Position=UDim2.fromOffset(0,y)
-    button.Size=UDim2.new(1,0,0,42)
-    button.Text=title
-    button.TextColor3=accent
-    button.BackgroundColor3=Color3.fromRGB(29,29,29)
-    button.Font=Enum.Font.GothamBold
-    button.TextSize=14
-    round(button)
-    connect(button.Activated,callback)
-end
-local function disableEverything()
-    for key,value in pairs(cfg) do
-        if type(value)=='boolean' then cfg[key]=false end
-    end
-    if stopFreecam then stopFreecam() end
-    for _,refresh in ipairs(toggleRefreshers) do refresh() end
-end
-actionButton('Выключить все функции',0,disableEverything)
-local quickOff=Instance.new('TextButton',panel)
-quickOff.Position=UDim2.fromOffset(632,12)
-quickOff.Size=UDim2.fromOffset(126,34)
-quickOff.Text='Всё ВЫКЛ'
-quickOff.TextColor3=Color3.fromRGB(12,12,12)
-quickOff.BackgroundColor3=accent
-quickOff.Font=Enum.Font.GothamBold
-quickOff.TextSize=13
-round(quickOff)
-connect(quickOff.Activated,disableEverything)
-actionButton('Убрать диагностические надписи',52,function()
-    for _,name in ipairs({'OX1DE_Check','OX1DELoaderStatus'}) do
-        local diagnostic=playerGui:FindFirstChild(name)
-        if diagnostic then diagnostic:Destroy() end
-    end
-end)
-local miscHint=text(miscPage,'Правый Shift — открыть или скрыть меню.\nНастройки включаются вручную после каждого запуска.',112,90)
-miscHint.TextColor3=dim
-local status = text(panel, 'Включи аим и закрой меню. Упреждение по умолчанию OFF.', 318, 42)
-status.Position = UDim2.fromOffset(190, 420)
-status.Size = UDim2.fromOffset(610, 36)
-status.TextXAlignment = Enum.TextXAlignment.Left
-status.TextColor3 = dim
-status.TextSize = 12
-local menuButton = Instance.new('TextButton', gui)
-menuButton.Position = UDim2.fromOffset(16, 40)
-menuButton.Size = UDim2.fromOffset(100, 36)
-menuButton.Text = 'OX1DE / MENU'
-menuButton.TextColor3 = accent
-menuButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-menuButton.Font = Enum.Font.GothamBold
-menuButton.TextSize = 12
-menuButton.ZIndex = 10
+refreshTarget()
+numberBox(aimPage,'Aim Distance • метры','aimDistance',92,0,1000)
+numberBox(aimPage,'FOV • пиксели','fov',138,0,100)
+toggle(aimPage,'Wall Check','walls',184)
+local aimHint=text(aimPage,'Закрой меню для наведения. FOV или дальность 0: цель не выбирается.',232,40)
+aimHint.TextColor3=dim
+
+toggle(visuals,'Ник игрока','names',0)
+numberBox(visuals,'Distance • метры','distance',46,0,999)
+toggle(visuals,'HP игрока','hp',92)
+toggle(visuals,'Weapon • оружие в руках','weapon',138)
+local espHint=text(visuals,'Distance ограничивает ники, HP и Weapon.\nОружие показывается, если клиенту доступно его название.',192,64)
+espHint.TextColor3=dim
+
+toggle(resourcesPage,'Камень','stone',0)
+toggle(resourcesPage,'Металл','metal',46)
+toggle(resourcesPage,'Сера','nitrate',92)
+local oreHint=text(resourcesPage,'Независимые переключатели. До 24 ближайших меток каждого вида.',154,64)
+oreHint.TextColor3=dim
+
+toggle(housesPage,'ESP Шкаф','cupboard',0)
+toggle(housesPage,'Свободная камера','freecam',46)
+numberBox(housesPage,'Скорость движения камеры','cameraSpeed',92,1,500)
+local cameraHint=text(housesPage,'Камера: WASD — движение, Q/E — вниз/вверх.\nЛевый Shift — быстрее; ПКМ — поворот.\nЗакрой меню для полёта.',152,90)
+cameraHint.TextColor3=dim
+
+local status=text(panel,'Все функции выключены.',420,36)
+status.Position=UDim2.fromOffset(190,420)
+status.Size=UDim2.fromOffset(610,36)
+status.TextXAlignment=Enum.TextXAlignment.Left
+status.TextColor3=dim
+status.TextSize=12
+local menuButton=Instance.new('TextButton',gui)
+menuButton.Position=UDim2.fromOffset(16,40)
+menuButton.Size=UDim2.fromOffset(100,36)
+menuButton.Text='OX1DE / MENU'
+menuButton.TextColor3=accent
+menuButton.BackgroundColor3=Color3.fromRGB(20,20,20)
+menuButton.Font=Enum.Font.GothamBold
+menuButton.TextSize=12
+menuButton.ZIndex=10
 round(menuButton)
-connect(menuButton.Activated, function() panel.Visible=not panel.Visible end)
-connect(UIS.InputBegan, function(input)
-    if not UIS:GetFocusedTextBox() and input.KeyCode == Enum.KeyCode.RightShift then panel.Visible=not panel.Visible end
+connect(menuButton.Activated,function() panel.Visible=not panel.Visible end)
+connect(UIS.InputBegan,function(input)
+    if not UIS:GetFocusedTextBox() and input.KeyCode==Enum.KeyCode.RightShift then panel.Visible=not panel.Visible end
 end)
-local lastViewport, lastFov
+local lastViewport,lastFov
 local function updateCircle()
-    local camera = workspace.CurrentCamera
-    fovCircle.Visible = cfg.circle and camera ~= nil
+    local camera=workspace.CurrentCamera
+    fovCircle.Visible=cfg.aim and cfg.fov>0 and camera~=nil
     if not camera then return end
-    local viewport = camera.ViewportSize
-    if viewport ~= lastViewport then
-        lastViewport = viewport
-        local center = viewport/2
-        fovCircle.Position = UDim2.fromOffset(center.X, center.Y)
-        scale.Scale = math.min(1, math.max(0.1, (viewport.X-24)/820), math.max(0.1, (viewport.Y-40)/470))
+    local viewport=camera.ViewportSize
+    if viewport~=lastViewport then
+        lastViewport=viewport
+        local center=viewport/2
+        fovCircle.Position=UDim2.fromOffset(center.X,center.Y)
+        scale.Scale=math.min(1,math.max(0.1,(viewport.X-24)/820),math.max(0.1,(viewport.Y-40)/470))
     end
-    if cfg.fov ~= lastFov then
-        lastFov = cfg.fov
-        fovCircle.Size = UDim2.fromOffset(cfg.fov*2, cfg.fov*2)
+    if cfg.fov~=lastFov then
+        lastFov=cfg.fov
+        fovCircle.Size=UDim2.fromOffset(cfg.fov*2,cfg.fov*2)
     end
 end
-connect(RunService.RenderStepped, updateCircle)
+connect(RunService.RenderStepped,updateCircle)
 -- Resource detection is heuristic; no game-specific object names are known.
 local CollectionService = game:GetService('CollectionService')
 local resourceKinds = {
-    buildings = {title='Постройка', color=Color3.fromRGB(220,220,220)},
     cupboard = {title='Шкаф', color=Color3.fromRGB(197, 130, 255)},
     stone = {title='Камень', color=Color3.fromRGB(200, 205, 218)},
     nitrate = {title='Сера', color=Color3.fromRGB(255, 255, 255)},
@@ -496,14 +428,6 @@ end
 local function identifyResource(object)
     if object.Name == 'Flag' and object.Parent
         and object.Parent.Name == 'PlacedDeployables' then return 'cupboard' end
-    local container=object.Parent and object.Parent.Name
-    if container=='PlacedDeployables' or container=='PlacedBuildings' or container=='PlacedStructures' then
-        local name=object.Name:gsub('(%l)(%u)','%1 %2'):lower()
-        local buildingNames={wall=true,foundation=true,floor=true,roof=true,ceiling=true,door=true,doorway=true,window=true,stairs=true,house=true}
-        for token in name:gmatch('[^%s_%-%d%.]+') do
-            if buildingNames[token] then return 'buildings' end
-        end
-    end
     -- Typed metadata takes precedence over a generic model name.
     for _, key in ipairs({'ResourceType','OreType','Resource','NodeType'}) do
         local kind = identifyName(object:GetAttribute(key))
@@ -582,7 +506,7 @@ connect(workspace.DescendantRemoving, function(object)
     removeMarker(object)
 end)
 local function reserveMarkerSlot(counts, kind)
-    local limit = kind == 'cupboard' and 8 or (kind == 'buildings' and 12 or 24)
+    local limit = kind == 'cupboard' and 8 or 24
     local count = counts[kind] or 0
     if count >= limit then return false end
     counts[kind] = count + 1
@@ -626,8 +550,7 @@ connect(RunService.Heartbeat, function(dt)
                 ancestor = ancestor.Parent
             end
             local distance = (entry.part.Position-origin).Magnitude*0.28
-            local isBuilding=entry.kind=='cupboard' or entry.kind=='buildings'
-            local maxDistance=isBuilding and cfg.buildingDistance or cfg.resourceDistance
+            local maxDistance=RESOURCE_DISTANCE
             if not nested and distance <= maxDistance then
                 -- Keep the nearest markers independent of the camera angle.
                 -- Roblox handles clipping; a model can be visible with its pivot offscreen.
@@ -681,239 +604,127 @@ local function clearPath(origin, head)
     return not hit or hit.Instance:IsDescendantOf(head.Parent)
 end
 local function clear(player)
-    local e=tracked[player]
-    if not e then return end
-    for _,c in ipairs(e.connections) do c:Disconnect() end
-    for _,o in ipairs(e.objects) do o:Destroy() end
+    local entry=tracked[player]
+    if not entry then return end
+    for _,object in ipairs(entry.objects) do object:Destroy() end
     tracked[player]=nil
 end
 local function setup(player,char)
     clear(player)
-    local e={char=char,objects={},lines={},joints={},connections={},visible=false,nextVisibility=0}
-    tracked[player]=e
-    local function keep(o) table.insert(e.objects,o); return o end
-    e.highlight=keep(Instance.new('Highlight',folder))
-    e.highlight.Adornee=char
-    e.highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-    e.highlight.FillTransparency=0.85
-    e.tag=keep(Instance.new('BillboardGui',gui))
-    e.tag.Size=UDim2.fromOffset(270,48)
-    e.tag.StudsOffset=Vector3.new(0,2.5,0)
-    e.tag.AlwaysOnTop=true
-    e.label=text(e.tag,'',0,48)
-    e.label.TextStrokeTransparency=0
-    local function addJoint(o)
-        if o:IsA('Motor6D') then e.joints[o]=true end
+    local tag=Instance.new('BillboardGui',gui)
+    tag.Size=UDim2.fromOffset(290,100)
+    tag.StudsOffset=Vector3.new(0,3,0)
+    tag.AlwaysOnTop=true
+    local label=text(tag,'',0,100)
+    label.TextStrokeTransparency=0
+    label.TextSize=13
+    local entry={char=char,tag=tag,label=label,objects={tag},connections={}}
+    tracked[player]=entry
+    return entry
+end
+local function weaponName(char)
+    local tool=char:FindFirstChildOfClass('Tool')
+    if tool then return tool.Name end
+    for _,key in ipairs({'EquippedWeapon','WeaponName','CurrentWeapon'}) do
+        local value=char:GetAttribute(key)
+        if type(value)=='string' and value~='' then return value end
+        local field=char:FindFirstChild(key)
+        if field and field:IsA('StringValue') and field.Value~='' then return field.Value end
     end
-    -- Scan once; streaming and accessories are handled by events.
-    table.insert(e.connections,char.DescendantAdded:Connect(addJoint))
-    table.insert(e.connections,char.DescendantRemoving:Connect(function(o)
-        e.joints[o]=nil
-        local line=e.lines[o]
-        if line then line:Destroy(); e.lines[o]=nil end
-    end))
-    for _,o in ipairs(char:GetDescendants()) do addJoint(o) end
-    return e
+    return '—'
 end
 connect(Players.PlayerRemoving,clear)
-local elapsed = 0
+local espElapsed=0
 connect(RunService.Heartbeat,function(dt)
-    elapsed = elapsed + dt
-    if elapsed < 1/15 then return end
-    elapsed = 0
-    local now = os.clock()
-    local rayBudget, skeletonBudget = 4, 20
+    espElapsed=espElapsed+dt
+    if espElapsed<0.1 then return end
+    espElapsed=0
     local camera=workspace.CurrentCamera
     if not camera then return end
-    local root=me.Character and me.Character:FindFirstChild('HumanoidRootPart')
-    local origin=root and root.Position or camera.CFrame.Position
+    local ownRoot=me.Character and me.Character:FindFirstChild('HumanoidRootPart')
+    local origin=ownRoot and ownRoot.Position or camera.CFrame.Position
+    local enabled=cfg.names or cfg.hp or cfg.weapon
     for _,player in ipairs(Players:GetPlayers()) do
         if player==me then continue end
         local char=player.Character
         if not char then clear(player); continue end
-        local e=tracked[player]
-        if not e or e.char~=char then e=setup(player,char) end
+        local entry=tracked[player]
+        if not entry or entry.char~=char then entry=setup(player,char) end
         local head=char:FindFirstChild('Head')
+        local root=char:FindFirstChild('HumanoidRootPart') or head
         local hum=char:FindFirstChildOfClass('Humanoid')
-        local target=char:FindFirstChild('HumanoidRootPart') or head
-        local meters=target and (target.Position-origin).Magnitude*0.28 or math.huge
-        local show=cfg.esp and head~=nil and hum~=nil and hum.Health>0 and meters<=cfg.distance
-        local onScreen = false
-        if show then
-            local _, inside = camera:WorldToViewportPoint(head.Position)
-            onScreen = inside
-        end
-        -- Do not disable a whole character just because its head leaves the viewport.
-        if show and onScreen and now >= e.nextVisibility and rayBudget > 0 then
-            e.visible = clearPath(camera.CFrame.Position,head)
-            e.nextVisibility = now + 0.2
-            rayBudget = rayBudget - 1
-        end
-        local visible=show and e.visible
-        local drawSkeleton=show and onScreen and cfg.skeleton and meters<=150 and skeletonBudget>0
-        if drawSkeleton then skeletonBudget=skeletonBudget-1 end
-        local color=visible and Color3.fromRGB(60,255,100) or Color3.fromRGB(255,65,65)
-        e.highlight.Enabled=show
-        e.highlight.FillColor=color
-        e.highlight.OutlineColor=color
-        e.tag.Adornee=head
-        e.tag.Enabled=show and cfg.names
-        e.label.TextColor3=color
-        if target and hum then
-            local value=string.format('%s (@%s)\nHP: %d / %d | %d м',player.DisplayName,player.Name,math.ceil(hum.Health),math.ceil(hum.MaxHealth),math.round(meters))
-            if e.label.Text~=value then e.label.Text=value end
-        end
-        if drawSkeleton then
-            for joint in pairs(e.joints) do
-                local a,b=joint.Part0,joint.Part1
-                if not a or not b or a.Name=='HumanoidRootPart' or b.Name=='HumanoidRootPart' then continue end
-                if not e.lines[joint] then
-                    local line=Instance.new('LineHandleAdornment',folder)
-                    line.Adornee=workspace.Terrain
-                    line.AlwaysOnTop=true
-                    line.ZIndex=5
-                    line.Thickness=2
-                    e.lines[joint]=line
-                    table.insert(e.objects,line)
-                end
-            end
-        end
-        for joint,line in pairs(e.lines) do
-            local a,b=joint.Part0,joint.Part1
-            if not joint:IsDescendantOf(char) or not a or not b then
-                line:Destroy(); e.lines[joint]=nil
-            else
-                local length=(b.Position-a.Position).Magnitude
-                line.Visible=drawSkeleton and length>0.01
-                line.Color3=color
-                if line.Visible then line.Length=length; line.CFrame=CFrame.lookAt(a.Position,b.Position) end
-            end
-        end
+        local meters=root and (root.Position-origin).Magnitude*0.28 or math.huge
+        local show=enabled and cfg.distance>0 and meters<=cfg.distance and head~=nil and hum~=nil and hum.Health>0
+        entry.tag.Adornee=head
+        entry.tag.Enabled=show
+        if not show then continue end
+        local lines={}
+        if cfg.names then table.insert(lines,player.DisplayName..' (@'..player.Name..')') end
+        if cfg.hp then table.insert(lines,string.format('HP: %d / %d',math.ceil(hum.Health),math.ceil(hum.MaxHealth))) end
+        if cfg.weapon then table.insert(lines,'Weapon: '..weaponName(char)) end
+        table.insert(lines,string.format('%d м',math.round(meters)))
+        local value=table.concat(lines,'\n')
+        if entry.label.Text~=value then entry.label.Text=value end
     end
 end)
--- Ordinary camera aim. No metamethod hooks and no automatic firing.
-local function interceptTime(relative, velocity, speed)
-    if speed <= 0 then return 0 end
-    local a = velocity:Dot(velocity) - speed*speed
-    local b = 2*relative:Dot(velocity)
-    local c = relative:Dot(relative)
-    if math.abs(a) < 0.000001 then
-        if math.abs(b) < 0.000001 then return nil end
-        local t = -c/b
-        return t > 0 and t or nil
-    end
-    local discriminant = b*b - 4*a*c
-    if discriminant < 0 then return nil end
-    local root = math.sqrt(discriminant)
-    local t1, t2 = (-b-root)/(2*a), (-b+root)/(2*a)
-    if t1 > 0 and t2 > 0 then return math.min(t1,t2) end
-    if t1 > 0 then return t1 end
-    if t2 > 0 then return t2 end
+local function targetPart(char)
+    if cfg.target=='Head' then return char:FindFirstChild('Head') end
+    return char:FindFirstChild('UpperTorso') or char:FindFirstChild('Torso') or char:FindFirstChild('HumanoidRootPart')
 end
-local function chooseHead(camera)
-    local center = camera.ViewportSize/2
-    local ownRoot = me.Character and me.Character:FindFirstChild('HumanoidRootPart')
-    local origin = ownRoot and ownRoot.Position or camera.CFrame.Position
-    local candidatesForAim = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player == me then continue end
-        local char = player.Character
-        local head = char and char:FindFirstChild('Head')
-        local hum = char and char:FindFirstChildOfClass('Humanoid')
-        if not head or not hum or hum.Health <= 0 then continue end
-        local root = char:FindFirstChild('HumanoidRootPart') or head
-        local distance = (root.Position-origin).Magnitude*0.28
-        if distance > math.min(cfg.aimDistance, cfg.distance) then continue end
-        local point, onScreen = camera:WorldToViewportPoint(head.Position)
-        local pixels = (Vector2.new(point.X,point.Y)-center).Magnitude
-        if onScreen and pixels <= cfg.fov then
-            table.insert(candidatesForAim,{head=head,pixels=pixels})
-        end
+local function chooseTarget(camera)
+    if cfg.aimDistance<=0 or cfg.fov<=0 then return end
+    local ownRoot=me.Character and me.Character:FindFirstChild('HumanoidRootPart')
+    local origin=ownRoot and ownRoot.Position or camera.CFrame.Position
+    local center=camera.ViewportSize/2
+    local choices={}
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player==me then continue end
+        local char=player.Character
+        local part=char and targetPart(char)
+        local hum=char and char:FindFirstChildOfClass('Humanoid')
+        if not part or not hum or hum.Health<=0 then continue end
+        local root=char:FindFirstChild('HumanoidRootPart') or part
+        if (root.Position-origin).Magnitude*0.28>cfg.aimDistance then continue end
+        local projected,onScreen=camera:WorldToViewportPoint(part.Position)
+        local pixels=(Vector2.new(projected.X,projected.Y)-center).Magnitude
+        if onScreen and pixels<=cfg.fov then table.insert(choices,{part=part,pixels=pixels}) end
     end
-    table.sort(candidatesForAim,function(a,b) return a.pixels < b.pixels end)
-    for _, candidate in ipairs(candidatesForAim) do
-        if not cfg.walls or clearPath(camera.CFrame.Position,candidate.head) then return candidate.head end
+    table.sort(choices,function(a,b) return a.pixels<b.pixels end)
+    for _,choice in ipairs(choices) do
+        if not cfg.walls or clearPath(camera.CFrame.Position,choice.part) then return choice.part end
     end
 end
-local touchHeld = false
-local touchAimButton = Instance.new('TextButton',gui)
-touchAimButton.AnchorPoint = Vector2.new(1,1)
-touchAimButton.Position = UDim2.new(1,-20,1,-120)
-touchAimButton.Size = UDim2.fromOffset(85,44)
-touchAimButton.Text = 'HOLD AIM'
-touchAimButton.Font = Enum.Font.GothamBold
-touchAimButton.TextSize = 12
-touchAimButton.TextColor3 = Color3.fromRGB(12,12,12)
-touchAimButton.BackgroundColor3 = Color3.fromRGB(44,55,89)
-touchAimButton.Visible = UIS.TouchEnabled
-touchAimButton.ZIndex = 10
-round(touchAimButton)
-local activeTouch
-connect(touchAimButton.InputBegan,function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then activeTouch=input; touchHeld=true end
-end)
-connect(UIS.InputEnded,function(input)
-    if input == activeTouch then activeTouch=nil; touchHeld=false end
-end)
-connect(UIS.WindowFocusReleased,function() activeTouch=nil; touchHeld=false end)
-local selectedHead, nextSelection = nil, 0
-local function aimStatus(message)
-    if status.Text ~= message then status.Text = message end
+local selectedPart,nextSelection,lastTargetMode,lastWalls
+nextSelection=0
+local function aimStatus(value)
+    if status.Text~=value then status.Text=value end
 end
 RunService:BindToRenderStep('OX1DECameraAim',Enum.RenderPriority.Last.Value+1,function()
-    local camera = workspace.CurrentCamera
-    local holding = touchHeld or UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    if not alive or cfg.freecam or not cfg.aim or (cfg.holdAim and not holding) or panel.Visible or UIS:GetFocusedTextBox() or not camera then
-        if cfg.freecam then aimStatus('Свободная камера: WASD, Q/E, Shift, ПКМ.')
-        elseif not cfg.aim then aimStatus('Аим выключен.')
-        elseif panel.Visible then aimStatus('Аим включён. Закрой меню: Right Shift или ×.')
-        elseif cfg.holdAim and not holding then aimStatus('Удерживай ПКМ или кнопку HOLD AIM.')
-        else aimStatus('Наведение приостановлено.') end
-        selectedHead=nil
+    local camera=workspace.CurrentCamera
+    if not alive or not camera or not cfg.aim or cfg.freecam or panel.Visible or UIS:GetFocusedTextBox() then
+        selectedPart=nil
         nextSelection=0
+        if cfg.freecam then aimStatus('Свободная камера: WASD, Q/E, Shift, ПКМ.')
+        elseif cfg.aim then aimStatus('Aim включён — закрой меню для наведения.')
+        else aimStatus('Aim выключен.') end
         return
     end
-    local now = os.clock()
-    if now >= nextSelection then
-        selectedHead=chooseHead(camera)
+    local now=os.clock()
+    if now>=nextSelection or lastTargetMode~=cfg.target or lastWalls~=cfg.walls then
+        selectedPart=chooseTarget(camera)
         nextSelection=now+0.05
+        lastTargetMode,lastWalls=cfg.target,cfg.walls
     end
-    local head=selectedHead
-    if not head or not head:IsDescendantOf(workspace) then
-        aimStatus('Нет цели: голова должна быть в FOV, в пределах дальности и без стены.')
-        return
-    end
-    local hum=head.Parent:FindFirstChildOfClass('Humanoid')
-    if not hum or hum.Health<=0 then selectedHead=nil; return end
+    local part=selectedPart
+    if not part or not part:IsDescendantOf(workspace) then aimStatus('Нет цели в FOV и пределах Aim Distance.');return end
+    local hum=part.Parent:FindFirstChildOfClass('Humanoid')
+    if not hum or hum.Health<=0 then selectedPart=nil;return end
+    if cfg.walls and not clearPath(camera.CFrame.Position,part) then selectedPart=nil;nextSelection=0;return end
     local origin=camera.CFrame.Position
-    local point = head.Position
-    if cfg.predict then
-        local velocity=head.AssemblyLinearVelocity
-        local delay=cfg.leadMs/1000
-        local relative=head.Position+velocity*delay-origin
-        local flight=interceptTime(relative,velocity,cfg.bulletSpeed)
-        if flight == nil or flight > 3 then
-            aimStatus('Нет решения упреждения: проверь скорость пули.')
-            return
-        end
-        point=head.Position+velocity*(delay+flight)
-            +Vector3.new(0,0.5*cfg.bulletGravity*flight*flight,0)
+    if (part.Position-origin).Magnitude>0.001 then
+        camera.CFrame=CFrame.lookAt(origin,part.Position)
+        aimStatus(cfg.target..' • '..part.Parent.Name)
     end
-    if (point-origin).Magnitude<0.001 then return end
-    if cfg.predict and cfg.walls then
-        local params=RaycastParams.new()
-        params.FilterType=Enum.RaycastFilterType.Exclude
-        local excluded={folder,camera,head.Parent}
-        if me.Character then table.insert(excluded,me.Character) end
-        params.FilterDescendantsInstances=excluded
-        params.IgnoreWater=true
-        if rawRaycast(workspace,origin,point-origin,params) then
-            aimStatus('Точка упреждения закрыта препятствием.')
-            return
-        end
-    end
-    camera.CFrame=CFrame.lookAt(origin,point)
-    aimStatus((cfg.predict and 'С упреждением: ' or 'На голове: ') .. head.Parent.Name)
 end)
 -- Free camera affects only local view, not server streaming.
 local cameraActions = game:GetService('ContextActionService')
