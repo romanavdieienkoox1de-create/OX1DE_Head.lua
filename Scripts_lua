@@ -54,17 +54,17 @@ local function round(obj)
     local c = Instance.new('UICorner', obj)
     c.CornerRadius = UDim.new(0, 8)
 end
-local accent = Color3.fromRGB(113, 143, 255)
-local dim = Color3.fromRGB(146, 157, 184)
+local accent = Color3.fromRGB(245, 245, 245)
+local dim = Color3.fromRGB(165, 165, 165)
 local function text(parent, value, y, height)
     local label = Instance.new('TextLabel', parent)
     label.Position = UDim2.fromOffset(12, y)
     label.Size = UDim2.new(1, -24, 0, height)
     label.BackgroundTransparency = 1
     label.Text = value
-    label.TextColor3 = Color3.fromRGB(232, 236, 249)
+    label.TextColor3 = Color3.fromRGB(240, 240, 240)
     label.Font = Enum.Font.Gotham
-    label.TextSize = 13
+    label.TextSize = 14
     label.TextWrapped = true
     return label
 end
@@ -84,44 +84,76 @@ panel.Name = 'WideMenu'
 panel.Visible = true
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Position = UDim2.fromScale(0.5, 0.5)
-panel.Size = UDim2.fromOffset(640, 370)
-panel.BackgroundColor3 = Color3.fromRGB(16, 20, 31)
+panel.Size = UDim2.fromOffset(720, 400)
+panel.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
 panel.BorderSizePixel = 0
 panel.ZIndex = 10
 round(panel)
 local scale = Instance.new('UIScale', panel)
 local outline = Instance.new('UIStroke', panel)
-outline.Color = Color3.fromRGB(51, 61, 85)
+outline.Color = Color3.fromRGB(65, 65, 65)
 local heading = text(panel, 'OX1DE', 12, 30)
 heading.Position = UDim2.fromOffset(20, 12)
 heading.Size = UDim2.fromOffset(130, 30)
 heading.TextXAlignment = Enum.TextXAlignment.Left
 heading.Font = Enum.Font.GothamBold
 heading.TextSize = 22
-local subtitle = text(panel, 'CONTROL PANEL  /  RIGHT SHIFT', 14, 26)
+local subtitle = text(panel, 'НАСТРОЙКИ  /  ПРАВЫЙ SHIFT — МЕНЮ', 14, 26)
 subtitle.Position = UDim2.fromOffset(172, 14)
 subtitle.Size = UDim2.fromOffset(385, 26)
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
 subtitle.TextColor3 = dim
 subtitle.TextSize = 11
 local close = Instance.new('TextButton', panel)
-close.Position = UDim2.fromOffset(592, 12)
-close.Size = UDim2.fromOffset(32, 30)
+close.Position = UDim2.fromOffset(670, 12)
+close.Size = UDim2.fromOffset(36, 34)
 close.Text = '×'
 close.TextSize = 24
 close.TextColor3 = dim
 close.BackgroundTransparency = 1
 connect(close.Activated, function() panel.Visible = false end)
+-- Drag the header with mouse or touch.
+heading.Active = true
+subtitle.Active = true
+local menuDrag, menuDragStart, menuPosition
+local function beginDrag(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        menuDrag=input
+        menuDragStart=input.Position
+        menuPosition=panel.Position
+    end
+end
+connect(heading.InputBegan,beginDrag)
+connect(subtitle.InputBegan,beginDrag)
+connect(UIS.InputChanged,function(input)
+    if not menuDrag then return end
+    if input ~= menuDrag and input.UserInputType ~= Enum.UserInputType.MouseMovement then return end
+    local delta=input.Position-menuDragStart
+    local camera=workspace.CurrentCamera
+    if not camera then return end
+    local viewport=camera.ViewportSize
+    local halfWidth=360*scale.Scale
+    local halfHeight=200*scale.Scale
+    local centerX=menuPosition.X.Scale*viewport.X+menuPosition.X.Offset+delta.X
+    local centerY=menuPosition.Y.Scale*viewport.Y+menuPosition.Y.Offset+delta.Y
+    panel.Position=UDim2.fromOffset(
+        math.clamp(centerX,halfWidth,math.max(halfWidth,viewport.X-halfWidth)),
+        math.clamp(centerY,halfHeight,math.max(halfHeight,viewport.Y-halfHeight)))
+end)
+connect(UIS.InputEnded,function(input)
+    if input == menuDrag then menuDrag=nil end
+end)
 local divider = Instance.new('Frame', panel)
 divider.Position = UDim2.fromOffset(154, 56)
-divider.Size = UDim2.fromOffset(1, 290)
+divider.Size = UDim2.fromOffset(1, 320)
 divider.BorderSizePixel = 0
-divider.BackgroundColor3 = Color3.fromRGB(42, 49, 68)
+divider.BackgroundColor3 = Color3.fromRGB(48, 48, 48)
 local pages, tabs = {}, {}
 local function addPage(title, y)
     local page = Instance.new('Frame', panel)
     page.Position = UDim2.fromOffset(168, 58)
-    page.Size = UDim2.fromOffset(454, 252)
+    page.Size = UDim2.fromOffset(534, 272)
     page.BackgroundTransparency = 1
     page.Visible = false
     table.insert(pages, page)
@@ -139,8 +171,8 @@ local function addPage(title, y)
         for _, other in ipairs(pages) do
             other.Visible = other == page
             tabs[other].BackgroundColor3 = other == page
-                and Color3.fromRGB(44, 55, 89) or Color3.fromRGB(22, 27, 40)
-            tabs[other].TextColor3 = other == page and accent or dim
+                and Color3.fromRGB(235, 235, 235) or Color3.fromRGB(24, 24, 24)
+            tabs[other].TextColor3 = other == page and Color3.fromRGB(12, 12, 12) or dim
         end
     end
     connect(tab.Activated, select)
@@ -160,22 +192,26 @@ info.TextSize = 11
 local function toggle(parent, title, key, y)
     local button = Instance.new('TextButton', parent)
     button.Position = UDim2.fromOffset(0, y)
-    button.Size = UDim2.new(1, 0, 0, 38)
+    button.Size = UDim2.new(1, 0, 0, 42)
     button.Text = ''
-    button.BackgroundColor3 = Color3.fromRGB(25, 31, 45)
+    button.BackgroundColor3 = Color3.fromRGB(29, 29, 29)
     button.BorderSizePixel = 0
     button.AutoButtonColor = false
     round(button)
-    local label = text(button, title, 0, 38)
+    local label = text(button, title, 0, 42)
     label.Size = UDim2.new(1, -108, 1, 0)
     label.TextXAlignment = Enum.TextXAlignment.Left
     local indicator = text(button, '', 0, 38)
     indicator.Position = UDim2.new(1, -98, 0, 0)
-    indicator.Size = UDim2.fromOffset(86, 38)
+    indicator.Size = UDim2.fromOffset(78, 28)
+    indicator.Position = UDim2.new(1, -90, 0, 7)
+    round(indicator)
     indicator.Font = Enum.Font.GothamBold
     local function refresh()
-        indicator.Text = cfg[key] and 'ON' or 'OFF'
-        indicator.TextColor3 = cfg[key] and accent or dim
+        indicator.Text = cfg[key] and 'ВКЛ' or 'ВЫКЛ'
+        indicator.BackgroundTransparency = 0
+        indicator.BackgroundColor3 = cfg[key] and accent or Color3.fromRGB(46,46,46)
+        indicator.TextColor3 = cfg[key] and Color3.fromRGB(12,12,12) or dim
     end
     connect(button.Activated, function()
         cfg[key] = not cfg[key]
@@ -186,17 +222,17 @@ end
 local function numberBox(parent, title, key, y, minimum, maximum)
     local row = Instance.new('Frame', parent)
     row.Position = UDim2.fromOffset(0, y)
-    row.Size = UDim2.new(1, 0, 0, 38)
-    row.BackgroundColor3 = Color3.fromRGB(25, 31, 45)
+    row.Size = UDim2.new(1, 0, 0, 42)
+    row.BackgroundColor3 = Color3.fromRGB(29, 29, 29)
     row.BorderSizePixel = 0
     round(row)
-    local label = text(row, title, 0, 38)
+    local label = text(row, title, 0, 42)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Size = UDim2.new(1, -135, 1, 0)
     local box = Instance.new('TextBox', row)
     box.Position = UDim2.new(1, -112, 0, 5)
     box.Size = UDim2.fromOffset(100, 28)
-    box.BackgroundColor3 = Color3.fromRGB(39, 47, 69)
+    box.BackgroundColor3 = Color3.fromRGB(48, 48, 48)
     box.TextColor3 = Color3.new(1, 1, 1)
     box.Font = Enum.Font.GothamBold
     box.TextSize = 14
@@ -224,8 +260,8 @@ local fovLabel = text(aimPage, '', 136, 24)
 fovLabel.TextXAlignment = Enum.TextXAlignment.Left
 local bar = Instance.new('TextButton', aimPage)
 bar.Position = UDim2.fromOffset(12, 168)
-bar.Size = UDim2.new(1, -24, 0, 12)
-bar.BackgroundColor3 = Color3.fromRGB(43, 50, 71)
+bar.Size = UDim2.new(1, -24, 0, 18)
+bar.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 bar.Text = ''
 bar.AutoButtonColor = false
 round(bar)
@@ -277,8 +313,8 @@ numberBox(cameraPage, 'Скорость • studs/с', 'cameraSpeed', 46, 1, 500
 local cameraHint = text(cameraPage, 'W / A / S / D — движение\nQ / E — вниз / вверх\nShift — скорость ×3\nУдерживать ПКМ — поворот\nЗакрой меню, чтобы начать полёт.\nПерсонаж остаётся на месте.', 96, 148)
 cameraHint.TextColor3 = dim
 local status = text(panel, 'Включи аим и закрой меню. Упреждение по умолчанию OFF.', 318, 42)
-status.Position = UDim2.fromOffset(170, 318)
-status.Size = UDim2.fromOffset(450, 42)
+status.Position = UDim2.fromOffset(170, 342)
+status.Size = UDim2.fromOffset(530, 42)
 status.TextXAlignment = Enum.TextXAlignment.Left
 status.TextColor3 = dim
 status.TextSize = 12
@@ -287,7 +323,7 @@ menuButton.Position = UDim2.fromOffset(16, 40)
 menuButton.Size = UDim2.fromOffset(100, 36)
 menuButton.Text = 'OX1DE / MENU'
 menuButton.TextColor3 = accent
-menuButton.BackgroundColor3 = Color3.fromRGB(24, 29, 44)
+menuButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 menuButton.Font = Enum.Font.GothamBold
 menuButton.TextSize = 12
 menuButton.ZIndex = 10
@@ -306,7 +342,7 @@ local function updateCircle()
         lastViewport = viewport
         local center = viewport/2
         fovCircle.Position = UDim2.fromOffset(center.X, center.Y)
-        scale.Scale = math.min(1, math.max(0.1, (viewport.X-24)/640), math.max(0.1, (viewport.Y-40)/370))
+        scale.Scale = math.min(1, math.max(0.1, (viewport.X-24)/720), math.max(0.1, (viewport.Y-40)/400))
     end
     if cfg.fov ~= lastFov then
         lastFov = cfg.fov
@@ -681,7 +717,7 @@ touchAimButton.Size = UDim2.fromOffset(85,44)
 touchAimButton.Text = 'HOLD AIM'
 touchAimButton.Font = Enum.Font.GothamBold
 touchAimButton.TextSize = 12
-touchAimButton.TextColor3 = Color3.new(1,1,1)
+touchAimButton.TextColor3 = Color3.fromRGB(12,12,12)
 touchAimButton.BackgroundColor3 = Color3.fromRGB(44,55,89)
 touchAimButton.Visible = UIS.TouchEnabled
 touchAimButton.ZIndex = 10
