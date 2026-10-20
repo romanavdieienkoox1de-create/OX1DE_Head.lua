@@ -1,9 +1,16 @@
+local startupOK, startupError = xpcall(function()
 -- ESP / ordinary camera aim with configurable prediction. Not tested in Brisk Survival.
 if _G.BriskToolsStop then pcall(_G.BriskToolsStop) end
 local Players = game:GetService('Players')
 local RunService = game:GetService('RunService')
 local UIS = game:GetService('UserInputService')
+if not game:IsLoaded() then game.Loaded:Wait() end
 local me = Players.LocalPlayer
+if not me then
+    Players:GetPropertyChangedSignal('LocalPlayer'):Wait()
+    me = Players.LocalPlayer
+end
+assert(me, 'LocalPlayer unavailable: run on the client')
 local cfg = {esp=true, names=true, skeleton=true, aim=false, walls=true, fov=50, distance=100, aimDistance=100, circle=true, stone=true, sulfur=true, metal=true, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0}
 local alive, tracked, connections = true, {}, {}
 local folder = Instance.new('Folder', workspace)
@@ -11,9 +18,29 @@ folder.Name = 'BriskTools'
 local gui = Instance.new('ScreenGui')
 gui.Name = 'BriskToolsMenu'
 gui.ResetOnSpawn = false
+gui.DisplayOrder = 1000
+gui.Enabled = true
 gui.IgnoreGuiInset = true
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-gui.Parent = me:WaitForChild('PlayerGui')
+local playerGui = me:WaitForChild('PlayerGui', 20)
+assert(playerGui, 'PlayerGui did not load within 20 seconds')
+local oldMenu = playerGui:FindFirstChild('BriskToolsMenu')
+if oldMenu then oldMenu:Destroy() end
+gui.Parent = playerGui
+-- Register cleanup before building the interface, including partial startups.
+_G.BriskToolsStop = function()
+    alive = false
+    cfg.aim = false
+    pcall(function() RunService:UnbindFromRenderStep('OX1DECameraAim') end)
+    for _, connection in ipairs(connections) do connection:Disconnect() end
+    for _, entry in pairs(tracked) do
+        for _, connection in ipairs(entry.connections or {}) do connection:Disconnect() end
+        for _, object in ipairs(entry.objects or {}) do object:Destroy() end
+    end
+    folder:Destroy()
+    gui:Destroy()
+    _G.BriskToolsStop = nil
+end
 local function connect(signal, callback)
     local c = signal:Connect(callback)
     table.insert(connections, c)
@@ -50,6 +77,7 @@ circleStroke.Thickness = 1.5
 circleStroke.Transparency = 0.15
 local panel = Instance.new('Frame', gui)
 panel.Name = 'WideMenu'
+panel.Visible = true
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Position = UDim2.fromScale(0.5, 0.5)
 panel.Size = UDim2.fromOffset(640, 370)
@@ -450,29 +478,4 @@ local function clear(player)
     for _,o in ipairs(e.objects) do o:Destroy() end
     tracked[player]=nil
 end
-local function setup(player,char)
-    clear(player)
-    local e={char=char,objects={},lines={},joints={},connections={},visible=false,nextVisibility=0}
-    tracked[player]=e
-    local function keep(o) table.insert(e.objects,o); return o end
-    e.highlight=keep(Instance.new('Highlight',folder))
-    e.highlight.Adornee=char
-    e.highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
-    e.highlight.FillTransparency=0.85
-    e.tag=keep(Instance.new('BillboardGui',gui))
-    e.tag.Size=UDim2.fromOffset(270,48)
-    e.tag.StudsOffset=Vector3.new(0,2.5,0)
-    e.tag.AlwaysOnTop=true
-    e.label=text(e.tag,'',0,48)
-    e.label.TextStrokeTransparency=0
-    local function addJoint(o)
-        if o:IsA('Motor6D') then e.joints[o]=true end
-    end
-    -- Scan once; streaming and accessories are handled by events.
-    table.insert(e.connections,char.DescendantAdded:Connect(addJoint))
-    table.insert(e.connections,char.DescendantRemoving:Connect(function(o)
-        e.joints[o]=nil
-        local line=e.lines[o]
-        if line then line:Destroy(); e.lines[o]=nil end
-    end))
-    for _,o in ipairs(char:GetDescendants()) do addJoint(
+local function setup(player,ch
