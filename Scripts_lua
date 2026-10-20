@@ -351,7 +351,8 @@ local function identifyResource(object)
         local category = ancestor.Name:lower()
         if category == 'resources' or category == 'resource nodes'
             or category == 'resourcenodes' or category == 'ores'
-            or category == 'orenodes' or category == 'harvestables' then
+            or category == 'orenodes' or category == 'harvestables'
+            or category == 'spawnedharvestables' then
             return kind
         end
         ancestor = ancestor.Parent
