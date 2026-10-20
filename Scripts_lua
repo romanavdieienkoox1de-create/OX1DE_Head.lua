@@ -1,411 +1,292 @@
--- ESP + Names + Skeleton + experimental Raycast Silent Aim
--- Повторный запуск удаляет предыдущую версию.
-
-if _G.BriskToolsStop then
-    pcall(_G.BriskToolsStop)
-end
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UIS = game:GetService("UserInputService")
-
+-- ESP / experimental Raycast aim. Not tested in Brisk Survival.
+if _G.BriskToolsStop then pcall(_G.BriskToolsStop) end
+local Players = game:GetService('Players')
+local RunService = game:GetService('RunService')
+local UIS = game:GetService('UserInputService')
 local me = Players.LocalPlayer
-local playerGui = me:WaitForChild("PlayerGui")
-
-local settings = {
-    esp = true,
-    names = true,
-    skeleton = true,
-    silent = false,
-    walls = true,
-    fov = 150,
-}
-
-local alive = true
-local tracked = {}
-local connections = {}
-
-local folder = Instance.new("Folder")
-folder.Name = "BriskTools"
-folder.Parent = workspace
-
-local gui = Instance.new("ScreenGui")
-gui.Name = "BriskToolsMenu"
+local cfg = {esp=true, names=true, skeleton=true, aim=false, walls=true, fov=50, distance=100, aimDistance=100}
+local alive, tracked, connections = true, {}, {}
+local folder = Instance.new('Folder', workspace)
+folder.Name = 'BriskTools'
+local gui = Instance.new('ScreenGui')
+gui.Name = 'BriskToolsMenu'
 gui.ResetOnSpawn = false
-gui.Parent = playerGui
-
+gui.Parent = me:WaitForChild('PlayerGui')
 local function connect(signal, callback)
-    local connection = signal:Connect(callback)
-    table.insert(connections, connection)
-    return connection
+    local c = signal:Connect(callback)
+    table.insert(connections, c)
+    return c
 end
-
-local function corner(object)
-    local item = Instance.new("UICorner")
-    item.CornerRadius = UDim.new(0, 9)
-    item.Parent = object
+local function round(obj)
+    local c = Instance.new('UICorner', obj)
+    c.CornerRadius = UDim.new(0, 8)
 end
-
-local panel = Instance.new("Frame")
-panel.Size = UDim2.fromOffset(280, 350)
-panel.Position = UDim2.new(0.5, -140, 0.5, -175)
+local menuButton = Instance.new('TextButton', gui)
+menuButton.Size = UDim2.fromOffset(76, 36)
+menuButton.Position = UDim2.fromOffset(10, 10)
+menuButton.Text = 'MENU'
+local panel = Instance.new('ScrollingFrame', gui)
+panel.Size = UDim2.new(0, 280, 0.72, 0)
+panel.Position = UDim2.new(0.5, -140, 0.15, 0)
+panel.CanvasSize = UDim2.fromOffset(0, 570)
+panel.ScrollBarThickness = 4
 panel.BackgroundColor3 = Color3.fromRGB(25, 27, 35)
 panel.BorderSizePixel = 0
-panel.Parent = gui
-corner(panel)
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 44)
-title.BackgroundTransparency = 1
-title.Text = "ESP / AIM"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 20
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Parent = panel
-
-local function toggle(text, key, y)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -24, 0, 38)
-    button.Position = UDim2.fromOffset(12, y)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 14
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.Parent = panel
-    corner(button)
-
+round(panel)
+local function text(parent, value, y, height)
+    local label = Instance.new('TextLabel', parent)
+    label.Position = UDim2.fromOffset(12, y)
+    label.Size = UDim2.new(1, -24, 0, height)
+    label.BackgroundTransparency = 1
+    label.Text = value
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 13
+    label.TextWrapped = true
+    return label
+end
+text(panel, 'ESP / AIM — Right Shift', 4, 36)
+local function toggle(title, key, y)
+    local b = Instance.new('TextButton', panel)
+    b.Size = UDim2.new(1, -24, 0, 36)
+    b.Position = UDim2.fromOffset(12, y)
+    b.TextColor3 = Color3.new(1, 1, 1)
+    b.Font = Enum.Font.GothamBold
+    b.TextSize = 14
+    round(b)
     local function refresh()
-        button.Text = text .. ": " .. (settings[key] and "ВКЛ" or "ВЫКЛ")
-        button.BackgroundColor3 = settings[key]
-            and Color3.fromRGB(35, 120, 80)
-            or Color3.fromRGB(65, 67, 78)
+        b.Text = title .. ': ' .. (cfg[key] and 'ON' or 'OFF')
+        b.BackgroundColor3 = cfg[key] and Color3.fromRGB(35,120,80) or Color3.fromRGB(65,67,78)
     end
-
-    connect(button.Activated, function()
-        settings[key] = not settings[key]
-        refresh()
-    end)
-
+    connect(b.Activated, function() cfg[key] = not cfg[key]; refresh() end)
     refresh()
 end
-
-toggle("ESP", "esp", 48)
-toggle("Ники", "names", 92)
-toggle("Скелет", "skeleton", 136)
-toggle("Silent aim • эксперимент", "silent", 180)
-toggle("Проверка стен для aim", "walls", 224)
-
-local status = Instance.new("TextLabel")
-status.Position = UDim2.fromOffset(12, 270)
-status.Size = UDim2.new(1, -24, 0, 65)
-status.BackgroundTransparency = 1
-status.TextWrapped = true
-status.TextColor3 = Color3.fromRGB(190, 195, 210)
-status.Font = Enum.Font.Gotham
-status.TextSize = 12
-status.Text = "Правый Shift — меню\nРадиус наведения: 150 px от центра"
-status.Parent = panel
-
-local menuButton = Instance.new("TextButton")
-menuButton.Position = UDim2.fromOffset(12, 12)
-menuButton.Size = UDim2.fromOffset(75, 36)
-menuButton.Text = "MENU"
-menuButton.Font = Enum.Font.GothamBold
-menuButton.TextSize = 14
-menuButton.TextColor3 = Color3.new(1, 1, 1)
-menuButton.BackgroundColor3 = Color3.fromRGB(35, 38, 48)
-menuButton.Parent = gui
-corner(menuButton)
-
-connect(menuButton.Activated, function()
-    panel.Visible = not panel.Visible
-end)
-
-connect(UIS.InputBegan, function(input)
-    if UIS:GetFocusedTextBox() then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        panel.Visible = not panel.Visible
+toggle('ESP', 'esp', 44)
+toggle('Names / HP / meters', 'names', 86)
+toggle('Skeleton', 'skeleton', 128)
+toggle('Silent aim (experimental)', 'aim', 170)
+toggle('Aim wall check', 'walls', 212)
+local function slider(title, key, minimum, maximum, y)
+    local label = text(panel, '', y, 24)
+    local bar = Instance.new('TextButton', panel)
+    bar.Position = UDim2.fromOffset(16, y+27)
+    bar.Size = UDim2.new(1,-32,0,18)
+    bar.Text = ''
+    bar.BackgroundColor3 = Color3.fromRGB(65,67,78)
+    round(bar)
+    local fill = Instance.new('Frame', bar)
+    fill.BorderSizePixel = 0
+    fill.BackgroundColor3 = Color3.fromRGB(60,190,120)
+    round(fill)
+    local dragging, touch = false, nil
+    local function refresh()
+        label.Text = title .. ': ' .. cfg[key]
+        fill.Size = UDim2.fromScale((cfg[key]-minimum)/(maximum-minimum),1)
     end
+    local function set(x)
+        if bar.AbsoluteSize.X <= 0 then return end
+        local f = math.clamp((x-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
+        cfg[key] = math.round(minimum+f*(maximum-minimum))
+        refresh()
+    end
+    connect(bar.InputBegan,function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging=true; set(i.Position.X)
+        elseif i.UserInputType == Enum.UserInputType.Touch then touch=i; set(i.Position.X) end
+    end)
+    connect(UIS.InputChanged,function(i)
+        if i == touch or (dragging and i.UserInputType == Enum.UserInputType.MouseMovement) then set(i.Position.X) end
+    end)
+    connect(UIS.InputEnded,function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging=false end
+        if i == touch then touch=nil end
+    end)
+    refresh()
+end
+slider('FOV (pixels)', 'fov', 10, 100, 256)
+text(panel, 'ESP distance (meters, 1–100000)', 310, 24)
+local distanceBox = Instance.new('TextBox', panel)
+distanceBox.Position = UDim2.fromOffset(16,337)
+distanceBox.Size = UDim2.new(1,-32,0,32)
+distanceBox.Text = tostring(cfg.distance)
+distanceBox.ClearTextOnFocus = false
+distanceBox.TextSize = 16
+round(distanceBox)
+connect(distanceBox.FocusLost,function()
+    local n = tonumber(distanceBox.Text)
+    if n and n == n then cfg.distance=math.clamp(math.round(n),1,100000) end
+    distanceBox.Text=tostring(cfg.distance)
 end)
-
--- Сохраняем обычный Raycast для собственных проверок.
+text(panel, 'Aim distance (meters, 1–100000)', 377, 24)
+local aimDistanceBox = Instance.new('TextBox', panel)
+aimDistanceBox.Position = UDim2.fromOffset(16,404)
+aimDistanceBox.Size = UDim2.new(1,-32,0,32)
+aimDistanceBox.Text = tostring(cfg.aimDistance)
+aimDistanceBox.ClearTextOnFocus = false
+aimDistanceBox.TextSize = 16
+round(aimDistanceBox)
+connect(aimDistanceBox.FocusLost,function()
+    local n = tonumber(aimDistanceBox.Text)
+    if n and n == n then cfg.aimDistance=math.clamp(math.round(n),1,100000) end
+    aimDistanceBox.Text=tostring(cfg.aimDistance)
+end)
+local status = text(panel, 'Checking Raycast hook...', 444, 46)
+text(panel, 'Aim selects green ESP players only.\n1 stud ≈ 0.28 m. No recoil removal implemented.', 496, 64)
+connect(menuButton.Activated,function() panel.Visible=not panel.Visible end)
+connect(UIS.InputBegan,function(i)
+    if not UIS:GetFocusedTextBox() and i.KeyCode==Enum.KeyCode.RightShift then panel.Visible=not panel.Visible end
+end)
 local rawRaycast = workspace.Raycast
-
-local function clearPath(origin, target)
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-
-    local excluded = {folder}
-    if me.Character then
-        table.insert(excluded, me.Character)
-    end
-    if workspace.CurrentCamera then
-        table.insert(excluded, workspace.CurrentCamera)
-    end
-
-    params.FilterDescendantsInstances = excluded
-    params.IgnoreWater = true
-
-    local result = rawRaycast(
-        workspace,
-        origin,
-        target.Position - origin,
-        params
-    )
-
-    return result == nil
-        or result.Instance:IsDescendantOf(target.Parent)
+local function clearPath(origin, head)
+    local p = RaycastParams.new()
+    p.FilterType = Enum.RaycastFilterType.Exclude
+    local exclude = {folder}
+    if me.Character then table.insert(exclude,me.Character) end
+    if workspace.CurrentCamera then table.insert(exclude,workspace.CurrentCamera) end
+    p.FilterDescendantsInstances=exclude
+    p.IgnoreWater=true
+    local hit=rawRaycast(workspace,origin,head.Position-origin,p)
+    return not hit or hit.Instance:IsDescendantOf(head.Parent)
 end
-
-local function livingHead(player)
-    local character = player.Character
-    local humanoid = character
-        and character:FindFirstChildOfClass("Humanoid")
-    local head = character and character:FindFirstChild("Head")
-
-    if humanoid and humanoid.Health > 0 and head then
-        return head
-    end
+local function clear(player)
+    local e=tracked[player]
+    if not e then return end
+    for _,o in ipairs(e.objects) do o:Destroy() end
+    tracked[player]=nil
 end
-
-local function chooseTarget(origin, maxDistance)
-    local camera = workspace.CurrentCamera
+local function setup(player,char)
+    clear(player)
+    local e={char=char,objects={},lines={}}
+    tracked[player]=e
+    local function keep(o) table.insert(e.objects,o); return o end
+    e.highlight=keep(Instance.new('Highlight',folder))
+    e.highlight.Adornee=char
+    e.highlight.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+    e.highlight.FillTransparency=0.85
+    e.tag=keep(Instance.new('BillboardGui',gui))
+    e.tag.Size=UDim2.fromOffset(270,48)
+    e.tag.StudsOffset=Vector3.new(0,2.5,0)
+    e.tag.AlwaysOnTop=true
+    e.label=text(e.tag,'',0,48)
+    e.label.TextStrokeTransparency=0
+    return e
+end
+connect(Players.PlayerRemoving,clear)
+connect(RunService.RenderStepped,function()
+    local camera=workspace.CurrentCamera
     if not camera then return end
-
-    local center = camera.ViewportSize / 2
-    local best
-    local bestPixels = settings.fov
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player == me then continue end
-
-        local head = livingHead(player)
-        if not head then continue end
-        if (head.Position - origin).Magnitude > maxDistance then
-            continue
+    local root=me.Character and me.Character:FindFirstChild('HumanoidRootPart')
+    local origin=root and root.Position or camera.CFrame.Position
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player==me then continue end
+        local char=player.Character
+        if not char then clear(player); continue end
+        local e=tracked[player]
+        if not e or e.char~=char then e=setup(player,char) end
+        local head=char:FindFirstChild('Head')
+        local hum=char:FindFirstChildOfClass('Humanoid')
+        local target=char:FindFirstChild('HumanoidRootPart') or head
+        local meters=target and (target.Position-origin).Magnitude*0.28 or math.huge
+        local show=cfg.esp and head~=nil and hum~=nil and hum.Health>0 and meters<=cfg.distance
+        local visible=show and clearPath(camera.CFrame.Position,head)
+        local color=visible and Color3.fromRGB(60,255,100) or Color3.fromRGB(255,65,65)
+        e.highlight.Enabled=show
+        e.highlight.FillColor=color
+        e.highlight.OutlineColor=color
+        e.tag.Adornee=head
+        e.tag.Enabled=show and cfg.names
+        e.label.TextColor3=color
+        if target and hum then
+            e.label.Text=string.format('%s (@%s)\nHP: %d / %d | %d m',player.DisplayName,player.Name,math.ceil(hum.Health),math.ceil(hum.MaxHealth),math.round(meters))
         end
-
-        local point, onScreen = camera:WorldToViewportPoint(head.Position)
-        if not onScreen then continue end
-
-        local pixels = (
-            Vector2.new(point.X, point.Y) - center
-        ).Magnitude
-
-        if pixels < bestPixels
-            and (not settings.walls or clearPath(origin, head)) then
-            best = head
-            bestPixels = pixels
-        end
-    end
-
-    return best
-end
-
-local function clearPlayer(player)
-    local entry = tracked[player]
-    if not entry then return end
-
-    for _, object in ipairs(entry.objects) do
-        object:Destroy()
-    end
-
-    tracked[player] = nil
-end
-
-local function setup(player, character)
-    clearPlayer(player)
-
-    local entry = {
-        character = character,
-        objects = {},
-        lines = {},
-    }
-    tracked[player] = entry
-
-    local function keep(object)
-        table.insert(entry.objects, object)
-        return object
-    end
-
-    local highlight = keep(Instance.new("Highlight"))
-    highlight.Adornee = character
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.FillTransparency = 0.85
-    highlight.Parent = folder
-    entry.highlight = highlight
-
-    local tag = keep(Instance.new("BillboardGui"))
-    tag.Size = UDim2.fromOffset(240, 30)
-    tag.StudsOffset = Vector3.new(0, 2.5, 0)
-    tag.AlwaysOnTop = true
-    tag.Parent = gui
-    entry.tag = tag
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.fromScale(1, 1)
-    label.BackgroundTransparency = 1
-    label.Text = player.DisplayName .. " (@" .. player.Name .. ")"
-    label.TextStrokeTransparency = 0
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 14
-    label.Parent = tag
-    entry.label = label
-end
-
-connect(Players.PlayerRemoving, clearPlayer)
-
-connect(RunService.RenderStepped, function()
-    local camera = workspace.CurrentCamera
-    if not camera then return end
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player == me then continue end
-
-        local character = player.Character
-        if not character then
-            clearPlayer(player)
-            continue
-        end
-
-        local entry = tracked[player]
-        if not entry or entry.character ~= character then
-            setup(player, character)
-            entry = tracked[player]
-        end
-
-        local head = livingHead(player)
-        local visible = head
-            and clearPath(camera.CFrame.Position, head)
-
-        local color = visible
-            and Color3.fromRGB(60, 255, 100)
-            or Color3.fromRGB(255, 65, 65)
-
-        entry.highlight.Enabled = settings.esp and head ~= nil
-        entry.highlight.FillColor = color
-        entry.highlight.OutlineColor = color
-
-        entry.tag.Adornee = head
-        entry.tag.Enabled = settings.esp
-            and settings.names and head ~= nil
-        entry.label.TextColor3 = color
-
-        for _, joint in ipairs(character:GetDescendants()) do
-            if not joint:IsA("Motor6D") then continue end
-            local a, b = joint.Part0, joint.Part1
-            if not a or not b then continue end
-            if a.Name == "HumanoidRootPart"
-                or b.Name == "HumanoidRootPart" then
-                continue
-            end
-
-            local line = entry.lines[joint]
-            if not line then
-                line = Instance.new("LineHandleAdornment")
-                line.Adornee = workspace.Terrain
-                line.AlwaysOnTop = true
-                line.ZIndex = 5
-                line.Thickness = 2
-                line.Parent = folder
-                entry.lines[joint] = line
-                table.insert(entry.objects, line)
-            end
-
-            local length = (b.Position - a.Position).Magnitude
-            line.Color3 = color
-            line.Visible = settings.esp
-                and settings.skeleton
-                and head ~= nil
-                and length > 0.01
-
-            if length > 0.01 then
-                line.Length = length
-                line.CFrame = CFrame.lookAt(a.Position, b.Position)
-            end
-        end
-
-        for joint, line in pairs(entry.lines) do
-            if not joint:IsDescendantOf(character)
-                or not joint.Part0 or not joint.Part1 then
-                line:Destroy()
-                entry.lines[joint] = nil
-            end
-        end
-    end
-end)
-
--- Экспериментальный перехват Raycast.
--- Не влияет на серверные выстрелы или другие системы оружия.
-local hookInstalled = false
-
-if type(hookmetamethod) == "function"
-    and type(getnamecallmethod) == "function"
-    and type(checkcaller) == "function" then
-
-    local previous
-    local callback = function(self, ...)
-        local args = table.pack(...)
-
-        if alive
-            and settings.silent
-            and self == workspace
-            and not checkcaller()
-            and getnamecallmethod() == "Raycast"
-            and typeof(args[1]) == "Vector3"
-            and typeof(args[2]) == "Vector3" then
-
-            local origin = args[1]
-            local length = args[2].Magnitude
-
-            if length > 0 then
-                local ok, target = pcall(chooseTarget, origin, length)
-
-                if ok and target then
-                    local direction = target.Position - origin
-                    if direction.Magnitude > 0.001 then
-                        args[2] = direction.Unit * length
-                    end
+        if show and cfg.skeleton then
+            for _,joint in ipairs(char:GetDescendants()) do
+                if not joint:IsA('Motor6D') then continue end
+                local a,b=joint.Part0,joint.Part1
+                if not a or not b or a.Name=='HumanoidRootPart' or b.Name=='HumanoidRootPart' then continue end
+                if not e.lines[joint] then
+                    local line=Instance.new('LineHandleAdornment',folder)
+                    line.Adornee=workspace.Terrain
+                    line.AlwaysOnTop=true
+                    line.ZIndex=5
+                    line.Thickness=2
+                    e.lines[joint]=line
+                    table.insert(e.objects,line)
                 end
             end
         end
-
-        return previous(self, table.unpack(args, 1, args.n))
+        for joint,line in pairs(e.lines) do
+            local a,b=joint.Part0,joint.Part1
+            if not joint:IsDescendantOf(char) or not a or not b then
+                line:Destroy(); e.lines[joint]=nil
+            else
+                local length=(b.Position-a.Position).Magnitude
+                line.Visible=show and cfg.skeleton and length>0.01
+                line.Color3=color
+                if line.Visible then line.Length=length; line.CFrame=CFrame.lookAt(a.Position,b.Position) end
+            end
+        end
     end
-
-    local ok = pcall(function()
-        previous = hookmetamethod(
-            game,
-            "__namecall",
-            type(newcclosure) == "function"
-                and newcclosure(callback)
-                or callback
-        )
+end)
+local function chooseTarget(origin,maxDistance,rayParams)
+    local camera=workspace.CurrentCamera
+    if not camera or not cfg.esp then return end
+    local root=me.Character and me.Character:FindFirstChild('HumanoidRootPart')
+    local playerOrigin=root and root.Position or camera.CFrame.Position
+    local best,limit=nil,cfg.fov
+    local center=camera.ViewportSize/2
+    for _,player in ipairs(Players:GetPlayers()) do
+        if player==me then continue end
+        local char=player.Character
+        local head=char and char:FindFirstChild('Head')
+        local hum=char and char:FindFirstChildOfClass('Humanoid')
+        if not head or not hum or hum.Health<=0 then continue end
+        local delta=head.Position-origin
+        if delta.Magnitude>maxDistance or delta.Magnitude<0.001 then continue end
+        local distancePart=char:FindFirstChild('HumanoidRootPart') or head
+        local meters=(distancePart.Position-playerOrigin).Magnitude*0.28
+        if meters>cfg.aimDistance or meters>cfg.distance then continue end
+        -- Same camera visibility test used to color ESP green.
+        if not clearPath(camera.CFrame.Position,head) then continue end
+        local point,onScreen=camera:WorldToViewportPoint(head.Position)
+        local pixels=(Vector2.new(point.X,point.Y)-center).Magnitude
+        if not onScreen or pixels>=limit then continue end
+        if cfg.walls then
+            if not clearPath(origin,head) then continue end
+            -- Also honor the original ray's collision/filter settings.
+            local hit=rawRaycast(workspace,origin,delta.Unit*(delta.Magnitude+0.1),rayParams)
+            if hit and not hit.Instance:IsDescendantOf(char) then continue end
+        end
+        best,limit=head,pixels
+    end
+    return best
+end
+local installed=false
+if type(hookmetamethod)=='function' and type(getnamecallmethod)=='function' and type(checkcaller)=='function' then
+    local previous
+    local callback=function(self,...)
+        local args=table.pack(...)
+        if alive and cfg.aim and self==workspace and not checkcaller() and getnamecallmethod()=='Raycast'
+            and typeof(args[1])=='Vector3' and typeof(args[2])=='Vector3' then
+            local length=args[2].Magnitude
+            local ok,head=pcall(chooseTarget,args[1],length,args[3])
+            if ok and head then
+                local delta=head.Position-args[1]
+                if delta.Magnitude>0.001 then args[2]=delta.Unit*length end
+            end
+        end
+        return previous(self,table.unpack(args,1,args.n))
+    end
+    installed=pcall(function()
+        previous=hookmetamethod(game,'__namecall',type(newcclosure)=='function' and newcclosure(callback) or callback)
     end)
-
-    hookInstalled = ok
 end
-
-if hookInstalled then
-    status.Text = "Правый Shift — меню • Радиус: 150 px\n"
-        .. "Raycast-перехват установлен; попадания не проверены"
-else
-    status.Text = "Правый Shift — меню\n"
-        .. "Silent aim недоступен: нет поддержки перехвата"
-end
-
-_G.BriskToolsStop = function()
-    alive = false
-    settings.silent = false
-
-    for _, connection in ipairs(connections) do
-        connection:Disconnect()
-    end
-
-    for player in pairs(tracked) do
-        clearPlayer(player)
-    end
-
+status.Text=installed and 'Raycast hook installed. Game compatibility unverified.' or 'Raycast hook unavailable. ESP still works.'
+_G.BriskToolsStop=function()
+    alive=false
+    cfg.aim=false
+    for _,c in ipairs(connections) do c:Disconnect() end
+    for player in pairs(tracked) do clear(player) end
     folder:Destroy()
     gui:Destroy()
-    _G.BriskToolsStop = nil
+    _G.BriskToolsStop=nil
 end
