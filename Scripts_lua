@@ -11,7 +11,7 @@ if not me then
     me = Players.LocalPlayer
 end
 assert(me, 'LocalPlayer unavailable: run on the client')
-local cfg = {esp=false, names=false, skeleton=false, aim=false, walls=false, fov=50, distance=100, aimDistance=100, circle=false, stone=false, sulfur=false, metal=false, nitrate=false, cupboard=false, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false, freecam=false, cameraSpeed=50, buildings=false, buildingDistance=300}
+local cfg = {esp=false, names=false, skeleton=false, aim=false, walls=false, fov=50, distance=100, aimDistance=100, circle=false, stone=false, metal=false, nitrate=false, cupboard=false, resourceDistance=300, bulletSpeed=0, leadMs=100, bulletGravity=0, holdAim=false, predict=false, freecam=false, cameraSpeed=50, buildings=false, buildingDistance=300}
 local alive, tracked, connections = true, {}, {}
 local stopFreecam
 local folder = Instance.new('Folder', workspace)
@@ -322,7 +322,7 @@ toggle(visuals, 'Подсветка игроков', 'esp', 0)
 toggle(visuals, 'Ники / HP / расстояние', 'names', 46)
 toggle(visuals, 'Скелет • до 150 м', 'skeleton', 92)
 numberBox(visuals, 'Дальность ESP • метры', 'distance', 138)
-toggle(buildingsPage, 'Шкаф • фиолетовый', 'cupboard', 0)
+toggle(buildingsPage, 'Шкаф', 'cupboard', 0)
 toggle(buildingsPage, 'Другие постройки • тест', 'buildings', 46)
 numberBox(buildingsPage, 'Дальность построек • метры', 'buildingDistance', 92)
 local buildingHint=text(buildingsPage,'Шкаф распознаётся по точному имени Flag.\nОстальные постройки — по именам в папках построек; совместимость не проверена.',142,100)
@@ -369,11 +369,10 @@ connect(UIS.InputEnded, function(input)
 end)
 refreshFov()
 numberBox(aimPage, 'Дальность наведения • метры', 'aimDistance', 200)
-toggle(resourcesPage, 'Камень • серый', 'stone', 0)
-toggle(resourcesPage, 'Сера • белый', 'sulfur', 46)
-toggle(resourcesPage, 'Металл • жёлтый', 'metal', 92)
+toggle(resourcesPage, 'Камень', 'stone', 0)
+toggle(resourcesPage, 'Сера', 'nitrate', 46)
+toggle(resourcesPage, 'Металл', 'metal', 92)
 numberBox(resourcesPage, 'Дальность ресурсов • метры', 'resourceDistance', 138)
-toggle(resourcesPage, 'Селитра • белый', 'nitrate', 184)
 local resourceHint = text(resourcesPage, 'До 24 ближайших меток ресурсов.', 226, 24)
 resourceHint.TextColor3 = dim
 resourceHint.TextSize = 12
@@ -460,14 +459,12 @@ local resourceKinds = {
     buildings = {title='Постройка', color=Color3.fromRGB(220,220,220)},
     cupboard = {title='Шкаф', color=Color3.fromRGB(197, 130, 255)},
     stone = {title='Камень', color=Color3.fromRGB(200, 205, 218)},
-    sulfur = {title='Сера', color=Color3.fromRGB(255, 255, 255)},
-    nitrate = {title='Селитра', color=Color3.fromRGB(255, 255, 255)},
+    nitrate = {title='Сера', color=Color3.fromRGB(255, 255, 255)},
     metal = {title='Металл', color=Color3.fromRGB(255, 216, 70)},
 }
 local aliases = {
     stone={'stone','stoneore','stonenode','rock','rocknode','камень'},
     nitrate={'nitrate','nitrateore','nitratenode','saltpeter','saltpetre','селитра'},
-    sulfur={'sulfur','sulphur','sulfurore','sulphurore','sulfurnode','сера'},
     metal={'metal','metalore','metalnode','iron','ironore','металл','метал'},
 }
 local function identifyName(value)
