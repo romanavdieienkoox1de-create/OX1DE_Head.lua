@@ -219,31 +219,91 @@ local function toggle(parent, title, key, y)
     end)
     refresh()
 end
+-- Shared drag handlers for all numeric settings (mouse and touch).
+local activeSlider, activeSliderInput
+connect(UIS.InputChanged,function(input)
+    if not activeSlider then return end
+    if input == activeSliderInput or (activeSliderInput.UserInputType == Enum.UserInputType.MouseButton1
+        and input.UserInputType == Enum.UserInputType.MouseMovement) then
+        activeSlider(input.Position.X)
+    end
+end)
+connect(UIS.InputEnded,function(input)
+    if input == activeSliderInput then activeSlider=nil; activeSliderInput=nil end
+end)
+connect(UIS.WindowFocusReleased,function() activeSlider=nil; activeSliderInput=nil end)
 local function numberBox(parent, title, key, y, minimum, maximum)
+    minimum,maximum=minimum or 1,maximum or 100000
+    -- A curved distance scale gives more precision near the player.
+    local exponent=(key=='distance' or key=='aimDistance' or key=='resourceDistance') and 3
+        or (key=='bulletSpeed' and 2 or 1)
     local row = Instance.new('Frame', parent)
     row.Position = UDim2.fromOffset(0, y)
     row.Size = UDim2.new(1, 0, 0, 42)
-    row.BackgroundColor3 = Color3.fromRGB(29, 29, 29)
+    row.BackgroundColor3 = Color3.fromRGB(29,29,29)
     row.BorderSizePixel = 0
     round(row)
-    local label = text(row, title, 0, 42)
+    local label = text(row, title, 0, 24)
     label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Size = UDim2.new(1, -135, 1, 0)
+    label.Size = UDim2.new(1, -115, 0, 24)
+    label.TextSize = 13
     local box = Instance.new('TextBox', row)
-    box.Position = UDim2.new(1, -112, 0, 5)
-    box.Size = UDim2.fromOffset(100, 28)
-    box.BackgroundColor3 = Color3.fromRGB(48, 48, 48)
-    box.TextColor3 = Color3.new(1, 1, 1)
+    box.Position = UDim2.new(1, -100, 0, 2)
+    box.Size = UDim2.fromOffset(88, 22)
+    box.BackgroundColor3 = Color3.fromRGB(48,48,48)
+    box.TextColor3 = Color3.new(1,1,1)
     box.Font = Enum.Font.GothamBold
-    box.TextSize = 14
-    box.Text = tostring(cfg[key])
+    box.TextSize = 13
     box.ClearTextOnFocus = false
     round(box)
-    connect(box.FocusLost, function()
-        local value = tonumber(box.Text)
-        if value and value == value then cfg[key] = math.clamp(math.round(value), minimum or 1, maximum or 100000) end
-        box.Text = tostring(cfg[key])
+    local hit = Instance.new('TextButton',row)
+    hit.Position = UDim2.fromOffset(12,25)
+    hit.Size = UDim2.new(1,-24,0,15)
+    hit.BackgroundTransparency = 1
+    hit.Text = ''
+    hit.AutoButtonColor = false
+    local track = Instance.new('Frame',hit)
+    track.Position = UDim2.fromOffset(0,5)
+    track.Size = UDim2.new(1,0,0,5)
+    track.BackgroundColor3 = Color3.fromRGB(65,65,65)
+    track.BorderSizePixel = 0
+    round(track)
+    local progress = Instance.new('Frame',track)
+    progress.BackgroundColor3 = accent
+    progress.BorderSizePixel = 0
+    round(progress)
+    local knob = Instance.new('Frame',track)
+    knob.AnchorPoint = Vector2.new(0.5,0.5)
+    knob.Size = UDim2.fromOffset(11,11)
+    knob.BackgroundColor3 = accent
+    knob.BorderSizePixel = 0
+    round(knob)
+    local function refresh()
+        local value=math.clamp(cfg[key],minimum,maximum)
+        local fraction=((value-minimum)/(maximum-minimum))^(1/exponent)
+        box.Text=tostring(value)
+        progress.Size=UDim2.fromScale(fraction,1)
+        knob.Position=UDim2.fromScale(fraction,0.5)
+    end
+    local function setFromX(x)
+        if hit.AbsoluteSize.X<=0 then return end
+        local fraction=math.clamp((x-hit.AbsolutePosition.X)/hit.AbsoluteSize.X,0,1)
+        cfg[key]=math.clamp(math.round(minimum+(maximum-minimum)*fraction^exponent),minimum,maximum)
+        refresh()
+    end
+    connect(hit.InputBegan,function(input)
+        if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+            activeSlider=setFromX
+            activeSliderInput=input
+            setFromX(input.Position.X)
+        end
     end)
+    connect(box.FocusLost,function()
+        local value=tonumber(box.Text)
+        if value and value==value then cfg[key]=math.clamp(math.round(value),minimum,maximum) end
+        refresh()
+    end)
+    refresh()
 end
 toggle(visuals, 'Подсветка игроков', 'esp', 0)
 toggle(visuals, 'Ники / HP / расстояние', 'names', 46)
