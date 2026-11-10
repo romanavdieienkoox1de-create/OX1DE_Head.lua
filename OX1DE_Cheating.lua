@@ -523,3 +523,280 @@ local source=table.concat(o)
 local fn,err=loadstring(source,"OX1DE_Cheating")
 if not fn then error("OX1DE load error: "..tostring(err)) end
 fn()
+
+-- OX1DE v0.4 experimental automation
+-- Client-only helpers; server-controlled generator completion is never guaranteed.
+do
+    local P=game:GetService("Players").LocalPlayer
+    if P then
+        local W=game:GetService("Workspace")
+        local H=game:GetService("RunService")
+        local pg=P:WaitForChild("PlayerGui")
+        local g=pg:FindFirstChild("OX1DE_Cheating")
+        local win=g and g:FindFirstChild("OX1DEWindow")
+        local right=win and win:FindFirstChild("MainTab",true)
+        local panel
+        if right then
+            for _,c in ipairs(right:GetChildren()) do
+                if c:IsA("Frame") then
+                    for _,v in ipairs(c:GetChildren()) do
+                        if v:IsA("TextLabel") and v.Text=="ОСНОВНЫЕ ФУНКЦИИ" then panel=c end
+                    end
+                end
+            end
+        end
+        local green=Color3.fromRGB(116,255,47)
+        local muted=Color3.fromRGB(165,174,178)
+        local autoGen,autoSkill=false,false
+        local alive=true
+        local held=false
+        local promptAt=0
+        local skillAt=0
+        local lastAligned=false
+        local statusGen,statusSkill="ожидание","ожидание"
+        local function key(k,down)
+            local success=false
+            local ok,vi=pcall(function()return game:GetService("VirtualInputManager") end)
+            if ok and vi then
+                success=pcall(function()vi:SendKeyEvent(down,k,false,game)end)
+            end
+            if not success then
+                local code=k==Enum.KeyCode.Space and 0x20 or 0x45
+                local fn=down and keypress or keyrelease
+                if type(fn)=="function" then success=pcall(fn,code) end
+            end
+            return success
+        end
+        local function hold(v)
+            if held~=v then
+                if key(Enum.KeyCode.E,v) then held=v end
+            end
+        end
+        local function part(obj)
+            if obj:IsA("BasePart") then return obj end
+            if obj:IsA("Model") then return obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart",true) end
+        end
+        local prompts=setmetatable({},{__mode="k"})
+        local gens=setmetatable({},{__mode="k"})
+        local function tagged(obj)
+            local s=string.lower(obj.Name)
+            local p=obj.Parent
+            for i=1,3 do
+                if not p or p==W then break end
+                s=s.." "..string.lower(p.Name)
+                p=p.Parent
+            end
+            if obj:IsA("ProximityPrompt") then
+                s=s.." "..string.lower(obj.ActionText).." "..string.lower(obj.ObjectText)
+            end
+            return s:find("generator",1,true) or s:find("генератор",1,true) or s:find("repair",1,true) or s:find("ремонт",1,true) or s:find("fix",1,true)
+        end
+        local function collect(obj)
+            if obj:IsA("ProximityPrompt") and tagged(obj) then prompts[obj]=true end
+            if (obj:IsA("Model") or obj:IsA("BasePart")) and tagged(obj) and obj.Name:lower():find("gen",1,true) then
+                local pt=part(obj)
+                if pt then gens[pt]=true end
+            end
+        end
+        for _,d in ipairs(W:GetDescendants()) do collect(d) end
+        local addConn=W.DescendantAdded:Connect(collect)
+        local function nearest()
+            local root=P.Character and P.Character:FindFirstChild("HumanoidRootPart")
+            if not root then return nil,false end
+            local best,dist=nil,math.huge
+            for pr in pairs(prompts) do
+                if pr.Parent and pr.Enabled then
+                    local p=part(pr.Parent)
+                    if p then
+                        local d=(root.Position-p.Position).Magnitude
+                        if d<math.min(13,pr.MaxActivationDistance+1) and d<dist then best=pr;dist=d end
+                    end
+                end
+            end
+            if best then return best,true end
+            for p in pairs(gens) do
+                if p.Parent and (root.Position-p.Position).Magnitude<=12 then return nil,true end
+            end
+            return nil,false
+        end
+        local function visible(o)
+            if not (o and o:IsA("GuiObject") and o.Parent) then return false end
+            local x=o
+            while x and x~=pg do
+                if x:IsA("GuiObject") and not x.Visible then return false end
+                x=x.Parent
+            end
+            return true
+        end
+        local function skillWidget()
+            for _,o in ipairs(pg:GetDescendants()) do
+                if o:IsA("GuiObject") and visible(o) then
+                    local n=string.lower(o.Name)
+                    if n:find("skill",1,true) or n:find("check",1,true) or n:find("timing",1,true) or n:find("minigame",1,true) then
+                        if #o:GetDescendants()>2 then return o end
+                    end
+                end
+            end
+        end
+        local function aligned(parent)
+            if not parent or not visible(parent) then return false end
+            local needle,target
+            for _,o in ipairs(parent:GetDescendants()) do
+                if o:IsA("GuiObject") and visible(o) then
+                    local n=string.lower(o.Name)
+                    if not needle and (n:find("needle",1,true) or n:find("pointer",1,true) or n:find("indicator",1,true) or n:find("cursor",1,true)) then needle=o end
+                    if not target and (n:find("target",1,true) or n:find("success",1,true) or n:find("great",1,true) or n:find("white",1,true) or n:find("zone",1,true)) then target=o end
+                end
+            end
+            if not needle or not target then return false end
+            local np,ns=needle.AbsolutePosition,needle.AbsoluteSize
+            local tp,ts=target.AbsolutePosition,target.AbsoluteSize
+            local x=np.X+ns.X/2
+            if x>tp.X+ts.X*.2 and x<tp.X+ts.X*.8 and math.abs(np.Y+ns.Y/2-tp.Y-ts.Y/2)<math.max(32,ts.Y*1.5) then return true end
+            local angle=(needle.Rotation-target.Rotation+540)%360-180
+            return (needle.Rotation~=0 or target.Rotation~=0) and math.abs(angle)<8
+        end
+        local function pulse()
+            if os.clock()-skillAt<.6 then return end
+            skillAt=os.clock()
+            hold(false)
+            if key(Enum.KeyCode.E,true) then
+                task.wait(.03)
+                key(Enum.KeyCode.E,false)
+                statusSkill="попытка попадания"
+            else
+                statusSkill="эмуляция клавиши недоступна"
+            end
+        end
+        local function activatePrompt(pr)
+            local ok=pcall(function()
+                if type(fireproximityprompt)=="function" then
+                    fireproximityprompt(pr)
+                else
+                    pr:InputHoldBegin()
+                    task.wait(math.max(.12,pr.HoldDuration+.08))
+                    if pr.Parent then pr:InputHoldEnd() end
+                end
+            end)
+            if not ok then statusGen="промпт недоступен" end
+        end
+        local genSub,skillSub
+        if panel then
+            local last
+            for _,v in ipairs(panel:GetChildren()) do
+                if v:IsA("TextButton") then
+                    for _,txt in ipairs(v:GetChildren()) do
+                        if txt:IsA("TextLabel") and txt.Text=="Auto Generator / Skill Check" then last=v end
+                    end
+                end
+            end
+            if last then last:Destroy() end
+            local function makeRow(y,title,subtitle,callback)
+                local row=Instance.new("TextButton")
+                row.Name="OX1DE_Auto_"..title
+                row.Text=""
+                row.AutoButtonColor=false
+                row.BackgroundColor3=Color3.fromRGB(29,35,39)
+                row.BorderSizePixel=0
+                row.Size=UDim2.fromOffset(396,39)
+                row.Position=UDim2.fromOffset(11,y)
+                row.Parent=panel
+                local corner=Instance.new("UICorner",row)
+                corner.CornerRadius=UDim.new(0,9)
+                local function label(t,y,h,sz,c)
+                    local v=Instance.new("TextLabel")
+                    v.BackgroundTransparency=1
+                    v.Position=UDim2.fromOffset(16,y)
+                    v.Size=UDim2.new(1,-90,0,h)
+                    v.Text=t
+                    v.TextSize=sz
+                    v.TextColor3=c
+                    v.Font=Enum.Font.Gotham
+                    v.TextXAlignment=Enum.TextXAlignment.Left
+                    v.Parent=row
+                    return v
+                end
+                label(title,2,20,13,Color3.new(1,1,1))
+                local s=label(subtitle,20,16,10,muted)
+                local b=Instance.new("Frame")
+                b.Size=UDim2.fromOffset(45,22)
+                b.Position=UDim2.new(1,-56,.5,-11)
+                b.BackgroundColor3=Color3.fromRGB(60,74,68)
+                b.Parent=row
+                Instance.new("UICorner",b).CornerRadius=UDim.new(1,0)
+                local circle=Instance.new("Frame")
+                circle.Size=UDim2.fromOffset(16,16)
+                circle.Position=UDim2.fromOffset(3,3)
+                circle.BackgroundColor3=Color3.new(1,1,1)
+                circle.Parent=b
+                Instance.new("UICorner",circle).CornerRadius=UDim.new(1,0)
+                row.MouseButton1Click:Connect(function()
+                    local now=callback()
+                    b.BackgroundColor3=now and green or Color3.fromRGB(60,74,68)
+                    circle.Position=now and UDim2.fromOffset(26,3) or UDim2.fromOffset(3,3)
+                    circle.BackgroundColor3=now and Color3.fromRGB(9,12,15) or Color3.new(1,1,1)
+                end)
+                return s
+            end
+            genSub=makeRow(232,"Auto Generator","Работает рядом с генератором",function() autoGen=not autoGen;return autoGen end)
+            skillSub=makeRow(272,"Auto Skill Check","Распознавание белой зоны",function() autoSkill=not autoSkill;return autoSkill end)
+        end
+        local oldStop=_G.OX1DE_CHEATING_STOP
+        _G.OX1DE_CHEATING_STOP=function()
+            alive=false
+            hold(false)
+            if addConn then addConn:Disconnect() end
+            if type(oldStop)=="function" then pcall(oldStop) end
+        end
+        task.spawn(function()
+            while alive do
+                if autoGen then
+                    local prompt,close=nearest()
+                    if prompt and os.clock()>=promptAt then
+                        hold(false)
+                        promptAt=os.clock()+math.max(1.3,prompt.HoldDuration+.5)
+                        statusGen="взаимодействие"
+                        task.spawn(activatePrompt,prompt)
+                    elseif close and not prompt then
+                        hold(true)
+                        statusGen=held and "удержание E" or "ввод недоступен"
+                    elseif not close then
+                        hold(false)
+                        statusGen="подойди к генератору"
+                    end
+                else
+                    hold(false)
+                end
+                if genSub and genSub.Parent then
+                    genSub.Text="Auto Generator"
+                    genSub.Text=""
+                end
+                task.wait(.25)
+            end
+            hold(false)
+        end)
+        local currentSkill
+        task.spawn(function()
+            while alive do
+                if autoSkill then currentSkill=skillWidget() else currentSkill=nil end
+                task.wait(.15)
+            end
+        end)
+        local beat=H.Heartbeat:Connect(function()
+            if not alive then return end
+            if autoSkill and currentSkill then
+                local hit=aligned(currentSkill)
+                if hit and not lastAligned then task.spawn(pulse) end
+                lastAligned=hit
+            else
+                lastAligned=false
+            end
+        end)
+        -- Replace cleanup hook with one that also tears down the render loop.
+        local currentStop=_G.OX1DE_CHEATING_STOP
+        _G.OX1DE_CHEATING_STOP=function()
+            if beat then beat:Disconnect() end
+            if type(currentStop)=="function" then pcall(currentStop) end
+        end
+    end
+end
