@@ -606,7 +606,7 @@ do
             local best,dist=nil,math.huge
             for pr in pairs(prompts) do
                 if pr.Parent and pr.Enabled then
-                    local p=part(pr.Parent)
+                    local parent=pr.Parent;local p=parent and (parent:IsA("Attachment") and parent.Parent or part(parent))
                     if p then
                         local d=(root.Position-p.Position).Magnitude
                         if d<math.min(13,pr.MaxActivationDistance+1) and d<dist then best=pr;dist=d end
