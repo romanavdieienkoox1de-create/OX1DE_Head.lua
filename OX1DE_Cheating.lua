@@ -60,12 +60,16 @@ if savedSettings then
   end
  end
 end
-local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20}
+local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20,mode="legit"}
 if savedSettings and type(savedSettings.warfare)=="table" then
  for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},smooth={5,100},drop={0,100}}) do
   local v=savedSettings.warfare[name]
   if type(v)=="number" then warSettings[name]=math.clamp(v,limits[1],limits[2]) end
  end
+end
+if savedSettings and type(savedSettings.warfare)=="table" then
+ local rememberedMode=savedSettings.warfare.mode
+ if rememberedMode=="hard" or rememberedMode=="legit" then warSettings.mode=rememberedMode end
 end
 local function editableColor(key)
  return key=="players" or key=="generators" or key=="pumpkins" or key=="pallets"
@@ -733,7 +737,7 @@ local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
 local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
 text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
-local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,1010),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,1130),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,345),CanvasSize=UDim2.fromOffset(0,425),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
@@ -757,13 +761,42 @@ local function warRow(parent,y,key,heading,details,colorKey,binding)
  switch(row,key,x,41)
  listen(row.MouseButton1Click,function() toggle(key) end)
 end
-warRow(mscroll,0,"warAimPreview","AIM • наведение","ПКМ для плавного наведения на врага","warAim","warAim")
+warRow(mscroll,0,"warAimPreview","AIM • наведение","Legit / Hard • бинд F10","warAim","warAim")
 warRow(mscroll,82,"warFly","Fly","Полёт по WASD / Space",nil,"warFly")
 warRow(mscroll,164,"warNoClip","NoClip","Проход сквозь препятствия",nil,"warNoClip")
 warRow(mscroll,246,"warFov","FOV • круг","Цвет и радиус FOV","warFov")
 warRow(mscroll,328,"warWallCheck","Wall Check","Проверять препятствия")
 warRow(mscroll,410,"warTeamCheck","Team Check","Не выбирать своих тиммейтов")
-warRow(mscroll,492,"warHoldAim","AIM • удержание ПКМ","Работает, пока зажата ПКМ")
+warRow(mscroll,492,"warHoldAim","AIM • удержание","ПКМ или ЛКМ при стрельбе")
+local aimModeRow=make("Frame",mscroll,{
+ Position=UDim2.fromOffset(5,574),Size=UDim2.fromOffset(398,74),
+ BackgroundColor3=C.row,BorderSizePixel=0
+})
+corner(aimModeRow,10)
+text(aimModeRow,"Режим AIM",UDim2.fromOffset(13,8),UDim2.fromOffset(175,28),14,true,C.white)
+text(aimModeRow,"Legit • плавно / Hard • сразу",UDim2.fromOffset(13,39),UDim2.fromOffset(220,24),10,false,C.muted)
+local modeButtons={}
+for _,opt in ipairs({{key="legit",name="LEGIT",x=242},{key="hard",name="HARD",x=317}}) do
+ local btn=make("TextButton",aimModeRow,{
+  Position=UDim2.fromOffset(opt.x,21),Size=UDim2.fromOffset(70,35),
+  Text=opt.name,TextColor3=C.white,TextSize=12,Font=Enum.Font.GothamBold,
+  BackgroundColor3=C.card,BorderSizePixel=0,AutoButtonColor=false
+ })
+ corner(btn,8)
+ modeButtons[opt.key]=btn
+ listen(btn.MouseButton1Click,function()
+  warSettings.mode=opt.key
+  for key,button in pairs(modeButtons) do
+   tween(button,{BackgroundColor3=key==warSettings.mode and C.darkgreen or C.card},.18)
+   button.TextColor3=key==warSettings.mode and C.green or C.white
+  end
+  scheduleSettingsSave()
+ end)
+end
+for key,button in pairs(modeButtons) do
+ button.BackgroundColor3=key==warSettings.mode and C.darkgreen or C.card
+ button.TextColor3=key==warSettings.mode and C.green or C.white
+end
 -- Slider controls instead of plus/minus buttons. The values are display/
 -- selection preferences, not modifications to remote damage or projectiles.
 local warSliderState={dragging=false}
@@ -825,11 +858,11 @@ local function warValue(y,key,title,unit,minV,maxV,step)
  end)
  render()
 end
-warValue(578,"fov","FOV • радиус"," px",20,400,5)
-warValue(657,"distance","Дальность AIM"," м",10,300,5)
-warValue(736,"prediction","Упреждение • движение"," %",0,100,5)
-warValue(815,"smooth","Плавность камеры"," %",5,100,5)
-warValue(894,"drop","Поправка по дальности"," %",0,100,5)
+warValue(660,"fov","FOV • радиус"," px",20,400,5)
+warValue(739,"distance","Макс. дальность"," м",10,300,5)
+warValue(818,"prediction","Упреждение движения"," %",0,100,5)
+warValue(897,"smooth","Скорость Legit"," %",5,100,5)
+warValue(976,"drop","Поправка по дальности"," %",0,100,5)
 warRow(escroll,0,"warAllies","Союзники","Салатовая подсветка и контур","warAllies")
 warRow(escroll,82,"warEnemies","Противники","Красная подсветка и контур","warEnemies")
 warRow(escroll,164,"warNames","Никнеймы ESP","Цвет ника зависит от команды")
@@ -1450,6 +1483,8 @@ local function warfareTarget()
        (ownTeam~=nil and theirTeam~=nil and ownTeam~=theirTeam))
    if allowed then
     local ch=player.Character
+    -- The Head part is used at its current world position: crouching and
+    -- prone animations shift it automatically, unlike a fixed torso offset.
     local part=ch:FindFirstChild("Head") or ch:FindFirstChild("HumanoidRootPart")
     local hum=ch:FindFirstChildOfClass("Humanoid")
     if part and hum and hum.Health>0 and (ownRoot.Position-part.Position).Magnitude<=maxRange then
@@ -1465,7 +1500,10 @@ local function warfareTarget()
      if visible and point.Z>0 then
       local xy=Vector2.new(point.X,point.Y)
       local px=(xy-center).Magnitude
-      if px<=warSettings.fov and px<bestDist then
+      -- Choose nearest player in 3D, not the smallest pixel distance to
+      -- the crosshair. Pixel distance is used only as a tie-breaker.
+      if px<=warSettings.fov and (range<bestDist-1 or
+       (math.abs(range-bestDist)<=1 and (not bestPoint or px<(bestPoint-center).Magnitude))) then
        local unobstructed=true
        if state.warWallCheck then
         local origin=cam.CFrame.Position
@@ -1476,7 +1514,7 @@ local function warfareTarget()
         local hit=Workspace:Raycast(origin,ray,params)
         unobstructed=not hit or hit.Instance:IsDescendantOf(ch)
        end
-       if unobstructed then best,bestPoint,bestDist,bestAimPoint=player,xy,px,lead end
+       if unobstructed then best,bestPoint,bestDist,bestAimPoint=player,xy,range,lead end
       end
      end
     end
@@ -1517,7 +1555,7 @@ listen(RunService.RenderStepped,function(delta)
  local target,position,_,goal=warfareTarget()
  warCurrentTarget,warCurrentAimPoint=target,goal
  if warAimStatus and warAimStatus.Parent then
-  warAimStatus.Text=target and ("AIM: "..target.DisplayName.." • "..(state.warHoldAim and "зажми ПКМ" or "наведение включено")) or "AIM: нет доступного противника"
+  warAimStatus.Text=target and ("AIM "..string.upper(warSettings.mode).." • "..target.DisplayName.." • "..(state.warHoldAim and "ПКМ или ЛКМ" or "активен")) or "AIM: нет доступного противника"
  end
  if target and position then
   warAimMark.Text=target.DisplayName.."  •  ЦЕЛЬ"
@@ -1532,16 +1570,36 @@ local aimRenderEnabled=false
 local registered=pcall(function()
  RunService:BindToRenderStep(aimRenderName,Enum.RenderPriority.Camera.Value+1,function(dt)
   if not alive or isOpen or activeTab~="warfare" or not state.warAimPreview then return end
-  if state.warHoldAim and not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
+  -- When "hold" is on, aim while RMB is held OR while shooting with LMB.
+  -- This allows tracking a target without using ADS.
+  if state.warHoldAim and not (
+   UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+   or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+  ) then return end
   local target,goal=warCurrentTarget,warCurrentAimPoint
-  if not target or not target.Character or not goal then return end
+  local hum=target and target.Character and target.Character:FindFirstChildOfClass("Humanoid")
+  if not target or not target.Character or not hum or hum.Health<=0 or not goal then
+   -- Target died or despawned. Refresh nearest valid enemy immediately.
+   local nextTarget,_,_,nextGoal=warfareTarget()
+   target,goal=nextTarget,nextGoal
+   warCurrentTarget,warCurrentAimPoint=target,goal
+  end
+  if not target or not goal then return end
   local cam=Workspace.CurrentCamera
   if not cam then return end
   local dir=goal-cam.CFrame.Position
   if dir.Magnitude<.01 then return end
   local aimFrame=CFrame.lookAt(cam.CFrame.Position,goal)
-  local alpha=math.clamp(dt*(1.5+warSettings.smooth*.20),0,1)
-  cam.CFrame=cam.CFrame:Lerp(aimFrame,alpha)
+  if warSettings.mode=="hard" then
+   -- Hard: snap directly; the target is refreshed when it is downed
+   -- or dies, so the next nearest valid opponent is selected.
+   cam.CFrame=aimFrame
+  else
+   -- Legit: higher smooth value follows faster, with frame-rate independence.
+   local speed=2+(warSettings.smooth/100)*22
+   local alpha=1-math.exp(-speed*math.min(dt,.075))
+   cam.CFrame=cam.CFrame:Lerp(aimFrame,alpha)
+  end
  end)
  aimRenderEnabled=true
 end)
