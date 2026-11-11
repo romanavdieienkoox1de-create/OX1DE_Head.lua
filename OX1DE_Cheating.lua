@@ -33,7 +33,7 @@ local C={
 }
 local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,fly=false,noclip=false,autoSkill=true,
  warAllies=false,warEnemies=false,warWeapons=false,warFPV=false,
- warFly=false,warAimPreview=false,warFov=true,warWallCheck=true,warTeamCheck=true}
+ warFly=false,warNoClip=false,warAimPreview=false,warFov=true,warWallCheck=true,warTeamCheck=true}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),
  warAllies=Color3.fromRGB(119,255,48),warEnemies=Color3.fromRGB(255,67,81),warFPV=Color3.fromRGB(255,197,62),warFov=Color3.fromRGB(119,255,48),warAim=Color3.fromRGB(255,220,72)}
 -- Local, per-installation settings. No network sync is used.
@@ -221,7 +221,7 @@ local header=make("Frame",window,{Position=UDim2.fromOffset(0,0),Size=UDim2.new(
 make("Frame",window,{Position=UDim2.fromOffset(0,86),Size=UDim2.new(1,0,0,1),BackgroundColor3=Color3.fromRGB(51,81,41),BorderSizePixel=0})
 text(header,"OX1DE",UDim2.fromOffset(29,13),UDim2.fromOffset(510,38),30,true,C.green)
 local subtitleLabel=text(header,ActiveGame.subtitle,UDim2.fromOffset(31,53),UDim2.fromOffset(490,18),10,false,C.muted)
-local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7,warFly=Enum.KeyCode.F9,warAim=Enum.KeyCode.F10}
+local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7,warFly=Enum.KeyCode.F9,warNoClip=Enum.KeyCode.F8,warAim=Enum.KeyCode.F10}
 if savedSettings and type(savedSettings.keys)=="table" then
  for name in pairs(keybind) do
   local keyName=savedSettings.keys[name]
@@ -399,7 +399,7 @@ end
 bindVisual("menu")
 local function beginRebind(key)
  waitingFor=key
- for _,name in ipairs({"menu","fly","noclip","warFly","warAim"}) do bindVisual(name) end
+ for _,name in ipairs({"menu","fly","noclip","warFly","warNoClip","warAim"}) do bindVisual(name) end
 end
 listen(menuBind.MouseButton1Click,function() beginRebind("menu") end)
 local function hoverEffect(o)
@@ -508,7 +508,7 @@ listen(UserInputService.InputBegan,function(input,handled)
     keybind[target]=(key==Enum.KeyCode.Backspace and Enum.KeyCode.Unknown or key)
    end
   end
-  for _,name in ipairs({"menu","fly","noclip","warFly","warAim"}) do bindVisual(name) end
+  for _,name in ipairs({"menu","fly","noclip","warFly","warNoClip","warAim"}) do bindVisual(name) end
   if refreshMenuSink then refreshMenuSink() end
   scheduleSettingsSave()
   return
@@ -519,10 +519,10 @@ listen(UserInputService.InputBegan,function(input,handled)
   if _G.OX1DE_LOCAL_TOGGLE then _G.OX1DE_LOCAL_TOGGLE() end
   return
  end
- for _,name in ipairs({"fly","noclip","warFly","warAim"}) do
+ for _,name in ipairs({"fly","noclip","warFly","warNoClip","warAim"}) do
   if keybind[name]~=Enum.KeyCode.Unknown and key==keybind[name] then
    if (name=="fly" or name=="noclip") and activeTab~="violence_district" then return end
-   if (name=="warFly" or name=="warAim") and activeTab~="warfare" then return end
+   if (name=="warFly" or name=="warNoClip" or name=="warAim") and activeTab~="warfare" then return end
    toggle(name=="warAim" and "warAimPreview" or name)
    return
   end
@@ -733,7 +733,7 @@ local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
 local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
 text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
-local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,800),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,885),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,345),CanvasSize=UDim2.fromOffset(0,344),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
@@ -759,9 +759,10 @@ local function warRow(parent,y,key,heading,details,colorKey,binding)
 end
 warRow(mscroll,0,"warAimPreview","Silent Aim • цель","Визуальный выбор, не попадания","warAim","warAim")
 warRow(mscroll,82,"warFly","Fly","Полёт по WASD / Space",nil,"warFly")
-warRow(mscroll,164,"warFov","FOV • круг","Цвет и радиус FOV","warFov")
-warRow(mscroll,246,"warWallCheck","Wall Check","Проверять препятствия")
-warRow(mscroll,328,"warTeamCheck","Team Check","Не выбирать своих тиммейтов")
+warRow(mscroll,164,"warNoClip","NoClip","Проход сквозь препятствия",nil,"warNoClip")
+warRow(mscroll,246,"warFov","FOV • круг","Цвет и радиус FOV","warFov")
+warRow(mscroll,328,"warWallCheck","Wall Check","Проверять препятствия")
+warRow(mscroll,410,"warTeamCheck","Team Check","Не выбирать своих тиммейтов")
 -- Slider controls instead of plus/minus buttons. The values are display/
 -- selection preferences, not modifications to remote damage or projectiles.
 local warSliderState={dragging=false}
@@ -823,15 +824,15 @@ local function warValue(y,key,title,unit,minV,maxV,step)
  end)
  render()
 end
-warValue(414,"fov","FOV • радиус"," px",20,400,5)
-warValue(493,"distance","Дальность цели"," м",10,300,5)
-warValue(572,"prediction","Prediction • метка"," %",0,100,5)
-warValue(651,"hitChance","Hit Chance • параметр UI"," %",1,100,1)
+warValue(496,"fov","FOV • радиус"," px",20,400,5)
+warValue(575,"distance","Дальность цели"," м",10,300,5)
+warValue(654,"prediction","Prediction • метка"," %",0,100,5)
+warValue(733,"hitChance","Hit Chance • параметр UI"," %",1,100,1)
 warRow(escroll,0,"warAllies","Союзники","Своя Team • зелёный","warAllies")
 warRow(escroll,82,"warEnemies","Противники","Другие Team • красный","warEnemies")
 warRow(escroll,164,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
 warRow(escroll,246,"warFPV","FPV-дроны","Контур моделей дронов","warFPV")
-bindVisual("warFly");bindVisual("warAim")
+bindVisual("warFly");bindVisual("warNoClip");bindVisual("warAim")
 warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
 corner(warFovCircle,1000)
 warFovStroke=border(warFovCircle,palette.warFov,.25,1.4)
@@ -1196,7 +1197,7 @@ local function restore()
     end
 end
 listen(RunService.Stepped,function()
-    if not state.noclip or activeTab~="violence_district" then return end
+    if not ((activeTab=="violence_district" and state.noclip) or (activeTab=="warfare" and state.warNoClip)) then return end
     local ch=LocalPlayer.Character
     if not ch then return end
     for _,v in ipairs(ch:GetDescendants()) do
@@ -1530,7 +1531,7 @@ listen(RunService.Heartbeat,function(dt)
         lastFly=flyNow
         if lastFly then startFly() else stopFly() end
     end
-    local noclipNow=activeTab=="violence_district" and state.noclip
+    local noclipNow=(activeTab=="violence_district" and state.noclip) or (activeTab=="warfare" and state.warNoClip)
     if noclipNow~=lastNoClip then
         lastNoClip=noclipNow
         if not lastNoClip then restore() end
@@ -1607,7 +1608,7 @@ task.spawn(function()
 end)
 _G.OX1DE_CHEATING_STOP=function()
     saveSettingsNow()
-    alive=false;state.fly=false;state.noclip=false;state.warFly=false;state.warAimPreview=false
+    alive=false;state.fly=false;state.noclip=false;state.warFly=false;state.warNoClip=false;state.warAimPreview=false
     state.autoSkill=false
     stopFly();restore()
     if isOpen then stopMenuMouse() end
