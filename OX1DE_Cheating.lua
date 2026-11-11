@@ -406,6 +406,7 @@ local function hoverEffect(o)
  listen(o.MouseEnter,function() tween(o,{BackgroundColor3=Color3.fromRGB(35,45,46)},.17) end)
  listen(o.MouseLeave,function() tween(o,{BackgroundColor3=C.row},.2) end)
 end
+local skillSubtitle
 local rows={
  {key="fly",name="Fly",subtitle="Полёт • WASD / Space",icon="✈",bind=true},
  {key="noclip",name="NoClip",subtitle="Проход сквозь препятствия",icon="⇥",bind=true},
@@ -420,7 +421,8 @@ for i,v in ipairs(rows) do
  corner(ib,9)
  text(ib,v.icon,UDim2.fromScale(0,0),UDim2.fromScale(1,1),23,true,C.green,Enum.TextXAlignment.Center)
  text(f,v.name,UDim2.fromOffset(54,7),UDim2.fromOffset(242,26),15,true)
- text(f,v.subtitle,UDim2.fromOffset(54,34),UDim2.fromOffset(250,21),11,false,C.muted)
+ local subtitle=text(f,v.subtitle,UDim2.fromOffset(54,34),UDim2.fromOffset(250,21),11,false,C.muted)
+ if v.key=="autoSkill" then skillSubtitle=subtitle end
  if v.bind then
   local binding=make("TextButton",f,{Name=v.key.."Bind",Position=UDim2.fromOffset(302,20),Size=UDim2.fromOffset(55,25),BackgroundColor3=C.card,Text=niceKey(keybind[v.key]),TextColor3=C.green,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0,AutoButtonColor=false})
   corner(binding,6);border(binding,C.edge,.4,1)
@@ -889,99 +891,130 @@ local function sendKey(key,down)
  return false
 end
 local function visibleGui(o)
-    if not o or not o.Parent or not o:IsA("GuiObject") then return false end
-    local q=o
-    while q and q~=PlayerGui do
-        if q:IsA("GuiObject") and not q.Visible then return false end
-        q=q.Parent
-    end
-    return true
+ if not o or not o.Parent or not o:IsA("GuiObject") then return false end
+ local q=o
+ while q and q~=PlayerGui do
+  if q:IsA("GuiObject") and not q.Visible then return false end
+  if q:IsA("ScreenGui") and not q.Enabled then return false end
+  q=q.Parent
+ end
+ return q==PlayerGui
 end
 local knownSkillContainer
+local lastSkillSearch=0
+local wordNeedle={"needle","pointer","cursor","indicator","arrow","line","slider","sweep","hand","marker","стрел","указател","метка"}
+local wordTarget={"target","zone","success","perfect","great","hit","dark","black","shadow","white","good","area","window","сектор","зона","успех"}
+local function matchesWord(n,words)
+ for _,word in ipairs(words) do
+  if n:find(word,1,true) then return true end
+ end
+ return false
+end
 local function findSkillContainer()
  if knownSkillContainer and knownSkillContainer.Parent and visibleGui(knownSkillContainer) then
   return knownSkillContainer
  end
  knownSkillContainer=nil
+ if os.clock()-lastSkillSearch<.1 then return nil end
+ lastSkillSearch=os.clock()
  for _,o in ipairs(PlayerGui:GetDescendants()) do
-        if o:IsA("GuiObject") and visibleGui(o) then
-            local n=string.lower(o.Name)
-            if n:find("skill",1,true) or n:find("check",1,true) or n:find("timing",1,true)
-               or n:find("minigame",1,true) or n:find("qte",1,true) or n:find("reaction",1,true) then
-                if #o:GetDescendants()>=2 then
-                    knownSkillContainer=o
-                    return o
-                end
-            end
-        end
+  if o:IsA("GuiObject") and visibleGui(o) then
+   local n=string.lower(o.Name)
+   if matchesWord(n,{"skill","check","timing","minigame","qte","reaction","generatorcheck","repaircheck","провер","навык"}) then
+    if #o:GetDescendants()>=2 then
+     knownSkillContainer=o
+     return o
     end
-    return nil
+   end
+  end
+ end
+ return nil
 end
 local function skillMatch(container)
-    if not container then return false end
-    local needle, zone=nil,nil
-    for _,obj in ipairs(container:GetDescendants()) do
-        if obj:IsA("GuiObject") and visibleGui(obj) then
-            local n=string.lower(obj.Name)
-            local marker=(n:find("needle",1,true) or n:find("pointer",1,true) or n:find("cursor",1,true) or n:find("indicator",1,true) or n:find("arrow",1,true) or n:find("line",1,true) or n:find("slider",1,true) or n:find("sweep",1,true))
-            local target=(n:find("target",1,true) or n:find("zone",1,true) or n:find("success",1,true) or n:find("perfect",1,true) or n:find("great",1,true) or n:find("hit",1,true) or n:find("dark",1,true) or n:find("black",1,true) or n:find("shadow",1,true) or n:find("white",1,true))
-            if marker and not needle then needle=obj end
-            if target and not zone then zone=obj end
-        end
-    end
-    if not needle or not zone or needle==zone then return false end
-    local nPos,nSize=needle.AbsolutePosition,needle.AbsoluteSize
-    local zPos,zSize=zone.AbsolutePosition,zone.AbsoluteSize
-    if nSize.X<1 or zSize.X<1 then return false end
-    -- A horizontal skill-check bar: the needle's centre has reached
-    -- the inner part of the visible success zone.
-    local nx=nPos.X+nSize.X*.5
-    local zy=zPos.Y+zSize.Y*.5
-    local ny=nPos.Y+nSize.Y*.5
-    local early=math.min(zSize.X*.25,9)
-    if math.abs(ny-zy)<=math.max(zSize.Y*1.5,32) and nx>=zPos.X-early and nx<=zPos.X+zSize.X*.72 then
-        return true
-    end
-    -- Circular gauges sometimes use Rotation for needle and target.
-    if needle.Rotation~=0 or zone.Rotation~=0 then
-        local diff=(needle.Rotation-zone.Rotation+540)%360-180
-        if math.abs(diff)<=10 then return true end
-    end
-    return false
+ if not container then return false,"Шкала не обнаружена" end
+ local needles,zones={},{}
+ for _,o in ipairs(container:GetDescendants()) do
+  if o:IsA("GuiObject") and visibleGui(o) then
+   local n=string.lower(o.Name)
+   if matchesWord(n,wordNeedle) then needles[#needles+1]=o end
+   if matchesWord(n,wordTarget) then zones[#zones+1]=o end
+  end
+ end
+ if #needles==0 then return false,"Маркер не найден" end
+ if #zones==0 then return false,"Целевая зона не найдена" end
+ local bestNeedle,bestZone,score=nil,nil,math.huge
+ for _,needle in ipairs(needles) do
+  local nc=needle.AbsolutePosition+needle.AbsoluteSize*.5
+  for _,zone in ipairs(zones) do
+   if needle~=zone and zone.AbsoluteSize.X>0 and zone.AbsoluteSize.Y>0 then
+    local zc=zone.AbsolutePosition+zone.AbsoluteSize*.5
+    local distance=(nc-zc).Magnitude
+    if distance<score then bestNeedle,bestZone,score=needle,zone,distance end
+   end
+  end
+ end
+ if not bestNeedle then return false,"Маркер и зона не сопоставлены" end
+ local needle,zone=bestNeedle,bestZone
+ local np,ns=needle.AbsolutePosition,needle.AbsoluteSize
+ local zp,zs=zone.AbsolutePosition,zone.AbsoluteSize
+ if ns.X<1 or ns.Y<1 then return false,"Невидимый маркер" end
+ local nx,ny=np.X+ns.X*.5,np.Y+ns.Y*.5
+ local zx,zy=zp.X+zs.X*.5,zp.Y+zs.Y*.5
+ -- Only click when the target and indicator actually align. Guessing from
+ -- dark pixels in a single image is not possible from GuiObject properties.
+ if (needle.Rotation~=0 or zone.Rotation~=0) and math.abs(nx-zx)<math.max(90,zs.X*1.5) and math.abs(ny-zy)<math.max(90,zs.Y*1.5) then
+  local diff=(needle.Rotation-zone.Rotation+540)%360-180
+  if math.abs(diff)<=12 then return true,"Совпадение угла" end
+ end
+ local tolerance=math.clamp(zs.X*.16,2,10)
+ if math.abs(ny-zy)<=math.max(zs.Y,18) and nx>=zp.X-tolerance and nx<=zp.X+zs.X*.8 then
+  return true,"Совпадение зоны"
+ end
+ return false,"Ожидание совпадения"
 end
+local skillPressBusy=false
 local function skillPress()
-    if os.clock()-skillLastAt<.65 then return end
-    skillLastAt=os.clock()
-    local key=Enum.KeyCode.Space
-    if sendKey(key,true) then
-        task.wait(.035)
-        sendKey(key,false)
-        skillStatus="нажато"
-    else
-        skillStatus="ввод недоступен"
-    end
+ if skillPressBusy or os.clock()-skillLastAt<.22 then return end
+ skillPressBusy=true
+ local key=Enum.KeyCode.Space
+ local down=sendKey(key,true)
+ if down then
+  task.wait(.025)
+  sendKey(key,false)
+  skillLastAt=os.clock()
+  skillStatus="Space отправлен"
+ else
+  skillStatus="Space недоступен"
+ end
+ skillPressBusy=false
 end
--- Jobs are throttled to avoid scanning the entire Workspace each frame.
 task.spawn(function()
-    while alive do
-        if state.autoSkill then
-            local container=findSkillContainer()
-            local aligned=skillMatch(container)
-            if container then
-                skillStatus=aligned and "совпадение" or "отслеживание"
-                if aligned and not skillWasShown then
-                    task.spawn(skillPress)
-                end
-            else
-                skillStatus="шкала не найдена"
-            end
-            skillWasShown=aligned
-        else
-            skillWasShown=false
-            skillStatus="выключено"
-        end
-        task.wait(state.autoSkill and (skillStatus=="шкала не найдена" and .18 or .045) or .18)
-    end
+ local previousStatus=""
+ local shownAt=0
+ while alive do
+  if state.autoSkill then
+   local container=findSkillContainer()
+   local aligned,message=skillMatch(container)
+   if container and aligned and not skillWasShown then
+    task.spawn(skillPress)
+   end
+   skillWasShown=aligned
+   if os.clock()-skillLastAt>.4 then skillStatus=message end
+  else
+   skillWasShown=false
+   skillStatus="Выключено"
+  end
+  if skillSubtitle and skillSubtitle.Parent and (skillStatus~=previousStatus or os.clock()-shownAt>.4) then
+   previousStatus=skillStatus
+   shownAt=os.clock()
+   skillSubtitle.Text="Статус: "..skillStatus
+  end
+  if state.autoSkill and knownSkillContainer then
+   RunService.RenderStepped:Wait()
+  else
+   task.wait(.12)
+  end
+ end
 end)
 
 -- Local movement ----------------------------------------------------------
