@@ -65,6 +65,7 @@ if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.sele
  activeTab=savedSettings.selectedTab
 end
 local scheduleLegacyRefresh
+local hideWarfareFx
 local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20,mode="legit"}
 if savedSettings and type(savedSettings.warfare)=="table" then
  for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},smooth={5,100},drop={0,100}}) do
@@ -899,6 +900,7 @@ local function setTab(tab)
    objectFx[obj]=nil
   end
  elseif scheduleLegacyRefresh then
+  if hideWarfareFx then hideWarfareFx() end
   task.defer(function()
    if alive and activeTab=="violence_district" then scheduleLegacyRefresh() end
   end)
@@ -1402,13 +1404,14 @@ local function addWarfarePlayer(player)
  local character=player.Character
  local head=character and (character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart"))
  if not head then return nil end
- -- Put the Highlight outside the player's rig. This avoids nested
- -- Highlight rendering conflicts and survives custom character hierarchy.
- local highlight=make("Highlight",Workspace,{
-  Name="OX1DE_WARFARE_Player_"..tostring(player.UserId),
-  Adornee=character,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,
-  FillColor=C.white,FillTransparency=.42,
-  OutlineColor=C.white,OutlineTransparency=0,Enabled=false
+ -- Put the highlight on the actual renderable character. Character models
+ -- can be replaced on respawn, so fx is re-created when the rig changes.
+ local highlight=make("Highlight",character,{
+  Name="OX1DE_WARFARE_TeamOutline",Adornee=character,
+  DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,
+  FillColor=C.white,FillTransparency=.56,
+  OutlineColor=C.white,OutlineTransparency=0,
+  Enabled=false
  })
  local bill,label=billboard(head,C.white,player.DisplayName)
  bill.MaxDistance=320
@@ -1673,9 +1676,13 @@ listen(RunService.Heartbeat,function(dt)
    if need and not fx then fx=addWarfarePlayer(player) end
    if fx then
     fx.billboard.Enabled=named and true or false
-    fx.highlight.Enabled=outlined and true or false
+    -- A team's toggle controls its outline. The nickname toggle only
+    -- controls text, never body highlighting.
     fx.highlight.OutlineColor=kind and palette[kind] or C.white
     fx.highlight.FillColor=kind and palette[kind] or C.white
+    fx.highlight.OutlineTransparency=0
+    fx.highlight.FillTransparency=.56
+    fx.highlight.Enabled=outlined and true or false
     fx.label.TextColor3=kind and palette[kind] or C.white
     fx.weaponLabel.TextColor3=kind and palette[kind] or C.white
     local heldWeapon=nil
@@ -1732,7 +1739,18 @@ task.spawn(function()
  end
 end)
 
+hideWarfareFx=function()
+ for _,fx in pairs(warfarePlayers) do
+  if fx.highlight then fx.highlight.Enabled=false end
+  if fx.billboard then fx.billboard.Enabled=false end
+  if fx.weaponBillboard then fx.weaponBillboard.Enabled=false end
+ end
+ for _,h in pairs(warfareDrones) do if h then h.Enabled=false end end
+ if warAimMark then warAimMark.Visible=false end
+ if warFovCircle then warFovCircle.Visible=false end
+end
 warfareCleanup=function()
+ if hideWarfareFx then hideWarfareFx() end
  pcall(function() RunService:UnbindFromRenderStep(aimRenderName) end)
  if warFovCircle then warFovCircle.Visible=false end
  if warAimMark then warAimMark.Visible=false end
