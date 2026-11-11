@@ -1179,7 +1179,10 @@ local function setTab(tab)
    if alive and activeTab=="violence_district" then scheduleLegacyRefresh() end
   end)
  end
- if changed then scheduleSettingsSave() end
+ if changed then
+  scheduleSettingsSave()
+  if auxUI.refreshMobileControls then auxUI.refreshMobileControls() end
+ end
 end
 auxUI.activateTab=setTab
 listen(selectedNav.MouseButton1Click,function()setTab("violence_district")end)
@@ -1890,7 +1893,7 @@ local registered=pcall(function()
   if not alive or isOpen or activeTab~="warfare" or not state.warAimPreview then return end
   -- When "hold" is on, aim while RMB is held OR while shooting with LMB.
   -- This allows tracking a target without using ADS.
-  if state.warHoldAim and not (
+  if state.warHoldAim and auxUI.deviceMode~="mobile" and not (
    UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
    or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
   ) then return end
@@ -2308,10 +2311,7 @@ local function startDeviceChooser()
   boot:Destroy()
   auxUI.deviceMode="mobile"
   if activeTab=="settings" and auxUI.activateTab then auxUI.activateTab("warfare") end
-  -- Touch devices do not have physical RMB, use the floating AIM toggle.
-  state.warHoldAim=false
-  applyToggle("warHoldAim")
-  scheduleSettingsSave()
+  -- Mobile AIM uses its own floating toggle; do not overwrite PC hold preference.
   mobileWindow.Visible=true
   bubble.Visible=true
   auxUI.refreshMobileControls()
@@ -2323,6 +2323,7 @@ local function startDeviceChooser()
  isOpen=false
  window.Visible=false
 end
+-- Start the device chooser even when no external Telegram service is linked.
 local bootOk=pcall(startDeviceChooser)
 if not bootOk then
  -- Fail open, so an optional chooser error never prevents PC usage.
