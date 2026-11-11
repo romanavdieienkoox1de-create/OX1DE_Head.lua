@@ -189,7 +189,7 @@ local function niceKey(key)
  return aliases[key.Name] or key.Name
 end
 local menuBind=make("TextButton",header,{
- Position=UDim2.fromOffset(762,22),Size=UDim2.fromOffset(188,41),BackgroundColor3=C.card,Visible=false,
+ Position=UDim2.fromOffset(762,22),Size=UDim2.fromOffset(188,41),BackgroundColor3=C.card,
  Text="",AutoButtonColor=false,BorderSizePixel=0
 })
 corner(menuBind,10);border(menuBind,C.edge,.53,1)
@@ -473,11 +473,7 @@ refreshMenuSink()
 startMenuMouse()
 listen(minimize.MouseButton1Click,function() setVisible(false) end)
 listen(close.MouseButton1Click,function()
- if type(_G.OX1DE_CHEATING_STOP)=="function" then
-  _G.OX1DE_CHEATING_STOP()
- else
-  setVisible(false)
- end
+ setVisible(false)
 end)
 local dragging=false
 local dragInput,dragStart,startPos
