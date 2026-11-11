@@ -718,13 +718,17 @@ listen(pickerDone.MouseButton1Click,function() pickerLayer.Visible=false end)
 listen(pickerX.MouseButton1Click,function() pickerLayer.Visible=false end)
 
 
+-- WARFARE shared declarations
+local warFovCircle,warFovStroke,warStatus,warAimStatus
+local warfareCleanup
+do -- WARFARE UI scoped
 -- WARFARE: separate profile, preserving all original Violence District controls.
 local wh=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(816,145),C.green)
 make("UIGradient",wh,{Color=ColorSequence.new(Color3.fromRGB(9,30,18),Color3.fromRGB(9,19,24))})
 text(wh,"WARFARE",UDim2.fromOffset(27,11),UDim2.fromOffset(650,54),35,true,C.green)
 text(wh,"TEAM  •  FPV  •  WEAPON INFO",UDim2.fromOffset(30,68),UDim2.fromOffset(650,27),13,true)
-local warStatus=text(wh,"Команды: Roblox Team • FPV: модели",UDim2.fromOffset(30,91),UDim2.fromOffset(750,24),11,false,C.muted)
-local warAimStatus=text(wh,"Цель: ожидание",UDim2.fromOffset(30,117),UDim2.fromOffset(740,20),11,true,C.green)
+warStatus=text(wh,"Команды: Roblox Team • FPV: модели",UDim2.fromOffset(30,91),UDim2.fromOffset(750,24),11,false,C.muted)
+warAimStatus=text(wh,"Цель: ожидание",UDim2.fromOffset(30,117),UDim2.fromOffset(740,20),11,true,C.green)
 local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
 local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
@@ -828,9 +832,9 @@ warRow(escroll,82,"warEnemies","Противники","Другие Team • к�
 warRow(escroll,164,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
 warRow(escroll,246,"warFPV","FPV-дроны","Контур моделей дронов","warFPV")
 bindVisual("warFly");bindVisual("warAim")
-local warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
+warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
 corner(warFovCircle,1000)
-local warFovStroke=border(warFovCircle,palette.warFov,.25,1.4)
+warFovStroke=border(warFovCircle,palette.warFov,.25,1.4)
 local function setTab(tab)
  if tab~="warfare" and tab~="violence_district" then return end
  activeTab=tab
@@ -842,6 +846,8 @@ local function setTab(tab)
 end
 listen(selectedNav.MouseButton1Click,function()setTab("violence_district")end)
 listen(warNav.MouseButton1Click,function()setTab("warfare")end)
+
+end -- WARFARE UI scoped
 
 -- ESP: world objects ------------------------------------------------------
 local function category(obj)
@@ -1256,6 +1262,7 @@ if type(queueTeleport)=="function" then
     end)
 end
 
+do -- WARFARE runtime scoped
 -- WARFARE local-world visualization: team, weapon and FPV outlines.
 local warfarePlayers,warfareDrones={},{}
 local function warfareTeamKey(player)
@@ -1501,6 +1508,17 @@ task.spawn(function()
  end
 end)
 
+warfareCleanup=function()
+ if warFovCircle then warFovCircle.Visible=false end
+ if warAimMark then warAimMark.Visible=false end
+ for player in pairs(warfarePlayers) do clearWarfarePlayer(player) end
+ for object,highlight in pairs(warfareDrones) do
+  if highlight then highlight:Destroy() end
+  warfareDrones[object]=nil
+ end
+end
+end -- WARFARE runtime scoped
+
 -- BillboardGui follows character positions directly on every render frame.
 -- No on-screen repositioning or collision-offset hopping.
 local lastFly,lastNoClip=false,false
@@ -1598,13 +1616,7 @@ _G.OX1DE_CHEATING_STOP=function()
     for _,c in ipairs(connections) do c:Disconnect() end
     for p in pairs(playerFx) do clearPlayer(p) end
     for obj in pairs(objectFx) do clearObject(obj) end
-    warFovCircle.Visible=false
-    warAimMark.Visible=false
-    for player in pairs(warfarePlayers) do clearWarfarePlayer(player) end
-    for object,highlight in pairs(warfareDrones) do
-     if highlight then highlight:Destroy() end
-     warfareDrones[object]=nil
-    end
+    if warfareCleanup then pcall(warfareCleanup) end
     _G.OX1DE_CHEATING_STOP=nil
     _G.OX1DE_LOCAL_TOGGLE=nil
     if gui then gui:Destroy() end
