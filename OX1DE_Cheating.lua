@@ -27,7 +27,7 @@ local C={
  muted=Color3.fromRGB(158,171,176),unknown=Color3.fromRGB(185,187,193),
  darkgreen=Color3.fromRGB(20,57,25)
 }
-local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,windows=false,fly=false,noclip=false,autoSkill=true}
+local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,windows=false,fly=false,noclip=false,autoSkill=true,espMaster=false}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),windows=Color3.fromRGB(245,192,65)}
 local function editableColor(key)
  return key=="players" or key=="generators" or key=="pumpkins" or key=="pallets" or key=="windows"
@@ -188,36 +188,25 @@ local function niceKey(key)
  return aliases[key.Name] or key.Name
 end
 local menuBind=make("TextButton",header,{
- Position=UDim2.fromOffset(666,22),Size=UDim2.fromOffset(197,41),BackgroundColor3=C.card,
+ Position=UDim2.fromOffset(762,22),Size=UDim2.fromOffset(188,41),BackgroundColor3=C.card,
  Text="",AutoButtonColor=false,BorderSizePixel=0
 })
 corner(menuBind,10);border(menuBind,C.edge,.53,1)
 local menuBindText=text(menuBind,"Right Shift  •  БИНД МЕНЮ",UDim2.fromOffset(8,0),UDim2.new(1,-16,1,0),12,true,C.green,Enum.TextXAlignment.Center)
-local minimize=make("TextButton",header,{Position=UDim2.fromOffset(954,22),Size=UDim2.fromOffset(40,41),BackgroundColor3=C.card,Text="−",Font=Enum.Font.GothamBold,TextSize=21,TextColor3=C.white,BorderSizePixel=0,AutoButtonColor=false})
+local minimize=make("TextButton",header,{Position=UDim2.fromOffset(961,22),Size=UDim2.fromOffset(37,41),BackgroundColor3=C.card,Text="−",Font=Enum.Font.GothamBold,TextSize=21,TextColor3=C.white,BorderSizePixel=0,AutoButtonColor=false})
 corner(minimize,10)
-local close=make("TextButton",header,{Position=UDim2.fromOffset(999,22),Size=UDim2.fromOffset(40,41),BackgroundColor3=C.card,Text="×",Font=Enum.Font.GothamBold,TextSize=21,TextColor3=C.white,BorderSizePixel=0,AutoButtonColor=false})
+local close=make("TextButton",header,{Position=UDim2.fromOffset(1004,22),Size=UDim2.fromOffset(37,41),BackgroundColor3=C.card,Text="×",Font=Enum.Font.GothamBold,TextSize=21,TextColor3=C.white,BorderSizePixel=0,AutoButtonColor=false})
 corner(close,10)
 
-local smaller=make("TextButton",header,{
- Position=UDim2.fromOffset(869,22),Size=UDim2.fromOffset(37,41),
- BackgroundColor3=C.card,Text="A−",TextColor3=C.white,
- Font=Enum.Font.GothamBold,TextSize=14,BorderSizePixel=0,AutoButtonColor=false
+-- Drag the bottom-right handle to resize the whole window, like a desktop app.
+local sizeGrip=make("TextButton",window,{
+ Name="ResizeGrip",Position=UDim2.new(1,-31,1,-30),
+ Size=UDim2.fromOffset(26,25),Text="◢",TextColor3=C.green,
+ Font=Enum.Font.GothamBold,TextSize=20,BackgroundColor3=C.card,
+ BackgroundTransparency=.06,BorderSizePixel=0,AutoButtonColor=false,
+ Active=true,ZIndex=20
 })
-corner(smaller,9)
-local bigger=make("TextButton",header,{
- Position=UDim2.fromOffset(911,22),Size=UDim2.fromOffset(37,41),
- BackgroundColor3=C.card,Text="A+",TextColor3=C.white,
- Font=Enum.Font.GothamBold,TextSize=14,BorderSizePixel=0,AutoButtonColor=false
-})
-corner(bigger,9)
-listen(smaller.MouseButton1Click,function()
- requestedScale=math.max(.6,requestedScale-.1)
- resize()
-end)
-listen(bigger.MouseButton1Click,function()
- requestedScale=math.min(1.3,requestedScale+.1)
- resize()
-end)
+corner(sizeGrip,7)
 
 local sidebar=make("Frame",window,{Position=UDim2.fromOffset(0,87),Size=UDim2.fromOffset(204,589),BackgroundColor3=Color3.fromRGB(10,16,15),BorderSizePixel=0,ClipsDescendants=true})
 make("UIGradient",sidebar,{Rotation=100,Color=ColorSequence.new(Color3.fromRGB(9,15,15),Color3.fromRGB(9,31,15))})
@@ -305,10 +294,30 @@ local function applyToggle(key)
   end
  end
 end
+local espKeys={"players","killers","generators","pumpkins","pallets","windows"}
+local espIndex={players=true,killers=true,generators=true,pumpkins=true,pallets=true,windows=true}
 local function setOption(key,enabled)
+ if key=="espMaster" then
+  state.espMaster=enabled
+  applyToggle("espMaster")
+  for _,category in ipairs(espKeys) do
+   state[category]=enabled
+   applyToggle(category)
+  end
+  if onEspToggle then onEspToggle("espMaster",enabled) end
+  return
+ end
  if state[key]==enabled then return end
  state[key]=enabled
  applyToggle(key)
+ if espIndex[key] then
+  local every=true
+  for _,category in ipairs(espKeys) do
+   if not state[category] then every=false;break end
+  end
+  state.espMaster=every
+  applyToggle("espMaster")
+ end
  if onEspToggle then onEspToggle(key,enabled) end
 end
 local function toggle(key)
@@ -345,25 +354,26 @@ local function hoverEffect(o)
 end
 local rows={
  {key="fly",name="Fly",subtitle="Полёт • WASD / Space",icon="✈",bind=true},
- {key="noclip",name="NoClip",subtitle="Проход сквозь препятствия",icon="◇",bind=true},
- {key="autoSkill",name="Auto Skill Check",subtitle="Отслеживание тёмной зоны (эксп.)",icon="◎",bind=false}
+ {key="noclip",name="NoClip",subtitle="Проход сквозь препятствия",icon="⇥",bind=true},
+ {key="autoSkill",name="Auto Skill Check",subtitle="Поиск отметки на шкале (эксп.)",icon="◎",bind=false},
+ {key="espMaster",name="ESP • Подсветка",subtitle="Включить / выключить все ESP",icon="◉",bind=false}
 }
 for i,v in ipairs(rows) do
- local y=48+(i-1)*102
- local f=make("TextButton",functionsPanel,{Position=UDim2.fromOffset(12,y),Size=UDim2.fromOffset(420,88),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
+ local y=48+(i-1)*74
+ local f=make("TextButton",functionsPanel,{Position=UDim2.fromOffset(12,y),Size=UDim2.fromOffset(420,65),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
  corner(f,11);hoverEffect(f)
- local ib=make("Frame",f,{Position=UDim2.fromOffset(12,24),Size=UDim2.fromOffset(40,40),BackgroundColor3=C.card,BorderSizePixel=0})
+ local ib=make("Frame",f,{Position=UDim2.fromOffset(9,13),Size=UDim2.fromOffset(38,38),BackgroundColor3=C.card,BorderSizePixel=0})
  corner(ib,9)
  text(ib,v.icon,UDim2.fromScale(0,0),UDim2.fromScale(1,1),23,true,C.green,Enum.TextXAlignment.Center)
- text(f,v.name,UDim2.fromOffset(61,17),UDim2.fromOffset(228,27),16,true)
- text(f,v.subtitle,UDim2.fromOffset(61,48),UDim2.fromOffset(245,21),11,false,C.muted)
+ text(f,v.name,UDim2.fromOffset(54,7),UDim2.fromOffset(242,26),15,true)
+ text(f,v.subtitle,UDim2.fromOffset(54,34),UDim2.fromOffset(250,21),11,false,C.muted)
  if v.bind then
-  local binding=make("TextButton",f,{Name=v.key.."Bind",Position=UDim2.fromOffset(306,32),Size=UDim2.fromOffset(53,27),BackgroundColor3=C.card,Text=niceKey(keybind[v.key]),TextColor3=C.green,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0,AutoButtonColor=false})
+  local binding=make("TextButton",f,{Name=v.key.."Bind",Position=UDim2.fromOffset(302,20),Size=UDim2.fromOffset(55,25),BackgroundColor3=C.card,Text=niceKey(keybind[v.key]),TextColor3=C.green,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0,AutoButtonColor=false})
   corner(binding,6);border(binding,C.edge,.4,1)
   bindButtons[v.key]=binding
   listen(binding.MouseButton1Click,function() beginRebind(v.key) end)
  end
- switch(f,v.key,369,32)
+ switch(f,v.key,365,20)
  listen(f.MouseButton1Click,function() toggle(v.key) end)
 end
 
@@ -516,6 +526,28 @@ startMenuMouse()
 listen(minimize.MouseButton1Click,function() setVisible(false) end)
 listen(close.MouseButton1Click,function()
  setVisible(false)
+end)
+local resizing=false
+local resizeStart,scaleAtStart
+listen(sizeGrip.InputBegan,function(input)
+ if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+  resizing=true
+  resizeStart=input.Position
+  scaleAtStart=requestedScale
+ end
+end)
+listen(UserInputService.InputEnded,function(input)
+ if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+  resizing=false
+ end
+end)
+listen(UserInputService.InputChanged,function(input)
+ if not resizing or (input.UserInputType~=Enum.UserInputType.MouseMovement and input.UserInputType~=Enum.UserInputType.Touch) then return end
+ local delta=input.Position-resizeStart
+ local dx=delta.X/1050
+ local dy=delta.Y/676
+ requestedScale=math.clamp(scaleAtStart+(math.abs(dx)>math.abs(dy) and dx or dy),.55,1.45)
+ resize()
 end)
 local dragging=false
 local dragInput,dragStart,startPos
@@ -770,7 +802,7 @@ local function scanAll()
     end)
 end
 onEspToggle=function(key,enabled)
-    if enabled and (key=="generators" or key=="pumpkins" or key=="pallets" or key=="windows") then scanAll() end
+ if enabled and (key=="espMaster" or key=="generators" or key=="pumpkins" or key=="pallets" or key=="windows") then scanAll() end
 end
 listen(Workspace.DescendantAdded,function(obj)
     if not alive or not (state.generators or state.pumpkins or state.pallets or state.windows) then return end
@@ -789,8 +821,16 @@ local function sendKey(key,down)
   if not virtualInput then virtualInput=game:GetService("VirtualInputManager") end
   return virtualInput
  end)
- if not ok or not im then return false end
- return pcall(function() im:SendKeyEvent(down,key,false,game) end)
+ if ok and im then
+  local done=pcall(function() im:SendKeyEvent(down,key,false,game) end)
+  if done then return true end
+ end
+ -- Optional compatibility path when the Lua environment exposes keyboard input.
+ if key==Enum.KeyCode.Space then
+  local fn=down and keypress or keyrelease
+  if type(fn)=="function" then return pcall(fn,0x20) end
+ end
+ return false
 end
 local function visibleGui(o)
     if not o or not o.Parent or not o:IsA("GuiObject") then return false end
@@ -801,12 +841,21 @@ local function visibleGui(o)
     end
     return true
 end
+local knownSkillContainer
 local function findSkillContainer()
-    for _,o in ipairs(PlayerGui:GetDescendants()) do
+ if knownSkillContainer and knownSkillContainer.Parent and visibleGui(knownSkillContainer) then
+  return knownSkillContainer
+ end
+ knownSkillContainer=nil
+ for _,o in ipairs(PlayerGui:GetDescendants()) do
         if o:IsA("GuiObject") and visibleGui(o) then
             local n=string.lower(o.Name)
-            if n:find("skill",1,true) or n:find("check",1,true) or n:find("timing",1,true) or n:find("minigame",1,true) then
-                if #o:GetDescendants()>=2 then return o end
+            if n:find("skill",1,true) or n:find("check",1,true) or n:find("timing",1,true)
+               or n:find("minigame",1,true) or n:find("qte",1,true) or n:find("reaction",1,true) then
+                if #o:GetDescendants()>=2 then
+                    knownSkillContainer=o
+                    return o
+                end
             end
         end
     end
@@ -818,8 +867,8 @@ local function skillMatch(container)
     for _,obj in ipairs(container:GetDescendants()) do
         if obj:IsA("GuiObject") and visibleGui(obj) then
             local n=string.lower(obj.Name)
-            local marker=(n:find("needle",1,true) or n:find("pointer",1,true) or n:find("cursor",1,true) or n:find("indicator",1,true) or n:find("arrow",1,true) or n:find("line",1,true))
-            local target=(n:find("target",1,true) or n:find("zone",1,true) or n:find("success",1,true) or n:find("perfect",1,true) or n:find("great",1,true) or n:find("hit",1,true) or n:find("white",1,true))
+            local marker=(n:find("needle",1,true) or n:find("pointer",1,true) or n:find("cursor",1,true) or n:find("indicator",1,true) or n:find("arrow",1,true) or n:find("line",1,true) or n:find("slider",1,true) or n:find("sweep",1,true))
+            local target=(n:find("target",1,true) or n:find("zone",1,true) or n:find("success",1,true) or n:find("perfect",1,true) or n:find("great",1,true) or n:find("hit",1,true) or n:find("dark",1,true) or n:find("black",1,true) or n:find("shadow",1,true) or n:find("white",1,true))
             if marker and not needle then needle=obj end
             if target and not zone then zone=obj end
         end
@@ -840,7 +889,7 @@ local function skillMatch(container)
     -- Circular gauges sometimes use Rotation for needle and target.
     if needle.Rotation~=0 or zone.Rotation~=0 then
         local diff=(needle.Rotation-zone.Rotation+540)%360-180
-        if math.abs(diff)<=8 then return true end
+        if math.abs(diff)<=10 then return true end
     end
     return false
 end
@@ -875,7 +924,7 @@ task.spawn(function()
             skillWasShown=false
             skillStatus="выключено"
         end
-        task.wait(.12)
+        task.wait(state.autoSkill and (skillStatus=="шкала не найдена" and .18 or .045) or .18)
     end
 end)
 
