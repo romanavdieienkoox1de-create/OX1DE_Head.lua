@@ -1,4 +1,4 @@
--- OX1DE Cheating v0.7.2 (SAFE TEST) | Violence District game module | performance and cursor fix
+-- OX1DE | Район насилия | compact UI
 -- Client-side prototype. Game-specific behaviors are not verified.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -12,6 +12,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- One module per Roblox place; future game profiles can be registered here.
 local GameModules={violence_district={title="Район насилия",subtitle="VIOLENCE DISTRICT"}}
 local ActiveGame=GameModules.violence_district
+local GENERATOR_PREVIEW_ASSET_ID = "" -- Roblox image asset ID; supply after uploading the provided screenshot
 
 if type(_G.OX1DE_CHEATING_STOP)=="function" then pcall(_G.OX1DE_CHEATING_STOP) end
 local older=PlayerGui:FindFirstChild("OX1DE_Cheating")
@@ -26,7 +27,7 @@ local C={
  muted=Color3.fromRGB(158,171,176),unknown=Color3.fromRGB(185,187,193),
  darkgreen=Color3.fromRGB(20,57,25)
 }
-local state={players=false,killers=false,generators=false,pumpkins=false,fly=false,noclip=false,fastVault=false,autoGen=false,autoSkill=false}
+local state={players=false,killers=false,generators=false,pumpkins=false,fly=false,noclip=false,fastVault=false,autoSkill=false}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange}
 local function editableColor(key)
  return key=="players" or key=="generators" or key=="pumpkins"
@@ -174,10 +175,10 @@ listen(Workspace:GetPropertyChangedSignal("CurrentCamera"),updateCamera)
 
 local header=make("Frame",window,{Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,0,0,86),BackgroundTransparency=1,Active=true})
 make("Frame",window,{Position=UDim2.fromOffset(0,86),Size=UDim2.new(1,0,0,1),BackgroundColor3=Color3.fromRGB(51,81,41),BorderSizePixel=0})
-local shadowX=text(header,"X",UDim2.fromOffset(28,10),UDim2.fromOffset(60,59),51,true,C.green)
+local shadowX=text(header,"X",UDim2.fromOffset(27,19),UDim2.fromOffset(38,39),36,true,C.green)
 shadowX.TextStrokeColor3=C.green;shadowX.TextStrokeTransparency=.63
-text(header,"OX1DE Cheating",UDim2.fromOffset(97,12),UDim2.fromOffset(500,40),29,true)
-text(header,ActiveGame.title:upper().."  /  "..ActiveGame.subtitle,UDim2.fromOffset(99,52),UDim2.fromOffset(490,21),11,false,C.muted)
+text(header,"OX1DE",UDim2.fromOffset(76,12),UDim2.fromOffset(500,40),29,true)
+text(header,ActiveGame.subtitle,UDim2.fromOffset(78,52),UDim2.fromOffset(490,21),11,false,C.muted)
 local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7,fastVault=Enum.KeyCode.F8}
 local bindButtons={}
 local waitingFor=nil
@@ -188,7 +189,7 @@ local function niceKey(key)
  return aliases[key.Name] or key.Name
 end
 local menuBind=make("TextButton",header,{
- Position=UDim2.fromOffset(762,22),Size=UDim2.fromOffset(188,41),BackgroundColor3=C.card,
+ Position=UDim2.fromOffset(762,22),Size=UDim2.fromOffset(188,41),BackgroundColor3=C.card,Visible=false,
  Text="",AutoButtonColor=false,BorderSizePixel=0
 })
 corner(menuBind,10);border(menuBind,C.edge,.53,1)
@@ -202,20 +203,14 @@ local sidebar=make("Frame",window,{Position=UDim2.fromOffset(0,87),Size=UDim2.fr
 make("UIGradient",sidebar,{Rotation=100,Color=ColorSequence.new(Color3.fromRGB(9,15,15),Color3.fromRGB(9,31,15))})
 local wave=make("Frame",sidebar,{Position=UDim2.fromOffset(-130,414),Size=UDim2.fromOffset(380,180),Rotation=-18,BackgroundColor3=C.green,BackgroundTransparency=.90,BorderSizePixel=0})
 corner(wave,80)
-text(sidebar,"ИГРА  •  РАЙОН НАСИЛИЯ",UDim2.fromOffset(19,20),UDim2.fromOffset(178,26),10,true,C.muted)
-local selectedNav=make("Frame",sidebar,{Position=UDim2.fromOffset(14,65),Size=UDim2.fromOffset(178,59),BackgroundColor3=C.darkgreen,BorderSizePixel=0})
+-- Game name is now the navigation item only
+local selectedNav=make("Frame",sidebar,{Position=UDim2.fromOffset(14,34),Size=UDim2.fromOffset(178,59),BackgroundColor3=C.darkgreen,BorderSizePixel=0})
 corner(selectedNav,13)
 local navStroke=border(selectedNav,C.green,.05,1.4)
 text(selectedNav,"⌂",UDim2.fromOffset(20,0),UDim2.fromOffset(30,59),27,true,C.green)
-text(selectedNav,"Основное",UDim2.fromOffset(58,0),UDim2.fromOffset(112,59),16,true,C.white)
-text(sidebar,"БИНДЫ",UDim2.fromOffset(20,154),UDim2.fromOffset(159,24),11,true,C.muted)
-local bindInfo=text(sidebar,"F6 — Fly\nF7 — NoClip\nF8 — Fast Vault",UDim2.fromOffset(20,185),UDim2.fromOffset(170,87),12,false,C.white)
-bindInfo.TextWrapped=true;bindInfo.TextYAlignment=Enum.TextYAlignment.Top;bindInfo.TextTruncate=Enum.TextTruncate.None
-text(sidebar,"Клавиши меняются\nпрямо в настройках",UDim2.fromOffset(20,279),UDim2.fromOffset(167,45),11,false,C.muted)
-local countText=text(sidebar,"Игроков: 0\nГенераторов: 0\nТыкв: 0",UDim2.fromOffset(19,461),UDim2.fromOffset(172,66),11,false,C.muted)
-countText.TextYAlignment=Enum.TextYAlignment.Top;countText.TextWrapped=true
-text(sidebar,"OX1DE   •   v0.7.2 SAFE",UDim2.fromOffset(19,548),UDim2.fromOffset(178,21),12,true,C.green)
-text(sidebar,"SAFE TEST • ВКЛЮЧАЙ ESP ВРУЧНУЮ",UDim2.fromOffset(19,567),UDim2.fromOffset(178,18),9,false,C.muted)
+text(selectedNav,"Район насилия",UDim2.fromOffset(51,0),UDim2.fromOffset(125,59),13,true,C.white)
+local bindInfo={Text=""}
+-- Sidebar stays intentionally minimal; shortcuts remain internal.
 
 local content=make("Frame",window,{Position=UDim2.fromOffset(204,87),Size=UDim2.fromOffset(846,589),BackgroundTransparency=1,ClipsDescendants=true})
 local function panel(parent,pos,size,col)
@@ -231,8 +226,15 @@ make("UIGradient",hero,{Rotation=0,Color=ColorSequence.new({
 })})
 local heroAccent=make("Frame",hero,{Position=UDim2.fromOffset(773,-10),Size=UDim2.fromOffset(20,100),Rotation=36,BackgroundColor3=C.green,BackgroundTransparency=.72,BorderSizePixel=0})
 make("Frame",hero,{Position=UDim2.fromOffset(495,24),Size=UDim2.fromOffset(1,132),BackgroundColor3=Color3.fromRGB(49,94,71),BorderSizePixel=0})
-local viewport=make("ViewportFrame",hero,{
+local generatorPhoto=make("ImageLabel",hero,{
  Position=UDim2.fromOffset(13,12),Size=UDim2.fromOffset(470,158),
+ BackgroundColor3=Color3.fromRGB(11,18,21),BorderSizePixel=0,
+ Image=GENERATOR_PREVIEW_ASSET_ID~="" and ("rbxassetid://"..GENERATOR_PREVIEW_ASSET_ID) or "",
+ ScaleType=Enum.ScaleType.Fit,Visible=GENERATOR_PREVIEW_ASSET_ID~="",ZIndex=2
+})
+corner(generatorPhoto,12)
+local viewport=make("ViewportFrame",hero,{
+ Position=UDim2.fromOffset(13,12),Size=UDim2.fromOffset(470,158),Visible=GENERATOR_PREVIEW_ASSET_ID=="",
  BackgroundColor3=Color3.fromRGB(11,18,21),BorderSizePixel=0,
  Ambient=Color3.fromRGB(145,166,175),LightColor=Color3.fromRGB(220,238,240),LightDirection=Vector3.new(-1,-1,-1)
 })
@@ -252,7 +254,7 @@ for i=-2,2 do
  v.Material=Enum.Material.Neon
 end
 for i=-1,1 do previewBlock("Piston",Vector3.new(i*1.28,1.27,.0),Vector3.new(.7,.83,.75),Color3.fromRGB(77,90,94)) end
-local previewLabel=text(hero,"ГЕНЕРАТОР  •  ПРЕВЬЮ",UDim2.fromOffset(26,16),UDim2.fromOffset(420,24),12,true,C.cyan)
+local previewLabel=text(hero,"ГЕНЕРАТОР",UDim2.fromOffset(26,16),UDim2.fromOffset(420,24),12,true,C.cyan)
 previewLabel.ZIndex=4
 local generatorTitle=text(hero,"Генератор",UDim2.fromOffset(518,30),UDim2.fromOffset(276,41),27,true,C.white)
 local distanceLabel=text(hero,"Модель в радиусе загрузки",UDim2.fromOffset(519,73),UDim2.fromOffset(270,24),12,false,C.muted)
@@ -316,11 +318,10 @@ local function hoverEffect(o)
  listen(o.MouseLeave,function() tween(o,{BackgroundColor3=C.row},.2) end)
 end
 local rows={
- {key="fly",name="Fly",subtitle="Полёт • WASD / Space",icon="✈",bind=true},
- {key="noclip",name="NoClip",subtitle="Проход без столкновений",icon="◇",bind=true},
- {key="fastVault",name="Fast Vault",subtitle="Перелаз ×1.55 (эксп.)",icon="↟",bind=true},
- {key="autoGen",name="Auto Generator",subtitle="Ремонт рядом (эксп.)",icon="⚙",bind=false},
- {key="autoSkill",name="Auto Skill Check",subtitle="Поиск белой зоны (эксп.)",icon="◎",bind=false}
+ {key="fly",name="Fly",subtitle="Полёт • WASD / Space",icon="✈",bind=false},
+ {key="noclip",name="NoClip",subtitle="Проход без столкновений",icon="◇",bind=false},
+ {key="fastVault",name="Fast Vault",subtitle="Ускоренный перелаз • ×1.8",icon="↟",bind=false},
+ {key="autoSkill",name="Auto Skill Check",subtitle="Проверка белой зоны",icon="◎",bind=false}
 }
 for i,v in ipairs(rows) do
  local y=48+(i-1)*61
@@ -346,8 +347,8 @@ local openPicker
 local descriptions={
  {key="players",name="ESP игроков",subtitle="Обводка • ник • метры",icon="♙"},
  {key="killers",name="ESP маньяка",subtitle="Ник красный • фиксирован",icon="☠"},
- {key="generators",name="ESP генераторов",subtitle="Генераторы на карте",icon="⚙"},
- {key="pumpkins",name="ESP тыкв",subtitle="Все видимые объекты",icon="♧"}
+ {key="generators",name="ESP генераторов",subtitle="Генераторы на карте",icon=""},
+ {key="pumpkins",name="ESP тыкв",subtitle="Тыквы на карте",icon="🎃"}
 }
 for i,v in ipairs(descriptions) do
  local y=49+(i-1)*77
@@ -355,7 +356,16 @@ for i,v in ipairs(descriptions) do
  corner(f,11);hoverEffect(f)
  local iconBox=make("Frame",f,{Position=UDim2.fromOffset(9,17),Size=UDim2.fromOffset(35,35),BackgroundColor3=C.card,BorderSizePixel=0})
  corner(iconBox,9)
- text(iconBox,v.icon,UDim2.fromScale(0,0),UDim2.fromScale(1,1),21,true,v.key=="players" and C.white or palette[v.key],Enum.TextXAlignment.Center)
+ if v.key=="generators" then
+  local body=make("Frame",iconBox,{Position=UDim2.fromOffset(5,11),Size=UDim2.fromOffset(25,19),BackgroundColor3=Color3.fromRGB(25,47,52),BorderSizePixel=0})
+  corner(body,3);border(body,C.cyan,.1,1)
+  for n=0,2 do
+   make("Frame",body,{Position=UDim2.fromOffset(4+n*7,5),Size=UDim2.fromOffset(3,9),BackgroundColor3=C.cyan,BorderSizePixel=0})
+  end
+  for n=0,1 do make("Frame",iconBox,{Position=UDim2.fromOffset(9+n*11,7),Size=UDim2.fromOffset(6,4),BackgroundColor3=C.cyan,BorderSizePixel=0}) end
+ else
+  text(iconBox,v.icon,UDim2.fromScale(0,0),UDim2.fromScale(1,1),21,true,v.key=="players" and C.white or palette[v.key],Enum.TextXAlignment.Center)
+ end
  text(f,v.name,UDim2.fromOffset(51,10),UDim2.fromOffset(197,27),14,true)
  text(f,v.subtitle,UDim2.fromOffset(51,37),UDim2.fromOffset(198,24),10,false,C.muted)
  local swatch=make("TextButton",f,{Position=UDim2.fromOffset(252,21),Size=UDim2.fromOffset(27,27),Text="",BackgroundColor3=palette[v.key],BorderSizePixel=0,AutoButtonColor=false})
@@ -461,7 +471,13 @@ refreshMenuSink=function() end
 refreshMenuSink()
 startMenuMouse()
 listen(minimize.MouseButton1Click,function() setVisible(false) end)
-listen(close.MouseButton1Click,function() setVisible(false) end)
+listen(close.MouseButton1Click,function()
+ if type(_G.OX1DE_CHEATING_STOP)=="function" then
+  _G.OX1DE_CHEATING_STOP()
+ else
+  setVisible(false)
+ end
+end)
 local dragging=false
 local dragInput,dragStart,startPos
 listen(header.InputBegan,function(input)
@@ -490,18 +506,21 @@ corner(pickerX,9)
 local wheel=make("Frame",picker,{Position=UDim2.fromOffset(78,56),Size=UDim2.fromOffset(220,220),BackgroundTransparency=1,Active=true,ZIndex=54})
 local wheelCenter=Vector2.new(110,110)
 local wheelRadius=101
-local sectors,rings=48,4
-for ri=0,rings do
- local s=ri/rings
- local radius=wheelRadius*(.05+.95*s)
- for seg=0,sectors-1 do
-  local angle=seg/sectors*math.pi*2
-  local hue=seg/sectors
-  local x=110+math.cos(angle)*radius
-  local y=110+math.sin(angle)*radius
-  local tile=make("Frame",wheel,{Position=UDim2.fromOffset(x-6.5,y-6.5),Size=UDim2.fromOffset(13,13),BackgroundColor3=Color3.fromHSV(hue,s,1),BorderSizePixel=0,ZIndex=54,Active=false})
-  corner(tile,6)
- end
+-- Continuous-looking HSV disk: radial gradient spokes instead of dotted tiles.
+local sectors=144
+for seg=0,sectors-1 do
+ local hue=seg/sectors
+ local spoke=make("Frame",wheel,{
+  AnchorPoint=Vector2.new(.5,1),Position=UDim2.fromOffset(110,110),
+  Size=UDim2.fromOffset(8,106),Rotation=hue*360+90,
+  BackgroundColor3=C.white,BorderSizePixel=0,ZIndex=54,Active=false
+ })
+ make("UIGradient",spoke,{
+  Rotation=90,Color=ColorSequence.new({
+   ColorSequenceKeypoint.new(0,Color3.fromHSV(hue,1,1)),
+   ColorSequenceKeypoint.new(1,Color3.new(1,1,1))
+  })
+ })
 end
 local pickerDot=make("Frame",wheel,{Position=UDim2.fromOffset(103,3),Size=UDim2.fromOffset(14,14),BackgroundColor3=C.white,BorderSizePixel=0,ZIndex=56,Active=false})
 corner(pickerDot,9);border(pickerDot,C.bg,0,2)
@@ -757,104 +776,18 @@ listen(Workspace.DescendantAdded,function(obj)
 end)
 
 
--- Auto interactions: best-effort, normal local input only. These features cannot
--- bypass server-owned repair progress or infer hidden game state.
-local repairHeld=false
-local repairPrompt=nil
+-- Skill check: local GUI detection only, no generator auto-repair.
 local virtualInput=nil
-local nextPromptAt=0
 local skillLastAt=0
 local skillWasShown=false
 local skillStatus="ожидание"
-local autoGenStatus="ожидание"
-local function virtualService()
-    if virtualInput then return virtualInput end
-    local ok,v=pcall(function() return game:GetService("VirtualInputManager") end)
-    if ok and v then virtualInput=v end
-    return virtualInput
-end
 local function sendKey(key,down)
-    local vi=virtualService()
-    if not vi then return false end
-    local ok=pcall(function() vi:SendKeyEvent(down,key,false,game) end)
-    return ok
-end
-local function holdRepair(hold)
-    if repairHeld==hold then return end
-    if sendKey(Enum.KeyCode.E,hold) then repairHeld=hold end
-end
-local function labelHasRepair(obj)
-    local labels={obj.Name}
-    if obj:IsA("ProximityPrompt") then
-        labels[#labels+1]=obj.ActionText
-        labels[#labels+1]=obj.ObjectText
-    end
-    local p=obj.Parent
-    for i=1,3 do
-        if not p or p==Workspace then break end
-        labels[#labels+1]=p.Name
-        p=p.Parent
-    end
-    local name=string.lower(table.concat(labels," "))
-    for _,s in ipairs({"generator","repair","fix","генератор","ремонт","почин"}) do
-        if name:find(s,1,true) then return true end
-    end
-    return false
-end
-local promptRegistry={}
-local promptsReady=false
-local function updatePromptRegistry(inst)
- if inst and inst:IsA("ProximityPrompt") and labelHasRepair(inst) then
-  promptRegistry[inst]=true
- end
-end
-local function loadPromptRegistry()
- if promptsReady then return end
- promptsReady=true
- for _,inst in ipairs(Workspace:GetDescendants()) do updatePromptRegistry(inst) end
-end
-listen(Workspace.DescendantAdded,function(obj)
- if promptsReady then updatePromptRegistry(obj) end
-end)
-local function nearRepairPrompt()
- local me=root()
- if not me then return nil end
- loadPromptRegistry()
- local closest,best=nil,math.huge
- for obj in pairs(promptRegistry) do
-  if not obj.Parent or not obj:IsDescendantOf(Workspace) then
-   promptRegistry[obj]=nil
-  elseif obj.Enabled then
-   local ancestor=obj.Parent
-   local part=ancestor and (ancestor:IsA("BasePart") and ancestor or ancestor:FindFirstChildWhichIsA("BasePart",true))
-   if part then
-    local dist=(me.Position-part.Position).Magnitude
-    if dist<math.min(obj.MaxActivationDistance+1,14) and dist<best then
-     best=dist;closest=obj
-    end
-   end
-  end
- end
- return closest
-end
-local function nearGenerator()
-    local me=root()
-    if not me then return false end
-    for obj,fx in pairs(objectFx) do
-        if fx.kind=="generators" and fx.part and fx.part.Parent and not inactive(obj,fx.kind) then
-            if (me.Position-fx.part.Position).Magnitude<=13 then return true end
-        end
-    end
-    return false
-end
-local function tryPrompt(p)
-    if not p or not p.Parent then return end
-    local ok=pcall(function()
-        p:InputHoldBegin()
-        task.wait(math.max(.12,p.HoldDuration+.09))
-        if p.Parent then p:InputHoldEnd() end
-    end)
-    if ok then autoGenStatus="активирован" end
+ local ok,im=pcall(function()
+  if not virtualInput then virtualInput=game:GetService("VirtualInputManager") end
+  return virtualInput
+ end)
+ if not ok or not im then return false end
+ return pcall(function() im:SendKeyEvent(down,key,false,game) end)
 end
 local function visibleGui(o)
     if not o or not o.Parent or not o:IsA("GuiObject") then return false end
@@ -912,7 +845,6 @@ local function skillPress()
     if os.clock()-skillLastAt<.65 then return end
     skillLastAt=os.clock()
     local key=Enum.KeyCode.Space
-    if repairHeld then holdRepair(false) end
     if sendKey(key,true) then
         task.wait(.035)
         sendKey(key,false)
@@ -922,33 +854,6 @@ local function skillPress()
     end
 end
 -- Jobs are throttled to avoid scanning the entire Workspace each frame.
-task.spawn(function()
-    while alive do
-        if state.autoGen then
-            local p=nearRepairPrompt()
-            if p and os.clock()>nextPromptAt then
-                holdRepair(false)
-                nextPromptAt=os.clock()+math.max(1.5,p.HoldDuration+.7)
-                task.spawn(tryPrompt,p)
-                autoGenStatus="промпт"
-            elseif not p then
-                local close=nearGenerator()
-                if close then
-                    holdRepair(true)
-                    autoGenStatus=repairHeld and "удержание E" or "нет доступа к вводу"
-                else
-                    holdRepair(false)
-                    autoGenStatus="подойди к генератору"
-                end
-            end
-        else
-            holdRepair(false)
-            autoGenStatus="выключено"
-        end
-        task.wait(.36)
-    end
-    holdRepair(false)
-end)
 task.spawn(function()
     while alive do
         if state.autoSkill then
@@ -973,7 +878,7 @@ end)
 
 -- Fast Vault: conservative, client-side speedup for recognized vault tracks.
 -- Does not teleport the character, change server cooldowns or bypass server validation.
-local vaultSpeedMultiplier=1.55
+local vaultSpeedMultiplier=1.8
 local vaultAnimationConn
 local vaultTracks=setmetatable({}, {__mode="k"})
 local vaultKnown={"vault","window","pallet","hurdle","obstacle","jump_over","jumpover","clamber","перелаз","прыжокчерез","паллет","окно"}
@@ -1226,13 +1131,12 @@ task.spawn(function()
 end)
 _G.OX1DE_CHEATING_STOP=function()
     alive=false;state.fly=false;state.noclip=false
-    state.autoGen=false;state.autoSkill=false
-    holdRepair(false)
+    state.autoSkill=false
     state.fastVault=false
     restoreVaultTracks()
     if vaultAnimationConn then vaultAnimationConn:Disconnect();vaultAnimationConn=nil end
     stopFly();restore()
-    if captureBound then stopMenuMouse() end
+    if isOpen then stopMenuMouse() end
     pcall(function() ContextActionService:UnbindAction("OX1DE_MenuKey") end)
     if cameraConn then cameraConn:Disconnect() end
     for _,c in ipairs(connections) do c:Disconnect() end
