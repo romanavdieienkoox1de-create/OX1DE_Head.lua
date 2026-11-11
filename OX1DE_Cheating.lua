@@ -434,6 +434,7 @@ local function setOption(key,enabled)
  if state[key]==enabled then return end
  state[key]=enabled
  applyToggle(key)
+ if auxUI.refreshMobileControls then auxUI.refreshMobileControls() end
  if onEspToggle then onEspToggle(key,enabled) end
  scheduleSettingsSave()
 end
@@ -1180,6 +1181,7 @@ local function setTab(tab)
  end
  if changed then scheduleSettingsSave() end
 end
+auxUI.activateTab=setTab
 listen(selectedNav.MouseButton1Click,function()setTab("violence_district")end)
 listen(warNav.MouseButton1Click,function()setTab("warfare")end)
 listen(auxUI.settingsNav.MouseButton1Click,function()setTab("settings")end)
@@ -1590,6 +1592,11 @@ listen(RunService.RenderStepped,function()
     if UserInputService:IsKeyDown(Enum.KeyCode.A) then move-=cf.RightVector end
     if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move+=Vector3.yAxis end
     if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move-=Vector3.yAxis end
+    if auxUI.deviceMode=="mobile" then
+        local hum=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then move+=hum.MoveDirection end
+        if (auxUI.mobileJumpUntil or 0)>os.clock() then move+=Vector3.yAxis end
+    end
     if UserInputService.TouchEnabled then
         local h=LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if h then move+=h.MoveDirection end
@@ -2130,6 +2137,199 @@ task.spawn(function()
         end
     end
 end)
+-- Device selection runs once per injection. PC and mobile have separate
+-- surfaces, but share the same working feature state and saved colours.
+local function startDeviceChooser()
+ local boot=make("Frame",gui,{
+  Name="OX1DE_DeviceChoice",AnchorPoint=Vector2.new(.5,.5),
+  Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(390,251),
+  BackgroundColor3=C.bg,BorderSizePixel=0,ZIndex=180
+ })
+ corner(boot,21);border(boot,C.green,.18,1.4)
+ local bootTitle=text(boot,"OX1DE  /  УСТРОЙСТВО",
+  UDim2.fromOffset(24,19),UDim2.fromOffset(350,39),23,true,C.white)
+ bootTitle.ZIndex=181
+ local bootHint=text(boot,"Выбери способ управления",
+  UDim2.fromOffset(24,60),UDim2.fromOffset(340,25),13,false,C.muted)
+ bootHint.ZIndex=181
+ local pcChoice=make("TextButton",boot,{
+  Position=UDim2.fromOffset(21,112),Size=UDim2.fromOffset(166,79),
+  Text="▣   ПК",BackgroundColor3=C.darkgreen,
+  TextColor3=C.white,Font=Enum.Font.GothamBold,TextSize=20,
+  BorderSizePixel=0,AutoButtonColor=false,ZIndex=181
+ })
+ corner(pcChoice,15);border(pcChoice,C.green,.2,1)
+ local mobileChoice=make("TextButton",boot,{
+  Position=UDim2.fromOffset(202,112),Size=UDim2.fromOffset(166,79),
+  Text="▯   ТЕЛЕФОН",BackgroundColor3=C.card,
+  TextColor3=C.white,Font=Enum.Font.GothamBold,TextSize=16,
+  BorderSizePixel=0,AutoButtonColor=false,ZIndex=181
+ })
+ corner(mobileChoice,15);border(mobileChoice,C.green,.45,1)
+ local bootBottom=text(boot,"Telegram-проверка пока отключена",
+  UDim2.fromOffset(22,207),UDim2.fromOffset(340,23),11,false,C.muted)
+ bootBottom.ZIndex=181
+
+ local mobileWindow=make("Frame",gui,{
+  Name="OX1DE_Mobile",AnchorPoint=Vector2.new(.5,.5),
+  Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(375,586),
+  BackgroundColor3=C.bg,BorderSizePixel=0,
+  ClipsDescendants=true,Visible=false,ZIndex=185
+ })
+ corner(mobileWindow,19);border(mobileWindow,C.green,.25,1.2)
+ local mobileScale=make("UIScale",mobileWindow,{Scale=1})
+ local function resizeMobile()
+  local cam=Workspace.CurrentCamera
+  if cam then
+   local size=cam.ViewportSize
+   mobileScale.Scale=math.clamp(math.min((size.X-18)/375,(size.Y-26)/586),.42,1.45)
+  end
+ end
+ resizeMobile()
+ listen(Workspace:GetPropertyChangedSignal("CurrentCamera"),resizeMobile)
+ local mobileHead=text(mobileWindow,"OX1DE  •  MOBILE",
+  UDim2.fromOffset(19,12),UDim2.fromOffset(257,37),22,true,C.green)
+ mobileHead.ZIndex=186
+ local mobileClose=make("TextButton",mobileWindow,{
+  Position=UDim2.fromOffset(316,12),Size=UDim2.fromOffset(40,37),
+  Text="×",TextSize=22,Font=Enum.Font.GothamBold,TextColor3=C.white,
+  BackgroundColor3=C.card,BorderSizePixel=0,ZIndex=186
+ })
+ corner(mobileClose,10)
+ local mobileRD=make("TextButton",mobileWindow,{
+  Position=UDim2.fromOffset(17,65),Size=UDim2.fromOffset(162,48),
+  BackgroundColor3=C.card,Text="Район насилия",TextSize=13,
+  Font=Enum.Font.GothamBold,TextColor3=C.white,BorderSizePixel=0,ZIndex=186
+ })
+ corner(mobileRD,10)
+ local mobileWar=make("TextButton",mobileWindow,{
+  Position=UDim2.fromOffset(195,65),Size=UDim2.fromOffset(162,48),
+  BackgroundColor3=C.card,Text="WARFARE",TextSize=15,
+  Font=Enum.Font.GothamBold,TextColor3=C.white,BorderSizePixel=0,ZIndex=186
+ })
+ corner(mobileWar,10)
+ local mobileRows={}
+ for i=1,8 do
+  local action=make("TextButton",mobileWindow,{
+   Position=UDim2.fromOffset(17,125+(i-1)*54),
+   Size=UDim2.fromOffset(340,49),BackgroundColor3=C.row,
+   Text="",Font=Enum.Font.GothamBold,TextSize=13,
+   TextColor3=C.white,TextXAlignment=Enum.TextXAlignment.Left,
+   AutoButtonColor=false,BorderSizePixel=0,ZIndex=186
+  })
+  corner(action,11)
+  mobileRows[i]=action
+  listen(action.MouseButton1Click,function()
+   local key=action:GetAttribute("ToggleKey")
+   if type(key)=="string" and state[key]~=nil then toggle(key) end
+  end)
+ end
+ local mobileHelp=text(mobileWindow,"Перетащи значок OX1DE, чтобы изменить его место.",
+  UDim2.fromOffset(17,561),UDim2.fromOffset(342,19),10,false,C.muted)
+ mobileHelp.ZIndex=186
+ local bubble=make("TextButton",gui,{
+  Name="OX1DE_Floating",Position=UDim2.new(1,-68,.38,0),
+  Size=UDim2.fromOffset(54,54),BackgroundColor3=C.darkgreen,
+  Text="OX",TextColor3=C.white,Font=Enum.Font.GothamBold,
+  TextSize=18,BorderSizePixel=0,AutoButtonColor=false,
+  Active=true,Visible=false,ZIndex=190
+ })
+ corner(bubble,28);border(bubble,C.green,.05,2)
+ local dragging,origin,inputOrigin=false,nil,nil
+ listen(bubble.InputBegan,function(input)
+  if input.UserInputType==Enum.UserInputType.Touch or
+   input.UserInputType==Enum.UserInputType.MouseButton1 then
+   dragging=true
+   inputOrigin=input.Position
+   origin=bubble.AbsolutePosition
+  end
+ end)
+ listen(UserInputService.InputChanged,function(input)
+  if not dragging or not origin or not inputOrigin then return end
+  if input.UserInputType~=Enum.UserInputType.Touch and
+   input.UserInputType~=Enum.UserInputType.MouseMovement then return end
+  local p=origin+(input.Position-inputOrigin)
+  local cam=Workspace.CurrentCamera
+  if not cam then return end
+  local size=cam.ViewportSize
+  bubble.Position=UDim2.fromOffset(math.clamp(p.X,0,size.X-54),math.clamp(p.Y,0,size.Y-54))
+ end)
+ listen(UserInputService.InputEnded,function(input)
+  if input.UserInputType==Enum.UserInputType.MouseButton1 or
+   input.UserInputType==Enum.UserInputType.Touch then dragging=false end
+ end)
+ listen(bubble.MouseButton1Click,function() mobileWindow.Visible=not mobileWindow.Visible end)
+ listen(mobileClose.MouseButton1Click,function() mobileWindow.Visible=false end)
+ listen(UserInputService.JumpRequest,function()
+  if auxUI.deviceMode=="mobile" then auxUI.mobileJumpUntil=os.clock()+.22 end
+ end)
+ local districtControls={
+  {"Fly","fly"},{"NoClip","noclip"},{"Auto Skill Check","autoSkill"},
+  {"Игроки ESP","players"},{"Маньяк ESP","killers"},
+  {"Генераторы ESP","generators"},{"Тыквы ESP","pumpkins"},{"Паллеты ESP","pallets"}
+ }
+ local warfareControls={
+  {"AIM","warAimPreview"},{"Fly","warFly"},{"NoClip","warNoClip"},
+  {"Союзники • ESP","warAllies"},{"Противники • ESP","warEnemies"},
+  {"Никнеймы","warNames"},{"Оружие под ногами","warWeapons"},{"FPV-дроны","warFPV"}
+ }
+ auxUI.refreshMobileControls=function()
+  local isWar=activeTab=="warfare"
+  local list=isWar and warfareControls or districtControls
+  mobileWar.BackgroundColor3=isWar and C.darkgreen or C.card
+  mobileRD.BackgroundColor3=not isWar and C.darkgreen or C.card
+  for i,button in ipairs(mobileRows) do
+   local pair=list[i]
+   if pair then
+    local key=pair[2]
+    button:SetAttribute("ToggleKey",key)
+    button.Text="   "..pair[1].."   •   "..(state[key] and "ON" or "OFF")
+    button.TextColor3=state[key] and C.green or C.white
+    button.BackgroundColor3=state[key] and C.darkgreen or C.row
+   end
+  end
+ end
+ listen(mobileRD.MouseButton1Click,function()
+  if auxUI.activateTab then auxUI.activateTab("violence_district") end
+  auxUI.refreshMobileControls()
+ end)
+ listen(mobileWar.MouseButton1Click,function()
+  if auxUI.activateTab then auxUI.activateTab("warfare") end
+  auxUI.refreshMobileControls()
+ end)
+ listen(pcChoice.MouseButton1Click,function()
+  boot:Destroy()
+  auxUI.deviceMode="pc"
+  isOpen=false
+  window.Visible=false
+  setVisible(true)
+ end)
+ listen(mobileChoice.MouseButton1Click,function()
+  boot:Destroy()
+  auxUI.deviceMode="mobile"
+  if activeTab=="settings" and auxUI.activateTab then auxUI.activateTab("warfare") end
+  -- Touch devices do not have physical RMB, use the floating AIM toggle.
+  state.warHoldAim=false
+  applyToggle("warHoldAim")
+  scheduleSettingsSave()
+  mobileWindow.Visible=true
+  bubble.Visible=true
+  auxUI.refreshMobileControls()
+  isOpen=false
+  window.Visible=false
+  stopMenuMouse()
+ end)
+ if isOpen then stopMenuMouse() end
+ isOpen=false
+ window.Visible=false
+end
+local bootOk=pcall(startDeviceChooser)
+if not bootOk then
+ -- Fail open, so an optional chooser error never prevents PC usage.
+ isOpen=false;window.Visible=false
+ setVisible(true)
+end
+
 _G.OX1DE_CHEATING_STOP=function()
     saveSettingsNow()
     alive=false;state.fly=false;state.noclip=false;state.warFly=false;state.warNoClip=false;state.warAimPreview=false
