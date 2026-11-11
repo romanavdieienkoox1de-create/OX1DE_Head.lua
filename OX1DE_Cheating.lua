@@ -27,10 +27,10 @@ local C={
  muted=Color3.fromRGB(158,171,176),unknown=Color3.fromRGB(185,187,193),
  darkgreen=Color3.fromRGB(20,57,25)
 }
-local state={players=false,killers=false,generators=false,pumpkins=false,fly=false,noclip=false,autoSkill=true}
-local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange}
+local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,windows=false,fly=false,noclip=false,autoSkill=true}
+local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),windows=Color3.fromRGB(245,192,65)}
 local function editableColor(key)
- return key=="players" or key=="generators" or key=="pumpkins"
+ return key=="players" or key=="generators" or key=="pumpkins" or key=="pallets" or key=="windows"
 end
 -- Killer and survivor NICK colours are deliberately fixed.
 local swatches={}
@@ -288,6 +288,13 @@ text(functionsPanel,"⚙",UDim2.fromOffset(16,9),UDim2.fromOffset(34,34),24,true
 text(functionsPanel,"Основные функции",UDim2.fromOffset(51,9),UDim2.fromOffset(370,34),19,true)
 text(espPanel,"◉",UDim2.fromOffset(13,9),UDim2.fromOffset(34,34),23,true,C.green)
 text(espPanel,"ESP  •  Подсветка",UDim2.fromOffset(50,9),UDim2.fromOffset(300,34),18,true)
+local espScroll=make("ScrollingFrame",espPanel,{
+ Position=UDim2.fromOffset(7,45),Size=UDim2.new(1,-14,1,-52),
+ BackgroundTransparency=1,BorderSizePixel=0,Active=true,
+ CanvasSize=UDim2.fromOffset(0,462),
+ ScrollBarThickness=3,ScrollBarImageColor3=C.green,
+ ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true
+})
 
 local allRows={}
 local function applyToggle(key)
@@ -367,11 +374,13 @@ local descriptions={
  {key="players",name="ESP игроков",subtitle="Белая обводка • ник • метры",icon=""},
  {key="killers",name="ESP маньяка",subtitle="Ник красный • фиксирован",icon="☠"},
  {key="generators",name="ESP генераторов",subtitle="Генераторы на карте",icon=""},
- {key="pumpkins",name="ESP тыкв",subtitle="Тыквы на карте",icon="🎃"}
+ {key="pumpkins",name="ESP тыкв",subtitle="Тыквы на карте",icon="🎃"},
+ {key="pallets",name="ESP паллет",subtitle="Золотая обводка • метры",icon=""},
+ {key="windows",name="ESP окон",subtitle="Золотая обводка • метры",icon=""}
 }
 for i,v in ipairs(descriptions) do
- local y=45+(i-1)*76
- local f=make("TextButton",espPanel,{Position=UDim2.fromOffset(11,y),Size=UDim2.fromOffset(337,70),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
+ local y=4+(i-1)*76
+ local f=make("TextButton",espScroll,{Position=UDim2.fromOffset(4,y),Size=UDim2.fromOffset(329,70),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
  corner(f,11);hoverEffect(f)
  local iconBox=make("Frame",f,{Position=UDim2.fromOffset(11,16),Size=UDim2.fromOffset(38,38),BackgroundColor3=C.card,BorderSizePixel=0})
  corner(iconBox,9)
@@ -380,6 +389,17 @@ for i,v in ipairs(descriptions) do
   corner(head,12)
   local shoulders=make("Frame",iconBox,{Position=UDim2.fromOffset(6,23),Size=UDim2.fromOffset(26,11),BackgroundColor3=C.white,BorderSizePixel=0})
   corner(shoulders,8)
+ elseif v.key=="pallets" then
+  local frame=make("Frame",iconBox,{Position=UDim2.fromOffset(5,8),Size=UDim2.fromOffset(28,24),BackgroundTransparency=1,BorderSizePixel=0})
+  border(frame,palette.pallets,.1,2)
+  for n=0,2 do
+   make("Frame",frame,{Position=UDim2.fromOffset(3,3+n*7),Size=UDim2.fromOffset(22,4),BackgroundColor3=palette.pallets,BorderSizePixel=0})
+  end
+ elseif v.key=="windows" then
+  local frame=make("Frame",iconBox,{Position=UDim2.fromOffset(6,6),Size=UDim2.fromOffset(26,27),BackgroundTransparency=1,BorderSizePixel=0})
+  border(frame,palette.windows,.1,2)
+  make("Frame",frame,{Position=UDim2.fromOffset(12,0),Size=UDim2.fromOffset(2,27),BackgroundColor3=palette.windows,BorderSizePixel=0})
+  make("Frame",frame,{Position=UDim2.fromOffset(0,12),Size=UDim2.fromOffset(26,2),BackgroundColor3=palette.windows,BorderSizePixel=0})
  elseif v.key=="generators" then
   local body=make("Frame",iconBox,{Position=UDim2.fromOffset(5,11),Size=UDim2.fromOffset(25,19),BackgroundColor3=Color3.fromRGB(25,47,52),BorderSizePixel=0})
   corner(body,3);border(body,C.cyan,.1,1)
@@ -392,7 +412,7 @@ for i,v in ipairs(descriptions) do
  end
  text(f,v.name,UDim2.fromOffset(55,10),UDim2.fromOffset(195,25),14,true)
  text(f,v.subtitle,UDim2.fromOffset(55,37),UDim2.fromOffset(195,22),10,false,C.muted)
- local swatch=make("TextButton",f,{Position=UDim2.fromOffset(252,9),Size=UDim2.fromOffset(27,27),Text="",BackgroundColor3=palette[v.key],BorderSizePixel=0,AutoButtonColor=false})
+ local swatch=make("TextButton",f,{Position=UDim2.fromOffset(239,9),Size=UDim2.fromOffset(27,27),Text="",BackgroundColor3=palette[v.key],BorderSizePixel=0,AutoButtonColor=false})
  corner(swatch,7)
  if editableColor(v.key) then
   addSwatch(v.key,swatch)
@@ -407,7 +427,7 @@ for i,v in ipairs(descriptions) do
    task.delay(.12,function() if alive and swatch.Parent then tween(swatch,{BackgroundTransparency=0},.15) end end)
   end)
  end
- switch(f,v.key,286,40)
+ switch(f,v.key,281,40)
  listen(f.MouseButton1Click,function() toggle(v.key) end)
 end
 
@@ -571,7 +591,7 @@ end
 openPicker=function(key)
  if not editableColor(key) then return end
  chosenKey=key
- local names={players="Игроки • обводка",generators="Генераторы",pumpkins="Тыквы"}
+ local names={players="Игроки • обводка",generators="Генераторы",pumpkins="Тыквы",pallets="Паллеты",windows="Окна"}
  pickerHeading.Text="Цвет  •  "..(names[key] or "ESP")
  h,s,v=palette[key]:ToHSV()
  pickerLayer.Visible=true
@@ -612,6 +632,8 @@ local function category(obj)
     local n=string.lower(obj.Name)
     if n:find("pumpkin",1,true) or n:find("jack_o_lantern",1,true) or n:find("jack-o-lantern",1,true) or n:find("jackolantern",1,true) or n:find("тыкв",1,true) then return "pumpkins" end
     if n:find("generator",1,true) or n:find("генератор",1,true) then return "generators" end
+    if n:find("pallet",1,true) or n:find("паллет",1,true) or n:find("палет",1,true) or n:find("поддон",1,true) then return "pallets" end
+    if n:find("window",1,true) or n:find("окно",1,true) or n:find("окн",1,true) or n:find("vaultwindow",1,true) then return "windows" end
     return nil
 end
 local function insidePlayer(obj)
@@ -657,6 +679,9 @@ local function inactive(obj,kind)
     end
     if kind=="generators" then
         return readFlag(obj,{"Completed","IsCompleted","Repaired","IsRepaired"})==true
+    end
+    if kind=="pallets" or kind=="windows" then
+        return readFlag(obj,{"Destroyed","IsDestroyed","Broken","IsBroken"})==true
     end
     return false
 end
@@ -716,18 +741,19 @@ local function addObject(obj,kind)
         end
     end
     local color=palette[kind]
-    local h=make("Highlight",obj,{Name="OX1DE_Object",Adornee=obj,FillColor=color,FillTransparency=.66,OutlineColor=color,OutlineTransparency=0,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=state[kind]})
-    local bb,lab=billboard(part,color,kind=="pumpkins" and "Тыква" or "Генератор")
+    local h=make("Highlight",obj,{Name="OX1DE_Object",Adornee=obj,FillColor=color,FillTransparency=(kind=="pallets" or kind=="windows") and .9 or .66,OutlineColor=color,OutlineTransparency=0,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=state[kind]})
+    local labels={pumpkins="Тыква",generators="Генератор",pallets="Паллета",windows="Окно"}
+    local bb,lab=billboard(part,color,labels[kind] or "Объект")
     objectFx[obj]={kind=kind,h=h,bb=bb,lab=lab,part=part}
     -- Safe test: no scene model cloning in the preview
 end
 local function scanOne(obj)
     local target,kind=candidate(obj)
-    if target then addObject(target,kind) end
+    if target and state[kind] then addObject(target,kind) end
 end
 local scanPending=false
 local function scanAll()
-    if scanPending or not (state.generators or state.pumpkins) then return end
+    if scanPending or not (state.generators or state.pumpkins or state.pallets or state.windows) then return end
     scanPending=true
     task.spawn(function()
         local ok=pcall(function()
@@ -744,10 +770,10 @@ local function scanAll()
     end)
 end
 onEspToggle=function(key,enabled)
-    if enabled and (key=="generators" or key=="pumpkins") then scanAll() end
+    if enabled and (key=="generators" or key=="pumpkins" or key=="pallets" or key=="windows") then scanAll() end
 end
 listen(Workspace.DescendantAdded,function(obj)
-    if not alive or not (state.generators or state.pumpkins) then return end
+    if not alive or not (state.generators or state.pumpkins or state.pallets or state.windows) then return end
     if category(obj) then scanOne(obj) end
     if obj.Parent and category(obj.Parent) then scanOne(obj.Parent) end
 end)
@@ -984,8 +1010,9 @@ listen(RunService.Heartbeat,function(dt)
             fx.h.FillColor=palette[fx.kind]
             fx.h.OutlineColor=palette[fx.kind]
             fx.lab.TextColor3=palette[fx.kind]
-            fx.lab.Text=(fx.kind=="pumpkins" and "Тыква" or "Генератор").."  •  "..(my and fmtDistance(my.Position,fx.part.Position) or "?").." м"
-            if fx.kind=="pumpkins" then nPumpkin+=1 else nGenerator+=1 end
+            local labels={pumpkins="Тыква",generators="Генератор",pallets="Паллета",windows="Окно"}
+            fx.lab.Text=(labels[fx.kind] or "Объект").."  •  "..(my and fmtDistance(my.Position,fx.part.Position) or "?").." м"
+            if fx.kind=="pumpkins" then nPumpkin+=1 elseif fx.kind=="generators" then nGenerator+=1 end
         end
     end
     for _,p in ipairs(Players:GetPlayers()) do
