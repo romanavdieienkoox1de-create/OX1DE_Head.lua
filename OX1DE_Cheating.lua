@@ -10,7 +10,11 @@ local LocalPlayer = Players.LocalPlayer
 if not LocalPlayer then return end
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- One module per Roblox place; future game profiles can be registered here.
-local GameModules={violence_district={title="Район насилия",subtitle="VIOLENCE DISTRICT"}}
+local GameModules={
+ violence_district={title="Район насилия",subtitle="VIOLENCE DISTRICT"},
+ warfare={title="WARFARE",subtitle="WARFARE / TEAM & FPV"}
+}
+local activeTab="violence_district"
 local ActiveGame=GameModules.violence_district
 local GENERATOR_PREVIEW_ASSET_ID = "" -- Roblox image asset ID; supply after uploading the provided screenshot
 
@@ -27,8 +31,11 @@ local C={
  muted=Color3.fromRGB(158,171,176),unknown=Color3.fromRGB(185,187,193),
  darkgreen=Color3.fromRGB(20,57,25)
 }
-local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,fly=false,noclip=false,autoSkill=true}
-local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65)}
+local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,fly=false,noclip=false,autoSkill=true,
+ warAllies=false,warEnemies=false,warWeapons=false,warFPV=false,
+ warFly=false,warAimPreview=false,warFov=true,warWallCheck=true}
+local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),
+ warAllies=Color3.fromRGB(119,255,48),warEnemies=Color3.fromRGB(255,67,81),warFPV=Color3.fromRGB(255,197,62)}
 -- Local, per-installation settings. No network sync is used.
 local HttpService=game:GetService("HttpService")
 local settingsFile="OX1DE_ViolenceDistrict_"..tostring(LocalPlayer.UserId)..".json"
@@ -53,8 +60,16 @@ if savedSettings then
   end
  end
 end
+local warSettings={fov=160,distance=50,prediction=0,hitChance=100}
+if savedSettings and type(savedSettings.warfare)=="table" then
+ for name,limits in pairs({fov={50,400},distance={10,300},prediction={0,100},hitChance={1,100}}) do
+  local v=savedSettings.warfare[name]
+  if type(v)=="number" then warSettings[name]=math.clamp(v,limits[1],limits[2]) end
+ end
+end
 local function editableColor(key)
  return key=="players" or key=="generators" or key=="pumpkins" or key=="pallets"
+   or key=="warAllies" or key=="warEnemies" or key=="warFPV"
 end
 -- Killer and survivor NICK colours are deliberately fixed.
 local swatches={}
@@ -204,8 +219,8 @@ listen(Workspace:GetPropertyChangedSignal("CurrentCamera"),updateCamera)
 local header=make("Frame",window,{Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,0,0,86),BackgroundTransparency=1,Active=true})
 make("Frame",window,{Position=UDim2.fromOffset(0,86),Size=UDim2.new(1,0,0,1),BackgroundColor3=Color3.fromRGB(51,81,41),BorderSizePixel=0})
 text(header,"OX1DE",UDim2.fromOffset(29,13),UDim2.fromOffset(510,38),30,true,C.green)
-text(header,ActiveGame.subtitle,UDim2.fromOffset(31,53),UDim2.fromOffset(490,18),10,false,C.muted)
-local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7}
+local subtitleLabel=text(header,ActiveGame.subtitle,UDim2.fromOffset(31,53),UDim2.fromOffset(490,18),10,false,C.muted)
+local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7,warFly=Enum.KeyCode.F9,warAim=Enum.KeyCode.F10}
 if savedSettings and type(savedSettings.keys)=="table" then
  for name in pairs(keybind) do
   local keyName=savedSettings.keys[name]
@@ -218,7 +233,7 @@ end
 local savedVersion=0
 local function saveSettingsNow()
  if not settingsSupported or not alive then return end
- local snapshot={version=1,toggles={},colors={},keys={}}
+ local snapshot={version=2,toggles={},colors={},keys={},warfare=warSettings}
  for name,value in pairs(state) do if type(value)=="boolean" then snapshot.toggles[name]=value end end
  for name,color in pairs(palette) do
   snapshot.colors[name]={math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5)}
@@ -269,15 +284,20 @@ local wave=make("Frame",sidebar,{Position=UDim2.fromOffset(-130,414),Size=UDim2.
 corner(wave,80)
 TweenService:Create(wave,TweenInfo.new(3.6,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,-1,true),{BackgroundTransparency=.78}):Play()
 -- Game name is now the navigation item only
-local selectedNav=make("Frame",sidebar,{Position=UDim2.fromOffset(14,34),Size=UDim2.fromOffset(178,59),BackgroundColor3=C.darkgreen,BorderSizePixel=0})
+local selectedNav=make("TextButton",sidebar,{Position=UDim2.fromOffset(14,34),Size=UDim2.fromOffset(178,59),BackgroundColor3=C.darkgreen,BorderSizePixel=0,Text="",AutoButtonColor=false})
 corner(selectedNav,13)
 local navStroke=border(selectedNav,C.green,.05,1.4)
 text(selectedNav,"⌂",UDim2.fromOffset(20,0),UDim2.fromOffset(30,59),27,true,C.green)
 text(selectedNav,"Район насилия",UDim2.fromOffset(51,0),UDim2.fromOffset(125,59),13,true,C.white)
+local warNav=make("TextButton",sidebar,{Position=UDim2.fromOffset(14,101),Size=UDim2.fromOffset(178,59),BackgroundColor3=C.card,Text="",BorderSizePixel=0,AutoButtonColor=false})
+corner(warNav,13);border(warNav,C.edge,.4,1)
+text(warNav,"✦",UDim2.fromOffset(19,0),UDim2.fromOffset(28,59),24,true,C.green)
+text(warNav,"WARFARE",UDim2.fromOffset(52,0),UDim2.fromOffset(120,59),15,true,C.white)
 local bindInfo={Text=""}
 -- Sidebar stays intentionally minimal; shortcuts remain internal.
 
 local content=make("Frame",window,{Position=UDim2.fromOffset(204,87),Size=UDim2.fromOffset(846,589),BackgroundTransparency=1,ClipsDescendants=true})
+local warContent=make("Frame",window,{Position=UDim2.fromOffset(204,87),Size=UDim2.fromOffset(846,589),BackgroundTransparency=1,ClipsDescendants=true,Visible=false})
 local function panel(parent,pos,size,col)
  local f=make("Frame",parent,{Position=pos,Size=size,BackgroundColor3=C.panel,BorderSizePixel=0,ClipsDescendants=true})
  corner(f,16);border(f,col or C.edge,.22,1)
@@ -378,7 +398,7 @@ end
 bindVisual("menu")
 local function beginRebind(key)
  waitingFor=key
- for _,name in ipairs({"menu","fly","noclip"}) do bindVisual(name) end
+ for _,name in ipairs({"menu","fly","noclip","warFly","warAim"}) do bindVisual(name) end
 end
 listen(menuBind.MouseButton1Click,function() beginRebind("menu") end)
 local function hoverEffect(o)
@@ -487,7 +507,7 @@ listen(UserInputService.InputBegan,function(input,handled)
     keybind[target]=(key==Enum.KeyCode.Backspace and Enum.KeyCode.Unknown or key)
    end
   end
-  for _,name in ipairs({"menu","fly","noclip"}) do bindVisual(name) end
+  for _,name in ipairs({"menu","fly","noclip","warFly","warAim"}) do bindVisual(name) end
   if refreshMenuSink then refreshMenuSink() end
   scheduleSettingsSave()
   return
@@ -498,7 +518,7 @@ listen(UserInputService.InputBegan,function(input,handled)
   if _G.OX1DE_LOCAL_TOGGLE then _G.OX1DE_LOCAL_TOGGLE() end
   return
  end
- for _,name in ipairs({"fly","noclip"}) do
+ for _,name in ipairs({"fly","noclip","warFly","warAim"}) do
   if keybind[name]~=Enum.KeyCode.Unknown and key==keybind[name] then toggle(name);return end
  end
 end)
@@ -655,7 +675,7 @@ end
 openPicker=function(key)
  if not editableColor(key) then return end
  chosenKey=key
- local names={players="Игроки • обводка",generators="Генераторы",pumpkins="Тыквы",pallets="Паллеты"}
+ local names={players="Игроки • обводка",generators="Генераторы",pumpkins="Тыквы",pallets="Паллеты",warAllies="Союзники WARFARE",warEnemies="Противники WARFARE",warFPV="FPV WARFARE"}
  pickerHeading.Text="Цвет  •  "..(names[key] or "ESP")
  h,s,v=palette[key]:ToHSV()
  pickerLayer.Visible=true
@@ -690,6 +710,84 @@ listen(UserInputService.InputEnded,function(input)
 end)
 listen(pickerDone.MouseButton1Click,function() pickerLayer.Visible=false end)
 listen(pickerX.MouseButton1Click,function() pickerLayer.Visible=false end)
+
+
+-- WARFARE: separate profile, preserving all original Violence District controls.
+local wh=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(816,145),C.green)
+make("UIGradient",wh,{Color=ColorSequence.new(Color3.fromRGB(9,30,18),Color3.fromRGB(9,19,24))})
+text(wh,"WARFARE",UDim2.fromOffset(27,11),UDim2.fromOffset(650,54),35,true,C.green)
+text(wh,"TEAM  •  FPV  •  WEAPON INFO",UDim2.fromOffset(30,68),UDim2.fromOffset(650,27),13,true)
+local warStatus=text(wh,"Команды определяются через Roblox Team; FPV по именам моделей",UDim2.fromOffset(30,108),UDim2.fromOffset(750,26),12,false,C.muted)
+local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
+local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
+text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
+text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
+local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,705),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,345),CanvasSize=UDim2.fromOffset(0,344),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local function warRow(parent,y,key,heading,details,colorKey,binding)
+ local isMain=parent==mscroll
+ local w=isMain and 398 or 322
+ local row=make("TextButton",parent,{Position=UDim2.fromOffset(5,y),Size=UDim2.fromOffset(w,74),Text="",BackgroundColor3=C.row,AutoButtonColor=false,BorderSizePixel=0})
+ corner(row,10);hoverEffect(row)
+ text(row,heading,UDim2.fromOffset(13,7),UDim2.fromOffset(230,27),14,true)
+ text(row,details,UDim2.fromOffset(13,39),UDim2.fromOffset(252,22),10,false,C.muted)
+ local x=w-54
+ if colorKey then
+  local chip=make("TextButton",row,{Position=UDim2.fromOffset(x-35,10),Size=UDim2.fromOffset(23,23),BackgroundColor3=palette[colorKey],Text="",BorderSizePixel=0,AutoButtonColor=false})
+  corner(chip,6);addSwatch(colorKey,chip)
+  listen(chip.MouseButton1Click,function() if openPicker then openPicker(colorKey) end end)
+ end
+ if binding then
+  local keyButton=make("TextButton",row,{Position=UDim2.fromOffset(241,10),Size=UDim2.fromOffset(87,24),BackgroundColor3=C.card,Text=niceKey(keybind[binding]),TextColor3=C.green,TextSize=11,Font=Enum.Font.GothamBold,BorderSizePixel=0})
+  corner(keyButton,6)
+  bindButtons[binding]=keyButton
+  listen(keyButton.MouseButton1Click,function() beginRebind(binding) end)
+ end
+ switch(row,key,x,41)
+ listen(row.MouseButton1Click,function() toggle(key) end)
+end
+warRow(mscroll,0,"warAimPreview","Silent Aim • визуально","FOV-подсказка; не меняет выстрелы",nil,"warAim")
+warRow(mscroll,82,"warFly","Fly","Полёт по WASD / Space",nil,"warFly")
+warRow(mscroll,164,"warFov","FOV • круг","Показывать границу радиуса")
+warRow(mscroll,246,"warWallCheck","Wall Check","Препятствия для визуальной цели")
+local function warValue(y,key,title,unit,minV,maxV,step)
+ local f=make("Frame",mscroll,{Position=UDim2.fromOffset(5,y),Size=UDim2.fromOffset(398,72),BackgroundColor3=C.row,BorderSizePixel=0})
+ corner(f,9)
+ text(f,title,UDim2.fromOffset(13,11),UDim2.fromOffset(220,26),14,true)
+ local value=text(f,"",UDim2.fromOffset(190,39),UDim2.fromOffset(86,22),12,true,C.green)
+ local function render()value.Text=tostring(warSettings[key])..unit end
+ for _,info in ipairs({{-step,282,"−"},{step,335,"+"}}) do
+  local b=make("TextButton",f,{Position=UDim2.fromOffset(info[2],17),Size=UDim2.fromOffset(42,36),BackgroundColor3=C.card,Text=info[3],TextColor3=C.green,TextSize=21,Font=Enum.Font.GothamBold,BorderSizePixel=0})
+  corner(b,7)
+  listen(b.MouseButton1Click,function()
+   warSettings[key]=math.clamp(warSettings[key]+info[1],minV,maxV)
+   render();scheduleSettingsSave()
+  end)
+ end
+ render()
+end
+warValue(330,"fov","FOV • радиус"," px",50,400,10)
+warValue(409,"distance","Дальность"," м",10,300,10)
+warValue(488,"prediction","Prediction • визуально"," %",0,100,5)
+warValue(567,"hitChance","Hit Chance • настройка"," %",1,100,5)
+warRow(escroll,0,"warAllies","Союзники","Своя Team • зелёный","warAllies")
+warRow(escroll,82,"warEnemies","Противники","Другие Team • красный","warEnemies")
+warRow(escroll,164,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
+warRow(escroll,246,"warFPV","FPV-дроны","Контур моделей дронов","warFPV")
+bindVisual("warFly");bindVisual("warAim")
+local warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
+corner(warFovCircle,1000);border(warFovCircle,C.green,.25,1.4)
+local function setTab(tab)
+ if tab~="warfare" and tab~="violence_district" then return end
+ activeTab=tab
+ content.Visible=tab=="violence_district"
+ warContent.Visible=tab=="warfare"
+ subtitleLabel.Text=GameModules[tab].subtitle
+ tween(selectedNav,{BackgroundColor3=tab=="violence_district" and C.darkgreen or C.card},.15)
+ tween(warNav,{BackgroundColor3=tab=="warfare" and C.darkgreen or C.card},.15)
+end
+listen(selectedNav.MouseButton1Click,function()setTab("violence_district")end)
+listen(warNav.MouseButton1Click,function()setTab("warfare")end)
 
 -- ESP: world objects ------------------------------------------------------
 local function category(obj)
