@@ -1587,6 +1587,18 @@ local registered=pcall(function()
   if not target or not goal then return end
   local cam=Workspace.CurrentCamera
   if not cam then return end
+  -- Refresh the head at render rate, without scanning every other player.
+  -- This keeps AIM attached to a moving/crouching head between target scans.
+  local head=target.Character:FindFirstChild("Head") or target.Character:FindFirstChild("HumanoidRootPart")
+  local ownRoot=root()
+  if not head or not ownRoot then return end
+  local range=(ownRoot.Position-head.Position).Magnitude
+  if range>warSettings.distance*3.57 then return end
+  local distanceFactor=math.clamp(range/300,0,2.5)
+  goal=head.Position+
+   head.AssemblyLinearVelocity*(warSettings.prediction/100)*distanceFactor*.30+
+   Vector3.new(0,(warSettings.drop/100)*distanceFactor*distanceFactor*9,0)
+  warCurrentAimPoint=goal
   local dir=goal-cam.CFrame.Position
   if dir.Magnitude<.01 then return end
   local aimFrame=CFrame.lookAt(cam.CFrame.Position,goal)
