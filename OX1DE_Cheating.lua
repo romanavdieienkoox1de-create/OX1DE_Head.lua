@@ -27,7 +27,7 @@ local C={
  muted=Color3.fromRGB(158,171,176),unknown=Color3.fromRGB(185,187,193),
  darkgreen=Color3.fromRGB(20,57,25)
 }
-local state={players=false,killers=false,generators=false,pumpkins=false,fly=false,noclip=false,fastVault=false,autoSkill=true}
+local state={players=false,killers=false,generators=false,pumpkins=false,fly=false,noclip=false,autoSkill=true}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange}
 local function editableColor(key)
  return key=="players" or key=="generators" or key=="pumpkins"
@@ -50,7 +50,6 @@ local playerFx,objectFx={},{}
 local collisions=setmetatable({}, {__mode="k"})
 local flyVelocity,flyGyro
 local foundText,countText
-local onFastVaultToggle
 local onEspToggle
 local function listen(signal,callback)
  local connection=signal:Connect(callback)
@@ -157,11 +156,13 @@ make("UIGradient",window,{Rotation=16,Color=ColorSequence.new({
  ColorSequenceKeypoint.new(1,Color3.fromRGB(8,18,12))
 })})
 local scale=make("UIScale",window,{Scale=1})
+local requestedScale=1
 local function resize()
  local camera=Workspace.CurrentCamera
  if not camera then return end
  local vp=camera.ViewportSize
- scale.Scale=math.min(1,math.max(.28,math.min((vp.X-22)/1050,(vp.Y-22)/676)))
+ local fit=math.min((vp.X-28)/1050,(vp.Y-28)/676)
+ scale.Scale=math.max(.22,math.min(requestedScale,fit))
 end
 local cameraConn
 local function updateCamera()
@@ -177,7 +178,7 @@ local header=make("Frame",window,{Position=UDim2.fromOffset(0,0),Size=UDim2.new(
 make("Frame",window,{Position=UDim2.fromOffset(0,86),Size=UDim2.new(1,0,0,1),BackgroundColor3=Color3.fromRGB(51,81,41),BorderSizePixel=0})
 text(header,"OX1DE",UDim2.fromOffset(29,13),UDim2.fromOffset(510,38),30,true,C.green)
 text(header,ActiveGame.subtitle,UDim2.fromOffset(31,53),UDim2.fromOffset(490,18),10,false,C.muted)
-local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7,fastVault=Enum.KeyCode.F8}
+local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7}
 local bindButtons={}
 local waitingFor=nil
 local refreshMenuSink
@@ -187,15 +188,36 @@ local function niceKey(key)
  return aliases[key.Name] or key.Name
 end
 local menuBind=make("TextButton",header,{
- Position=UDim2.fromOffset(762,22),Size=UDim2.fromOffset(188,41),BackgroundColor3=C.card,
+ Position=UDim2.fromOffset(666,22),Size=UDim2.fromOffset(197,41),BackgroundColor3=C.card,
  Text="",AutoButtonColor=false,BorderSizePixel=0
 })
 corner(menuBind,10);border(menuBind,C.edge,.53,1)
 local menuBindText=text(menuBind,"Right Shift  •  БИНД МЕНЮ",UDim2.fromOffset(8,0),UDim2.new(1,-16,1,0),12,true,C.green,Enum.TextXAlignment.Center)
-local minimize=make("TextButton",header,{Position=UDim2.fromOffset(961,22),Size=UDim2.fromOffset(37,41),BackgroundColor3=C.card,Text="−",Font=Enum.Font.GothamBold,TextSize=21,TextColor3=C.white,BorderSizePixel=0,AutoButtonColor=false})
+local minimize=make("TextButton",header,{Position=UDim2.fromOffset(954,22),Size=UDim2.fromOffset(40,41),BackgroundColor3=C.card,Text="−",Font=Enum.Font.GothamBold,TextSize=21,TextColor3=C.white,BorderSizePixel=0,AutoButtonColor=false})
 corner(minimize,10)
-local close=make("TextButton",header,{Position=UDim2.fromOffset(1004,22),Size=UDim2.fromOffset(37,41),BackgroundColor3=C.card,Text="×",Font=Enum.Font.GothamBold,TextSize=21,TextColor3=C.white,BorderSizePixel=0,AutoButtonColor=false})
+local close=make("TextButton",header,{Position=UDim2.fromOffset(999,22),Size=UDim2.fromOffset(40,41),BackgroundColor3=C.card,Text="×",Font=Enum.Font.GothamBold,TextSize=21,TextColor3=C.white,BorderSizePixel=0,AutoButtonColor=false})
 corner(close,10)
+
+local smaller=make("TextButton",header,{
+ Position=UDim2.fromOffset(869,22),Size=UDim2.fromOffset(37,41),
+ BackgroundColor3=C.card,Text="A−",TextColor3=C.white,
+ Font=Enum.Font.GothamBold,TextSize=14,BorderSizePixel=0,AutoButtonColor=false
+})
+corner(smaller,9)
+local bigger=make("TextButton",header,{
+ Position=UDim2.fromOffset(911,22),Size=UDim2.fromOffset(37,41),
+ BackgroundColor3=C.card,Text="A+",TextColor3=C.white,
+ Font=Enum.Font.GothamBold,TextSize=14,BorderSizePixel=0,AutoButtonColor=false
+})
+corner(bigger,9)
+listen(smaller.MouseButton1Click,function()
+ requestedScale=math.max(.6,requestedScale-.1)
+ resize()
+end)
+listen(bigger.MouseButton1Click,function()
+ requestedScale=math.min(1.3,requestedScale+.1)
+ resize()
+end)
 
 local sidebar=make("Frame",window,{Position=UDim2.fromOffset(0,87),Size=UDim2.fromOffset(204,589),BackgroundColor3=Color3.fromRGB(10,16,15),BorderSizePixel=0,ClipsDescendants=true})
 make("UIGradient",sidebar,{Rotation=100,Color=ColorSequence.new(Color3.fromRGB(9,15,15),Color3.fromRGB(9,31,15))})
@@ -216,9 +238,52 @@ local function panel(parent,pos,size,col)
  corner(f,16);border(f,col or C.edge,.22,1)
  return f
 end
--- Generator hero removed: main tools and ESP now start at top.
-local functionsPanel=panel(content,UDim2.fromOffset(14,14),UDim2.fromOffset(444,558))
-local espPanel=panel(content,UDim2.fromOffset(471,14),UDim2.fromOffset(359,558))
+local hero=panel(content,UDim2.fromOffset(14,14),UDim2.fromOffset(816,182),C.green)
+make("UIGradient",hero,{Rotation=0,Color=ColorSequence.new({
+ ColorSequenceKeypoint.new(0,Color3.fromRGB(11,25,21)),
+ ColorSequenceKeypoint.new(.58,Color3.fromRGB(14,20,23)),
+ ColorSequenceKeypoint.new(1,Color3.fromRGB(12,30,19))
+})})
+local heroAccent=make("Frame",hero,{Position=UDim2.fromOffset(773,-10),Size=UDim2.fromOffset(20,100),Rotation=36,BackgroundColor3=C.green,BackgroundTransparency=.72,BorderSizePixel=0})
+make("Frame",hero,{Position=UDim2.fromOffset(495,24),Size=UDim2.fromOffset(1,132),BackgroundColor3=Color3.fromRGB(49,94,71),BorderSizePixel=0})
+local generatorPhoto=make("ImageLabel",hero,{
+ Position=UDim2.fromOffset(13,12),Size=UDim2.fromOffset(470,158),
+ BackgroundColor3=Color3.fromRGB(11,18,21),BorderSizePixel=0,
+ Image=GENERATOR_PREVIEW_ASSET_ID~="" and ("rbxassetid://"..GENERATOR_PREVIEW_ASSET_ID) or "",
+ ScaleType=Enum.ScaleType.Fit,Visible=GENERATOR_PREVIEW_ASSET_ID~="",ZIndex=2
+})
+corner(generatorPhoto,12)
+local viewport=make("ViewportFrame",hero,{
+ Position=UDim2.fromOffset(13,12),Size=UDim2.fromOffset(470,158),Visible=GENERATOR_PREVIEW_ASSET_ID=="",
+ BackgroundColor3=Color3.fromRGB(11,18,21),BorderSizePixel=0,
+ Ambient=Color3.fromRGB(145,166,175),LightColor=Color3.fromRGB(220,238,240),LightDirection=Vector3.new(-1,-1,-1)
+})
+corner(viewport,12)
+local world=make("WorldModel",viewport,{})
+local previewCamera=make("Camera",viewport,{CFrame=CFrame.lookAt(Vector3.new(8,4,12),Vector3.zero),FieldOfView=35})
+viewport.CurrentCamera=previewCamera
+-- Until Workspace provides a generator model, show a restrained placeholder, not a fake machine.
+local placeholder=make("Model",world,{Name="PreviewLoading"})
+local function previewBlock(name,pos,size,color)
+ return make("Part",placeholder,{Name=name,Size=size,Anchored=true,CanCollide=false,Color=color,Material=Enum.Material.Metal,CFrame=CFrame.new(pos)})
+end
+previewBlock("Body",Vector3.new(0,0,0),Vector3.new(5.7,2.0,2),Color3.fromRGB(119,42,36))
+previewBlock("Front",Vector3.new(0,-.2,1.04),Vector3.new(4,1.14,.08),Color3.fromRGB(55,63,65))
+for i=-2,2 do
+ local v=previewBlock("PanelWire",Vector3.new(i*.6,-.24,1.1),Vector3.new(.11,.93,.08),C.cyan)
+ v.Material=Enum.Material.Neon
+end
+for i=-1,1 do previewBlock("Piston",Vector3.new(i*1.28,1.27,.0),Vector3.new(.7,.83,.75),Color3.fromRGB(77,90,94)) end
+local previewLabel=text(hero,"ГЕНЕРАТОР",UDim2.fromOffset(26,16),UDim2.fromOffset(420,24),12,true,C.cyan)
+previewLabel.ZIndex=4
+local generatorTitle=text(hero,"Генератор",UDim2.fromOffset(518,30),UDim2.fromOffset(276,41),27,true,C.white)
+local distanceLabel=text(hero,"Модель в радиусе загрузки",UDim2.fromOffset(519,73),UDim2.fromOffset(270,24),12,false,C.muted)
+local previewAccent=make("Frame",hero,{Position=UDim2.fromOffset(520,128),Size=UDim2.fromOffset(20,20),BackgroundColor3=C.cyan,BorderSizePixel=0})
+corner(previewAccent,5)
+text(hero,"Цвет ESP генераторов — в панели справа",UDim2.fromOffset(553,120),UDim2.fromOffset(258,37),12,false,C.muted)
+
+local functionsPanel=panel(content,UDim2.fromOffset(14,207),UDim2.fromOffset(444,368))
+local espPanel=panel(content,UDim2.fromOffset(471,207),UDim2.fromOffset(359,368))
 text(functionsPanel,"⚙",UDim2.fromOffset(16,9),UDim2.fromOffset(34,34),24,true,C.green)
 text(functionsPanel,"Основные функции",UDim2.fromOffset(51,9),UDim2.fromOffset(370,34),19,true)
 text(espPanel,"◉",UDim2.fromOffset(13,9),UDim2.fromOffset(34,34),23,true,C.green)
@@ -237,7 +302,6 @@ local function setOption(key,enabled)
  if state[key]==enabled then return end
  state[key]=enabled
  applyToggle(key)
- if key=="fastVault" and onFastVaultToggle then onFastVaultToggle(enabled) end
  if onEspToggle then onEspToggle(key,enabled) end
 end
 local function toggle(key)
@@ -261,11 +325,11 @@ local function bindVisual(key)
   button.TextColor3=(waitingFor==key and C.white or C.green)
   tween(button,{BackgroundColor3=(waitingFor==key and C.darkgreen or C.card)},.15)
  end
- bindInfo.Text=niceKey(keybind.fly).." — Fly\n"..niceKey(keybind.noclip).." — NoClip\n"..niceKey(keybind.fastVault).." — Fast Vault"
+ bindInfo.Text=niceKey(keybind.fly).." — Fly\n"..niceKey(keybind.noclip).." — NoClip"
 end
 local function beginRebind(key)
  waitingFor=key
- for _,name in ipairs({"menu","fly","noclip","fastVault"}) do bindVisual(name) end
+ for _,name in ipairs({"menu","fly","noclip"}) do bindVisual(name) end
 end
 listen(menuBind.MouseButton1Click,function() beginRebind("menu") end)
 local function hoverEffect(o)
@@ -275,12 +339,11 @@ end
 local rows={
  {key="fly",name="Fly",subtitle="Полёт • WASD / Space",icon="✈",bind=true},
  {key="noclip",name="NoClip",subtitle="Проход сквозь препятствия",icon="◇",bind=true},
- {key="fastVault",name="Fast Vault",subtitle="Перелаз • анимация ×1.8",icon="↟",bind=true},
  {key="autoSkill",name="Auto Skill Check",subtitle="Отслеживание тёмной зоны (эксп.)",icon="◎",bind=false}
 }
 for i,v in ipairs(rows) do
- local y=66+(i-1)*112
- local f=make("TextButton",functionsPanel,{Position=UDim2.fromOffset(12,y),Size=UDim2.fromOffset(420,91),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
+ local y=48+(i-1)*102
+ local f=make("TextButton",functionsPanel,{Position=UDim2.fromOffset(12,y),Size=UDim2.fromOffset(420,88),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
  corner(f,11);hoverEffect(f)
  local ib=make("Frame",f,{Position=UDim2.fromOffset(12,24),Size=UDim2.fromOffset(40,40),BackgroundColor3=C.card,BorderSizePixel=0})
  corner(ib,9)
@@ -307,10 +370,10 @@ local descriptions={
  {key="pumpkins",name="ESP тыкв",subtitle="Тыквы на карте",icon="🎃"}
 }
 for i,v in ipairs(descriptions) do
- local y=66+(i-1)*112
- local f=make("TextButton",espPanel,{Position=UDim2.fromOffset(11,y),Size=UDim2.fromOffset(337,93),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
+ local y=45+(i-1)*76
+ local f=make("TextButton",espPanel,{Position=UDim2.fromOffset(11,y),Size=UDim2.fromOffset(337,70),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
  corner(f,11);hoverEffect(f)
- local iconBox=make("Frame",f,{Position=UDim2.fromOffset(11,26),Size=UDim2.fromOffset(38,38),BackgroundColor3=C.card,BorderSizePixel=0})
+ local iconBox=make("Frame",f,{Position=UDim2.fromOffset(11,16),Size=UDim2.fromOffset(38,38),BackgroundColor3=C.card,BorderSizePixel=0})
  corner(iconBox,9)
  if v.key=="players" then
   local head=make("Frame",iconBox,{Position=UDim2.fromOffset(13,7),Size=UDim2.fromOffset(12,12),BackgroundColor3=C.white,BorderSizePixel=0})
@@ -327,9 +390,9 @@ for i,v in ipairs(descriptions) do
  else
   text(iconBox,v.icon,UDim2.fromScale(0,0),UDim2.fromScale(1,1),21,true,v.key=="players" and C.white or palette[v.key],Enum.TextXAlignment.Center)
  end
- text(f,v.name,UDim2.fromOffset(55,17),UDim2.fromOffset(195,27),15,true)
- text(f,v.subtitle,UDim2.fromOffset(55,51),UDim2.fromOffset(195,22),10,false,C.muted)
- local swatch=make("TextButton",f,{Position=UDim2.fromOffset(252,15),Size=UDim2.fromOffset(27,27),Text="",BackgroundColor3=palette[v.key],BorderSizePixel=0,AutoButtonColor=false})
+ text(f,v.name,UDim2.fromOffset(55,10),UDim2.fromOffset(195,25),14,true)
+ text(f,v.subtitle,UDim2.fromOffset(55,37),UDim2.fromOffset(195,22),10,false,C.muted)
+ local swatch=make("TextButton",f,{Position=UDim2.fromOffset(252,9),Size=UDim2.fromOffset(27,27),Text="",BackgroundColor3=palette[v.key],BorderSizePixel=0,AutoButtonColor=false})
  corner(swatch,7)
  if editableColor(v.key) then
   addSwatch(v.key,swatch)
@@ -344,7 +407,7 @@ for i,v in ipairs(descriptions) do
    task.delay(.12,function() if alive and swatch.Parent then tween(swatch,{BackgroundTransparency=0},.15) end end)
   end)
  end
- switch(f,v.key,286,57)
+ switch(f,v.key,286,40)
  listen(f.MouseButton1Click,function() toggle(v.key) end)
 end
 
@@ -363,7 +426,7 @@ listen(UserInputService.InputBegan,function(input,handled)
     keybind[target]=(key==Enum.KeyCode.Backspace and Enum.KeyCode.Unknown or key)
    end
   end
-  for _,name in ipairs({"menu","fly","noclip","fastVault"}) do bindVisual(name) end
+  for _,name in ipairs({"menu","fly","noclip"}) do bindVisual(name) end
   if refreshMenuSink then refreshMenuSink() end
   return
  end
@@ -373,7 +436,7 @@ listen(UserInputService.InputBegan,function(input,handled)
   if _G.OX1DE_LOCAL_TOGGLE then _G.OX1DE_LOCAL_TOGGLE() end
   return
  end
- for _,name in ipairs({"fly","noclip","fastVault"}) do
+ for _,name in ipairs({"fly","noclip"}) do
   if keybind[name]~=Enum.KeyCode.Unknown and key==keybind[name] then toggle(name);return end
  end
 end)
@@ -790,102 +853,6 @@ task.spawn(function()
     end
 end)
 
--- Fast Vault: conservative, client-side speedup for recognized vault tracks.
--- Does not teleport the character, change server cooldowns or bypass server validation.
-local vaultSpeedMultiplier=1.8
-local vaultAnimationConn
-local vaultTracks=setmetatable({}, {__mode="k"})
-local vaultKnown={"vault","window","pallet","hurdle","obstacle","jump_over","jumpover","clamber","перелаз","прыжокчерез","паллет","окно"}
-local vaultContext={"vault","window","pallet","hurdle","obstacle","барьер","перелаз","паллет","окно","поддон"}
-local vaultNot={"attack","swing","killer","hit","death","repair","interact","hook","stun","punch","hold","idle","walk","run","sprint"}
-local function vaultContains(s,list)
-    for _,key in ipairs(list) do
-        if s:find(key,1,true) then return true end
-    end
-    return false
-end
-local function nearbyVaultObject()
-    local r=root()
-    if not r then return false end
-    local parameters=OverlapParams.new()
-    parameters.FilterType=Enum.RaycastFilterType.Exclude
-    parameters.FilterDescendantsInstances=LocalPlayer.Character and {LocalPlayer.Character} or {}
-    parameters.MaxParts=96
-    local ok,nearby=pcall(function()
-        return Workspace:GetPartBoundsInRadius(r.Position,9,parameters)
-    end)
-    if not ok or not nearby then return false end
-    for _,part in ipairs(nearby) do
-        local current=part
-        for _=1,4 do
-            if not current or current==Workspace then break end
-            if vaultContains(string.lower(current.Name),vaultContext) then return true end
-            current=current.Parent
-        end
-    end
-    return false
-end
-local function qualifiesVault(track)
-    local name=string.lower(track.Name or "")
-    if vaultContains(name,vaultKnown) then return true end
-    if vaultContains(name,vaultNot) then return false end
-    -- Some games publish tracks as "Animation" with no useful name. For those,
-    -- only consider short Action-priority animations next to a vault obstacle.
-    if not nearbyVaultObject() then return false end
-    local ok,priority,length=pcall(function() return track.Priority,track.Length end)
-    if not ok or not length or length<.25 or length>2.5 then return false end
-    return priority==Enum.AnimationPriority.Action or
-           priority==Enum.AnimationPriority.Action2 or
-           priority==Enum.AnimationPriority.Action3 or
-           priority==Enum.AnimationPriority.Action4
-end
-local function speedVaultTrack(track)
-    if not alive or not state.fastVault or not track then return end
-    if vaultTracks[track] or not qualifiesVault(track) then return end
-    local ok,isPlaying,original=pcall(function() return track.IsPlaying,track.Speed end)
-    if not ok or not isPlaying then return end
-    if type(original)~="number" or original<=0 then original=1 end
-    local success=pcall(function() track:AdjustSpeed(original*vaultSpeedMultiplier) end)
-    if success then
-        vaultTracks[track]=original
-        track.Stopped:Once(function() vaultTracks[track]=nil end)
-    end
-end
-local function restoreVaultTracks()
-    for track,original in pairs(vaultTracks) do
-        pcall(function()
-            if track.IsPlaying then track:AdjustSpeed(original) end
-        end)
-        vaultTracks[track]=nil
-    end
-end
-onFastVaultToggle=function(enabled)
-    if not enabled then restoreVaultTracks();return end
-    local character=LocalPlayer.Character
-    local humanoid=character and character:FindFirstChildOfClass("Humanoid")
-    local animator=humanoid and humanoid:FindFirstChildOfClass("Animator")
-    if animator then
-        local ok,tracks=pcall(function() return animator:GetPlayingAnimationTracks() end)
-        if ok then for _,track in ipairs(tracks) do speedVaultTrack(track) end end
-    end
-end
-local function connectVaultAnimator()
-    if vaultAnimationConn then vaultAnimationConn:Disconnect();vaultAnimationConn=nil end
-    restoreVaultTracks()
-    local character=LocalPlayer.Character
-    if not character then return end
-    task.spawn(function()
-        local humanoid=character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid",8)
-        if not humanoid or not alive or LocalPlayer.Character~=character then return end
-        local animator=humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator",8)
-        if not animator or not alive or LocalPlayer.Character~=character then return end
-        if vaultAnimationConn then vaultAnimationConn:Disconnect() end
-        vaultAnimationConn=animator.AnimationPlayed:Connect(speedVaultTrack)
-        if state.fastVault then onFastVaultToggle(true) end
-    end)
-end
-connectVaultAnimator()
-
 -- Local movement ----------------------------------------------------------
 local function stopFly()
     if flyVelocity then flyVelocity:Destroy();flyVelocity=nil end
@@ -955,7 +922,6 @@ listen(LocalPlayer.CharacterAdded,function()
     -- Character transitions can happen when returning to the lobby.
     -- Close the window first so mouse movement returns to Roblox.
     if isOpen then setVisible(false) end
-    connectVaultAnimator()
     stopFly();restore()
     task.delay(.6,function()
         if alive then
@@ -1046,9 +1012,6 @@ end)
 _G.OX1DE_CHEATING_STOP=function()
     alive=false;state.fly=false;state.noclip=false
     state.autoSkill=false
-    state.fastVault=false
-    restoreVaultTracks()
-    if vaultAnimationConn then vaultAnimationConn:Disconnect();vaultAnimationConn=nil end
     stopFly();restore()
     if isOpen then stopMenuMouse() end
     pcall(function() ContextActionService:UnbindAction("OX1DE_MenuKey") end)
