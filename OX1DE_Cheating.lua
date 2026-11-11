@@ -75,7 +75,7 @@ if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.sele
 end
 local scheduleLegacyRefresh
 local hideWarfareFx
-local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=0,height=-15,mode="legit"}
+local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20,height=0,mode="legit"}
 auxUI.defaults.warfare=table.clone(warSettings)
 if savedSettings and type(savedSettings.warfare)=="table" then
  for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},smooth={5,100},drop={0,100},height={-100,100}}) do
@@ -86,6 +86,13 @@ end
 if savedSettings and type(savedSettings.warfare)=="table" then
  local rememberedMode=savedSettings.warfare.mode
  if rememberedMode=="hard" or rememberedMode=="legit" then warSettings.mode=rememberedMode end
+end
+-- AIM v6: restore the pre-redesign Classic camera target correction.
+-- Older saved height=-15 offsets were added during UI revisions,
+-- so migrate just vertical correction and keep FOV, bind, mode, etc.
+if savedSettings and (savedSettings.version or 0)<6 then
+ warSettings.drop=20
+ warSettings.height=0
 end
 local function editableColor(key)
  return key=="players" or key=="generators" or key=="pumpkins" or key=="pallets"
@@ -278,7 +285,7 @@ end
 local savedVersion=0
 local function saveSettingsNow()
  if not settingsSupported or not alive then return end
- local snapshot={version=5,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings,graphicsMode=auxUI.graphicsMode,compact=auxUI.compact}
+ local snapshot={version=6,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings,graphicsMode=auxUI.graphicsMode,compact=auxUI.compact}
  for name,value in pairs(state) do if type(value)=="boolean" then snapshot.toggles[name]=value end end
  for name,color in pairs(palette) do
   snapshot.colors[name]={math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5)}
