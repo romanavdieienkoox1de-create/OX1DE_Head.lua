@@ -213,9 +213,9 @@ corner(window,30)
 local windowStroke=border(window,C.green,.34,1.6)
 TweenService:Create(windowStroke,TweenInfo.new(2.8,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,-1,true),{Transparency=.12,Thickness=2}):Play()
 make("UIGradient",window,{Rotation=16,Color=ColorSequence.new({
- ColorSequenceKeypoint.new(0,Color3.fromRGB(9,17,14)),
- ColorSequenceKeypoint.new(.58,Color3.fromRGB(7,10,13)),
- ColorSequenceKeypoint.new(1,Color3.fromRGB(8,18,12))
+ ColorSequenceKeypoint.new(0,Color3.fromRGB(21,21,33)),
+ ColorSequenceKeypoint.new(.58,Color3.fromRGB(15,16,23)),
+ ColorSequenceKeypoint.new(1,Color3.fromRGB(27,24,46))
 })})
 local scale=make("UIScale",window,{Scale=1})
 local requestedScale=1
@@ -238,7 +238,24 @@ listen(Workspace:GetPropertyChangedSignal("CurrentCamera"),updateCamera)
 
 local header=make("Frame",window,{Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,0,0,86),BackgroundTransparency=1,Active=true})
 make("Frame",window,{Position=UDim2.fromOffset(0,86),Size=UDim2.new(1,0,0,1),BackgroundColor3=Color3.fromRGB(51,81,41),BorderSizePixel=0})
-text(header,"OX1DE",UDim2.fromOffset(29,13),UDim2.fromOffset(510,38),30,true,C.green)
+text(header,"OX1DE",UDim2.fromOffset(28,14),UDim2.fromOffset(420,38),30,true,C.green)
+text(header,"●",UDim2.fromOffset(555,22),UDim2.fromOffset(24,35),16,true,C.green)
+text(header,"@"..LocalPlayer.Name,
+ UDim2.fromOffset(580,22),UDim2.fromOffset(219,35),15,true,C.white)
+auxUI.fpsInfo=text(header,"FPS: --",
+ UDim2.fromOffset(807,22),UDim2.fromOffset(144,38),14,true,C.muted)
+auxUI.frameCount=0;auxUI.frameTime=0
+listen(RunService.RenderStepped,function(dt)
+ if not alive then return end
+ auxUI.frameCount+=1
+ auxUI.frameTime+=dt
+ if auxUI.frameTime>=.6 then
+  if auxUI.fpsInfo and auxUI.fpsInfo.Parent then
+   auxUI.fpsInfo.Text="FPS: "..tostring(math.floor(auxUI.frameCount/auxUI.frameTime+.5))
+  end
+  auxUI.frameCount=0;auxUI.frameTime=0
+ end
+end)
 local subtitleLabel=text(header,ActiveGame.subtitle,UDim2.fromOffset(31,53),UDim2.fromOffset(490,18),10,false,C.muted)
 local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7,warFly=Enum.KeyCode.F9,warNoClip=Enum.KeyCode.F8,warAim=Enum.KeyCode.F10}
 auxUI.defaults.keys=table.clone(keybind)
@@ -300,7 +317,7 @@ local sizeGrip=make("TextButton",window,{
 corner(sizeGrip,7)
 
 local sidebar=make("Frame",window,{Position=UDim2.fromOffset(0,87),Size=UDim2.fromOffset(204,589),BackgroundColor3=Color3.fromRGB(10,16,15),BorderSizePixel=0,ClipsDescendants=true})
-make("UIGradient",sidebar,{Rotation=100,Color=ColorSequence.new(Color3.fromRGB(9,15,15),Color3.fromRGB(9,31,15))})
+make("UIGradient",sidebar,{Rotation=100,Color=ColorSequence.new(Color3.fromRGB(24,25,35),Color3.fromRGB(30,28,47))})
 local wave=make("Frame",sidebar,{Position=UDim2.fromOffset(-130,414),Size=UDim2.fromOffset(380,180),Rotation=-18,BackgroundColor3=C.green,BackgroundTransparency=.90,BorderSizePixel=0})
 corner(wave,80)
 TweenService:Create(wave,TweenInfo.new(3.6,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,-1,true),{BackgroundTransparency=.78}):Play()
@@ -811,7 +828,7 @@ warAimStatus.Parent=wm;warAimStatus.Position=UDim2.fromOffset(18,496);warAimStat
 local we=panel(warContent,UDim2.fromOffset(471,14),UDim2.fromOffset(359,560))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
 text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
-local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,392),CanvasSize=UDim2.fromOffset(0,1130),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,392),CanvasSize=UDim2.fromOffset(0,402),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,495),CanvasSize=UDim2.fromOffset(0,425),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
@@ -922,6 +939,7 @@ aimHint.TextWrapped=true
 -- Slider controls instead of plus/minus buttons. The values are display/
 -- selection preferences, not modifications to remote damage or projectiles.
 local warSliderState={dragging=false}
+auxUI.aimRefresh={}
 local function warValue(y,key,title,unit,minV,maxV,step)
  local row=make("Frame",aimSliders,{
   Position=UDim2.fromOffset(5,y),Size=UDim2.fromOffset(398,73),
@@ -987,6 +1005,7 @@ local function warValue(y,key,title,unit,minV,maxV,step)
   end
  end)
  render()
+ auxUI.aimRefresh[key]=render
 end
 warValue(0,"fov","FOV • радиус"," px",20,400,5)
 warValue(79,"distance","Дальность захвата"," м",10,300,5)
@@ -1007,6 +1026,120 @@ bindVisual("warFly");bindVisual("warNoClip");bindVisual("warAim")
 warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",ZIndex=200,Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
 corner(warFovCircle,1000)
 warFovStroke=border(warFovCircle,palette.warFov,.25,1.4)
+-- General settings: menu shortcut, real Roblox quality request and reset.
+do -- OX1DE options scope
+ local control=panel(auxUI.settingsContent,UDim2.fromOffset(14,14),UDim2.fromOffset(444,560))
+ local graphics=panel(auxUI.settingsContent,UDim2.fromOffset(471,14),UDim2.fromOffset(359,560))
+ text(control,"УПРАВЛЕНИЕ",UDim2.fromOffset(20,14),UDim2.fromOffset(385,34),20,true,C.white)
+ text(control,"Горячая клавиша открытия меню",UDim2.fromOffset(20,59),UDim2.fromOffset(396,25),13,true,C.muted)
+ menuBind.Parent=control
+ menuBind.Position=UDim2.fromOffset(20,96)
+ menuBind.Size=UDim2.fromOffset(403,50)
+ corner(menuBind,11)
+ menuBindText.TextSize=14
+ text(control,"Нажми кнопку и выбери клавишу. Esc — отмена.",
+   UDim2.fromOffset(21,151),UDim2.fromOffset(397,29),11,false,C.muted)
+ text(control,"СТАТУС СОХРАНЕНИЯ",UDim2.fromOffset(20,194),UDim2.fromOffset(390,27),15,true,C.white)
+ local savingInfo=text(control,
+   settingsSupported and "Настройки автоматически сохраняются для этого Roblox-аккаунта на данном устройстве." or
+   "Автосохранение недоступно в этой среде. Изменения действуют только в текущем сеансе.",
+   UDim2.fromOffset(20,226),UDim2.fromOffset(402,82),12,false,C.muted)
+ savingInfo.TextWrapped=true
+ local reset=make("TextButton",control,{
+  Position=UDim2.fromOffset(20,428),Size=UDim2.fromOffset(402,55),
+  BackgroundColor3=Color3.fromRGB(57,37,51),TextColor3=Color3.fromRGB(255,132,149),
+  Font=Enum.Font.GothamBold,TextSize=15,Text="СБРОСИТЬ ВСЕ НАСТРОЙКИ",
+  BorderSizePixel=0,AutoButtonColor=false
+ })
+ corner(reset,14);border(reset,C.red,.48,1.1)
+ text(control,"Подтверждение защищает от случайного сброса.",
+   UDim2.fromOffset(20,489),UDim2.fromOffset(404,26),11,false,C.muted)
+ auxUI.resetReady=false
+ listen(reset.MouseButton1Click,function()
+  if not auxUI.resetReady then
+   auxUI.resetReady=true
+   reset.Text="ПОДТВЕРДИТЬ СБРОС"
+   task.delay(5,function()
+    if not alive then return end
+    if auxUI.resetReady then
+     auxUI.resetReady=false
+     reset.Text="СБРОСИТЬ ВСЕ НАСТРОЙКИ"
+    end
+   end)
+   return
+  end
+  auxUI.resetReady=false
+  reset.Text="НАСТРОЙКИ СБРОШЕНЫ"
+  for key,default in pairs(auxUI.defaults.toggles) do
+   state[key]=default
+   applyToggle(key)
+  end
+  for key,color in pairs(auxUI.defaults.colors) do
+   palette[key]=color
+   paintSwatches(key)
+  end
+  for key,code in pairs(auxUI.defaults.keys) do
+   keybind[key]=code
+   bindVisual(key)
+  end
+  for key,value in pairs(auxUI.defaults.warfare) do warSettings[key]=value end
+  for _,refresh in pairs(auxUI.aimRefresh or {}) do refresh() end
+  for key,button in pairs(modeButtons) do
+   button.BackgroundColor3=key==warSettings.mode and C.darkgreen or C.card
+   button.TextColor3=key==warSettings.mode and C.green or C.white
+  end
+  auxUI.previewFov=false
+  scheduleSettingsSave()
+  task.delay(2,function()
+   if alive and reset.Parent then reset.Text="СБРОСИТЬ ВСЕ НАСТРОЙКИ" end
+  end)
+ end)
+ text(graphics,"ГРАФИКА",UDim2.fromOffset(19,14),UDim2.fromOffset(316,34),20,true,C.white)
+ local graphicsInfo=text(graphics,
+  "Профили качества Roblox. Эти настройки не устанавливают DLSS или 4K.",
+  UDim2.fromOffset(19,55),UDim2.fromOffset(319,61),12,false,C.muted)
+ graphicsInfo.TextWrapped=true
+ local graphicsChoices={}
+ local light=game:GetService("Lighting")
+ local originalShadows=light.GlobalShadows
+ local qualityMap={low=Enum.QualityLevel.Level01,medium=Enum.QualityLevel.Level05,high=Enum.QualityLevel.Level10}
+ local gfxStatus=text(graphics,"Режим: автоматически",
+  UDim2.fromOffset(19,398),UDim2.fromOffset(317,57),12,false,C.muted)
+ gfxStatus.TextWrapped=true
+ local function chooseGraphics(mode)
+  auxUI.graphicsMode=mode
+  local ok=pcall(function() settings().Rendering.QualityLevel=qualityMap[mode] end)
+  pcall(function()
+   if mode=="low" then light.GlobalShadows=false
+   else light.GlobalShadows=originalShadows end
+  end)
+  for key,button in pairs(graphicsChoices) do
+   tween(button,{BackgroundColor3=key==mode and C.darkgreen or C.row},.16)
+   button.TextColor3=key==mode and C.green or C.white
+  end
+  gfxStatus.Text=ok and "Режим применён локально (Roblox может ограничить качество)." or
+   "Roblox запретил изменение качества из скрипта. Выбери его в настройках игры."
+  scheduleSettingsSave()
+ end
+ local descriptions={
+  {key="low",name="POTATO • СЛАБЫЙ ПК",tip="Минимальное качество и тени",y=128},
+  {key="medium",name="СРЕДНИЙ",tip="Умеренное качество Roblox",y=215},
+  {key="high",name="ВЫСОКИЙ",tip="Высокое качество без обещаний 4K",y=302}
+ }
+ for _,item in ipairs(descriptions) do
+  local choice=make("TextButton",graphics,{
+   Position=UDim2.fromOffset(19,item.y),Size=UDim2.fromOffset(319,73),
+   BackgroundColor3=C.row,Text="",BorderSizePixel=0,AutoButtonColor=false
+  })
+  corner(choice,13)
+  text(choice,item.name,UDim2.fromOffset(14,9),UDim2.fromOffset(290,28),15,true,C.white)
+  text(choice,item.tip,UDim2.fromOffset(14,38),UDim2.fromOffset(293,26),11,false,C.muted)
+  graphicsChoices[item.key]=choice
+  listen(choice.MouseButton1Click,function() chooseGraphics(item.key) end)
+ end
+ if qualityMap[auxUI.graphicsMode] then chooseGraphics(auxUI.graphicsMode) end
+end -- OX1DE options scope
+
 local function setTab(tab)
  if tab~="warfare" and tab~="violence_district" and tab~="settings" then return end
  local changed=activeTab~=tab
