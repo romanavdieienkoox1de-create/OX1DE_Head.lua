@@ -1683,6 +1683,17 @@ end
 local function startWarfareRuntime()
 -- WARFARE local-world visualization: team, weapon and FPV outlines.
 local warfarePlayers,warfareDrones={},{}
+-- Optional on-screen team counter. The old in-menu diagnostic is hidden.
+local teamHud=make("Frame",gui,{
+ Name="OX1DE_WARFARE_TeamHUD",Position=UDim2.new(.5,-115,0,67),
+ Size=UDim2.fromOffset(230,34),BackgroundColor3=C.bg,
+ BackgroundTransparency=.16,BorderSizePixel=0,
+ Visible=false,Active=false,ZIndex=145
+})
+corner(teamHud,11);border(teamHud,C.green,.38,1)
+local teamHudLabel=text(teamHud,"Свои: 0  •  Враги: 0",
+ UDim2.fromOffset(10,1),UDim2.fromOffset(210,31),12,true,C.white,Enum.TextXAlignment.Center)
+teamHudLabel.ZIndex=146
 local function warfareTeamKey(player)
  if not player then return nil end
  -- Prefer actual Roblox team membership. Some games leave Neutral=true
@@ -1998,7 +2009,7 @@ listen(RunService.Heartbeat,function(dt)
    end
    local outlined=selected and (kind~=nil and state[kind] or false)
    local unknown=selected and kind==nil and state.warNames and (state.warAllies or state.warEnemies)
-   local named=selected and state.warNames and (outlined or unknown or state.warWeapons)
+   local named=selected and ((state.warNames and (outlined or unknown or state.warWeapons)) or state.warShowHP)
    local need=outlined or named or (selected and state.warWeapons)
    if need and not fx then fx=addWarfarePlayer(player) end
    if fx then
@@ -2038,7 +2049,17 @@ listen(RunService.Heartbeat,function(dt)
      elseif not len and #nick>22 then
       nick=string.sub(nick,1,19).."…"
      end
-     fx.label.Text=nick.."  •  "..tostring(distance).." м"
+     local caption=state.warNames and (nick.."  •  "..tostring(distance).." м") or ""
+     if state.warShowHP then
+      local hum=player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+      local hp="—"
+      if hum and hum.MaxHealth>0 then
+       hp=tostring(math.floor(math.max(0,hum.Health)+.5)).."/"..tostring(math.floor(hum.MaxHealth+.5))
+      end
+      fx.label.Text=(caption~="" and (caption.."\n") or "").."HP: "..hp
+     else
+      fx.label.Text=caption
+     end
     end
    end
    if kind=="warAllies" then teamPlayers+=1 elseif kind=="warEnemies" then otherPlayers+=1 else unknownPlayers+=1 end
@@ -2052,6 +2073,10 @@ listen(RunService.Heartbeat,function(dt)
    highlight.OutlineColor=palette.warFPV
    if highlight.Enabled then droneCount+=1 end
   end
+ end
+ teamHud.Visible=selected and state.warTeamHud and not isOpen
+ if teamHud.Visible then
+  teamHudLabel.Text="Союзники: "..teamPlayers.."   •   Противники: "..otherPlayers
  end
  if selected then
   local team=warfareTeamKey(LocalPlayer)
@@ -2067,6 +2092,7 @@ task.spawn(function()
 end)
 
 hideWarfareFx=function()
+ teamHud.Visible=false
  for _,fx in pairs(warfarePlayers) do
   if fx.highlight then fx.highlight.Enabled=false end
   if fx.billboard then fx.billboard.Enabled=false end
@@ -2078,6 +2104,7 @@ hideWarfareFx=function()
 end
 warfareCleanup=function()
  if hideWarfareFx then hideWarfareFx() end
+ if teamHud then teamHud:Destroy() end
  pcall(function() RunService:UnbindFromRenderStep(aimRenderName) end)
  if warFovCircle then warFovCircle.Visible=false end
  if warAimMark then warAimMark.Visible=false end
@@ -2251,10 +2278,10 @@ local function startDeviceChooser()
  })
  corner(mobileWar,10)
  local mobileRows={}
- for i=1,8 do
+ for i=1,10 do
   local action=make("TextButton",mobileWindow,{
-   Position=UDim2.fromOffset(17,125+(i-1)*54),
-   Size=UDim2.fromOffset(340,49),BackgroundColor3=C.row,
+   Position=UDim2.fromOffset(17,120+(i-1)*43),
+   Size=UDim2.fromOffset(340,39),BackgroundColor3=C.row,
    Text="",Font=Enum.Font.GothamBold,TextSize=13,
    TextColor3=C.white,TextXAlignment=Enum.TextXAlignment.Left,
    AutoButtonColor=false,BorderSizePixel=0,ZIndex=186
@@ -2313,7 +2340,8 @@ local function startDeviceChooser()
  local warfareControls={
   {"AIM","warAimPreview"},{"Fly","warFly"},{"NoClip","warNoClip"},
   {"Союзники • ESP","warAllies"},{"Противники • ESP","warEnemies"},
-  {"Никнеймы","warNames"},{"Оружие под ногами","warWeapons"},{"FPV-дроны","warFPV"}
+  {"Никнеймы","warNames"},{"Оружие под ногами","warWeapons"},{"FPV-дроны","warFPV"},
+  {"HP игроков","warShowHP"},{"Мини-HUD команд","warTeamHud"}
  }
  auxUI.refreshMobileControls=function()
   local isWar=activeTab=="warfare"
