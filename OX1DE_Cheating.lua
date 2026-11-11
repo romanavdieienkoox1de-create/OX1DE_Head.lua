@@ -34,7 +34,7 @@ local C={
  darkgreen=Color3.fromRGB(63,51,103)
 }
 local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,fly=false,noclip=false,autoSkill=false,
- warAllies=false,warEnemies=false,warNames=true,warWeapons=false,warFPV=false,
+ warAllies=false,warEnemies=false,warNames=true,warWeapons=false,warFPV=false,warShowHP=false,warTeamHud=false,
  warFly=false,warNoClip=false,warAimPreview=false,warFov=true,warWallCheck=true,warTeamCheck=true,warHoldAim=true}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=Color3.fromRGB(119,255,48),generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),
  warAllies=Color3.fromRGB(119,255,48),warEnemies=Color3.fromRGB(255,67,81),warFPV=Color3.fromRGB(255,197,62),warFov=Color3.fromRGB(119,255,48),warAim=Color3.fromRGB(255,220,72)}
@@ -50,6 +50,7 @@ if settingsSupported then
  local ok,data=pcall(function() return HttpService:JSONDecode(readfile(settingsFile)) end)
  if ok and type(data)=="table" then savedSettings=data end
 end
+auxUI.compact=not (savedSettings and savedSettings.compact==false)
 if savedSettings then
  if savedSettings.graphicsMode=="low" or savedSettings.graphicsMode=="medium" or savedSettings.graphicsMode=="high" then
   auxUI.graphicsMode=savedSettings.graphicsMode
@@ -218,7 +219,7 @@ make("UIGradient",window,{Rotation=16,Color=ColorSequence.new({
  ColorSequenceKeypoint.new(1,Color3.fromRGB(27,24,46))
 })})
 local scale=make("UIScale",window,{Scale=1})
-local requestedScale=1
+local requestedScale=auxUI.compact and .86 or 1
 local function resize()
  local camera=Workspace.CurrentCamera
  if not camera then return end
@@ -271,7 +272,7 @@ end
 local savedVersion=0
 local function saveSettingsNow()
  if not settingsSupported or not alive then return end
- local snapshot={version=4,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings,graphicsMode=auxUI.graphicsMode}
+ local snapshot={version=5,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings,graphicsMode=auxUI.graphicsMode,compact=auxUI.compact}
  for name,value in pairs(state) do if type(value)=="boolean" then snapshot.toggles[name]=value end end
  for name,color in pairs(palette) do
   snapshot.colors[name]={math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5)}
@@ -352,6 +353,22 @@ local navIndicator=make("Frame",sidebar,{
  BackgroundColor3=C.green,BorderSizePixel=0
 })
 corner(navIndicator,4)
+auxUI.densityButton=make("TextButton",sidebar,{
+ Position=UDim2.fromOffset(14,310),Size=UDim2.fromOffset(178,44),
+ BackgroundColor3=C.card,BorderSizePixel=0,Text="",
+ AutoButtonColor=false
+})
+corner(auxUI.densityButton,12)
+local densityTitle=text(auxUI.densityButton,
+ auxUI.compact and "▣  РАЗВЕРНУТЬ" or "▣  КОМПАКТНО",
+ UDim2.fromOffset(14,0),UDim2.fromOffset(155,44),13,true,C.green)
+listen(auxUI.densityButton.MouseButton1Click,function()
+ auxUI.compact=not auxUI.compact
+ requestedScale=auxUI.compact and .86 or 1
+ densityTitle.Text=auxUI.compact and "▣  РАЗВЕРНУТЬ" or "▣  КОМПАКТНО"
+ resize()
+ scheduleSettingsSave()
+end)
 text(sidebar,"OX1DE  •  CLIENT",UDim2.fromOffset(19,512),UDim2.fromOffset(174,25),12,true,C.green)
 local footerNote=text(sidebar,"Возможности зависят от игры.\nНастройки сохраняются локально.",
  UDim2.fromOffset(19,543),UDim2.fromOffset(174,55),11,false,C.muted)
@@ -1091,6 +1108,12 @@ do -- OX1DE options scope
    button.TextColor3=key==warSettings.mode and C.green or C.white
   end
   auxUI.previewFov=false
+  if not auxUI.compact then
+   auxUI.compact=true
+   requestedScale=.86
+   densityTitle.Text="▣  РАЗВЕРНУТЬ"
+   resize()
+  end
   scheduleSettingsSave()
   task.delay(2,function()
    if alive and reset.Parent then reset.Text="СБРОСИТЬ ВСЕ НАСТРОЙКИ" end
