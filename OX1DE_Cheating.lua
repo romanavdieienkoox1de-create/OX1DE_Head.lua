@@ -29,6 +29,30 @@ local C={
 }
 local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,windows=false,fly=false,noclip=false,autoSkill=true,espMaster=false}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),windows=Color3.fromRGB(245,192,65)}
+-- Local, per-installation settings. No network sync is used.
+local HttpService=game:GetService("HttpService")
+local settingsFile="OX1DE_ViolenceDistrict_"..tostring(LocalPlayer.UserId)..".json"
+local settingsSupported=type(readfile)=="function" and type(writefile)=="function"
+local savedSettings=nil
+if settingsSupported then
+ local ok,data=pcall(function() return HttpService:JSONDecode(readfile(settingsFile)) end)
+ if ok and type(data)=="table" then savedSettings=data end
+end
+if savedSettings then
+ if type(savedSettings.toggles)=="table" then
+  for name,value in pairs(savedSettings.toggles) do
+   if state[name]~=nil and type(value)=="boolean" then state[name]=value end
+  end
+ end
+ if type(savedSettings.colors)=="table" then
+  for name,rgb in pairs(savedSettings.colors) do
+   if palette[name] and type(rgb)=="table"
+    and type(rgb[1])=="number" and type(rgb[2])=="number" and type(rgb[3])=="number" then
+    palette[name]=Color3.fromRGB(math.clamp(rgb[1],0,255),math.clamp(rgb[2],0,255),math.clamp(rgb[3],0,255))
+   end
+  end
+ end
+end
 local function editableColor(key)
  return key=="players" or key=="generators" or key=="pumpkins" or key=="pallets" or key=="windows"
 end
@@ -179,6 +203,34 @@ make("Frame",window,{Position=UDim2.fromOffset(0,86),Size=UDim2.new(1,0,0,1),Bac
 text(header,"OX1DE",UDim2.fromOffset(29,13),UDim2.fromOffset(510,38),30,true,C.green)
 text(header,ActiveGame.subtitle,UDim2.fromOffset(31,53),UDim2.fromOffset(490,18),10,false,C.muted)
 local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7}
+if savedSettings and type(savedSettings.keys)=="table" then
+ for name in pairs(keybind) do
+  local keyName=savedSettings.keys[name]
+  if type(keyName)=="string" and #keyName<40 then
+   local ok,key=pcall(function() return Enum.KeyCode[keyName] end)
+   if ok and key and key~=Enum.KeyCode.Unknown then keybind[name]=key end
+  end
+ end
+end
+local savedVersion=0
+local function saveSettingsNow()
+ if not settingsSupported or not alive then return end
+ local snapshot={version=1,toggles={},colors={},keys={}}
+ for name,value in pairs(state) do if type(value)=="boolean" then snapshot.toggles[name]=value end end
+ for name,color in pairs(palette) do
+  snapshot.colors[name]={math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5)}
+ end
+ for name,key in pairs(keybind) do snapshot.keys[name]=key.Name end
+ pcall(function() writefile(settingsFile,HttpService:JSONEncode(snapshot)) end)
+end
+local function scheduleSettingsSave()
+ if not settingsSupported then return end
+ savedVersion+=1
+ local current=savedVersion
+ task.delay(.35,function()
+  if alive and savedVersion==current then saveSettingsNow() end
+ end)
+end
 local bindButtons={}
 local waitingFor=nil
 local refreshMenuSink
@@ -319,6 +371,7 @@ local function setOption(key,enabled)
   applyToggle("espMaster")
  end
  if onEspToggle then onEspToggle(key,enabled) end
+ scheduleSettingsSave()
 end
 local function toggle(key)
  setOption(key,not state[key])
@@ -343,6 +396,7 @@ local function bindVisual(key)
  end
  bindInfo.Text=niceKey(keybind.fly).." — Fly\n"..niceKey(keybind.noclip).." — NoClip"
 end
+bindVisual("menu")
 local function beginRebind(key)
  waitingFor=key
  for _,name in ipairs({"menu","fly","noclip"}) do bindVisual(name) end
@@ -458,6 +512,7 @@ listen(UserInputService.InputBegan,function(input,handled)
   end
   for _,name in ipairs({"menu","fly","noclip"}) do bindVisual(name) end
   if refreshMenuSink then refreshMenuSink() end
+  scheduleSettingsSave()
   return
  end
  if UserInputService:GetFocusedTextBox() then return end
@@ -612,7 +667,7 @@ local chosenKey="generators"
 local h,s,v=0,1,1
 local function applyColor()
  local color=Color3.fromHSV(h,s,v)
- if editableColor(chosenKey) then palette[chosenKey]=color;paintSwatches(chosenKey) end
+ if editableColor(chosenKey) then palette[chosenKey]=color;paintSwatches(chosenKey);scheduleSettingsSave() end
  sample.BackgroundColor3=color
  local r=wheelRadius*(.05+.95*s)
  local angle=h*math.pi*2
@@ -809,7 +864,8 @@ listen(Workspace.DescendantAdded,function(obj)
     if category(obj) then scanOne(obj) end
     if obj.Parent and category(obj.Parent) then scanOne(obj.Parent) end
 end)
-
+-- Restore selected object overlays when stored toggles were enabled on this device.
+if state.generators or state.pumpkins or state.pallets or state.windows then scanAll() end
 
 -- Skill check: local GUI detection only, no generator auto-repair.
 local virtualInput=nil
@@ -1086,6 +1142,7 @@ task.spawn(function()
     end
 end)
 _G.OX1DE_CHEATING_STOP=function()
+    saveSettingsNow()
     alive=false;state.fly=false;state.noclip=false
     state.autoSkill=false
     stopFly();restore()
