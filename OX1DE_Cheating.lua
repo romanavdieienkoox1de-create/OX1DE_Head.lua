@@ -32,7 +32,7 @@ local C={
  darkgreen=Color3.fromRGB(20,57,25)
 }
 local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,fly=false,noclip=false,autoSkill=true,
- warAllies=false,warEnemies=false,warWeapons=false,warFPV=false,
+ warAllies=false,warEnemies=false,warNames=true,warWeapons=false,warFPV=false,
  warFly=false,warNoClip=false,warAimPreview=false,warFov=true,warWallCheck=true,warTeamCheck=true}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),
  warAllies=Color3.fromRGB(119,255,48),warEnemies=Color3.fromRGB(255,67,81),warFPV=Color3.fromRGB(255,197,62),warFov=Color3.fromRGB(119,255,48),warAim=Color3.fromRGB(255,220,72)}
@@ -734,7 +734,7 @@ local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
 text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
 local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,885),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
-local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,345),CanvasSize=UDim2.fromOffset(0,344),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,345),CanvasSize=UDim2.fromOffset(0,425),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
  local w=isMain and 398 or 322
@@ -828,10 +828,11 @@ warValue(496,"fov","FOV • радиус"," px",20,400,5)
 warValue(575,"distance","Дальность цели"," м",10,300,5)
 warValue(654,"prediction","Prediction • метка"," %",0,100,5)
 warValue(733,"hitChance","Hit Chance • параметр UI"," %",1,100,1)
-warRow(escroll,0,"warAllies","Союзники","Своя Team • зелёный","warAllies")
-warRow(escroll,82,"warEnemies","Противники","Другие Team • красный","warEnemies")
-warRow(escroll,164,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
-warRow(escroll,246,"warFPV","FPV-дроны","Контур моделей дронов","warFPV")
+warRow(escroll,0,"warAllies","Союзники","Салатовая подсветка и контур","warAllies")
+warRow(escroll,82,"warEnemies","Противники","Красная подсветка и контур","warEnemies")
+warRow(escroll,164,"warNames","Никнеймы ESP","Цвет ника зависит от команды")
+warRow(escroll,246,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
+warRow(escroll,328,"warFPV","FPV-дроны","Контур моделей дронов","warFPV")
 bindVisual("warFly");bindVisual("warNoClip");bindVisual("warAim")
 warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
 corner(warFovCircle,1000)
@@ -1268,12 +1269,30 @@ do -- WARFARE runtime scoped
 local warfarePlayers,warfareDrones={},{}
 local function warfareTeamKey(player)
  if not player then return nil end
- if player.Team and not player.Neutral then return "T:"..player.Team.Name end
- for _,key in ipairs({"TeamId","Faction","Side","Squad"}) do
-  local value=player:GetAttribute(key)
-  if type(value)=="number" or (type(value)=="string" and value~="") then
-   return key..":"..tostring(value)
+ -- Prefer actual Roblox team membership. Some games leave Neutral=true
+ -- even while assigning a custom team.
+ if player.Team then return "team:"..string.lower(player.Team.Name) end
+ -- WARFARE variants may store the team on Player or Character instead.
+ for _,key in ipairs({"TeamId","TeamID","TeamName","Team","Faction","FactionId","Side","SideId","Squad","Army","Nation","Group"}) do
+  for _,source in ipairs({player,player.Character}) do
+   if source then
+    local value=source:GetAttribute(key)
+    if value==nil then
+     local instance=source:FindFirstChild(key)
+     if instance and instance:IsA("ValueBase") then value=instance.Value end
+    end
+    if type(value)=="string" and value~="" then
+     return string.lower(key)..":"..string.lower(value)
+    elseif type(value)=="number" then
+     return string.lower(key)..":"..tostring(value)
+    end
+   end
   end
+ end
+ -- BrickColor is a useful fallback when the game does use Roblox teams,
+ -- but the Team instance is not replicated.
+ if not player.Neutral and player.TeamColor then
+  return "teamcolor:"..tostring(player.TeamColor.Number)
  end
  return nil
 end
@@ -1297,16 +1316,18 @@ local function addWarfarePlayer(player)
  if not head then return nil end
  local highlight=make("Highlight",character,{
   Name="OX1DE_WARFARE_Player",Adornee=character,
-  DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,FillTransparency=1,
+  DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,FillTransparency=.78,
   OutlineColor=C.white,OutlineTransparency=0,Enabled=false
  })
  local bill,label=billboard(head,C.white,player.DisplayName)
- bill.MaxDistance=275
- bill.Size=UDim2.fromOffset(180,41)
+ bill.MaxDistance=320
+ bill.Size=UDim2.fromOffset(166,41)
  bill.StudsOffsetWorldSpace=Vector3.new(0,2.6,0)
  bill.Enabled=false
- label.TextSize=11
+ label.TextSize=12
+ label.TextStrokeTransparency=.05
  label.TextWrapped=true
+ label.TextTruncate=Enum.TextTruncate.AtEnd
  local fx={character=character,head=head,highlight=highlight,billboard=bill,label=label}
  warfarePlayers[player]=fx
  return fx
@@ -1457,7 +1478,7 @@ listen(RunService.Heartbeat,function(dt)
  warStatusClock=0
  local selected=activeTab=="warfare"
  local my=root()
- local teamPlayers,otherPlayers,droneCount=0,0,0
+ local teamPlayers,otherPlayers,unknownPlayers,droneCount=0,0,0,0
  for _,player in ipairs(Players:GetPlayers()) do
   if player~=LocalPlayer then
    local kind=warfareTeamKind(player)
@@ -1465,26 +1486,36 @@ listen(RunService.Heartbeat,function(dt)
    if fx and (fx.character~=player.Character or not fx.head.Parent) then
     clearWarfarePlayer(player);fx=nil
    end
-   local need=selected and (state.warWeapons or (kind and state[kind]))
+   local outlined=selected and (kind~=nil and state[kind] or false)
+   local unknown=selected and kind==nil and state.warNames and (state.warAllies or state.warEnemies)
+   local named=selected and state.warNames and (outlined or unknown or state.warWeapons)
+   local need=outlined or named
    if need and not fx then fx=addWarfarePlayer(player) end
    if fx then
-    local show=selected and (state.warWeapons or (kind and state[kind]))
-    fx.billboard.Enabled=show and true or false
-    fx.highlight.Enabled=selected and (kind~=nil and state[kind] or false)
+    fx.billboard.Enabled=named and true or false
+    fx.highlight.Enabled=outlined and true or false
     fx.highlight.OutlineColor=kind and palette[kind] or C.white
+    fx.highlight.FillColor=kind and palette[kind] or C.white
     fx.label.TextColor3=kind and palette[kind] or C.white
-    if show then
+    if named then
      local distance=my and fmtDistance(my.Position,fx.head.Position) or "?"
      local nick=player.DisplayName
-     if #nick>24 then nick=string.sub(nick,1,21).."…" end
-     fx.label.Text=nick.." • "..tostring(distance).." м"
+     if nick=="" then nick=player.Name end
+     local len= utf8 and utf8.len and utf8.len(nick)
+     if len and len>17 then
+      local cut=utf8.offset(nick,18)
+      if cut then nick=string.sub(nick,1,cut-1).."…" end
+     elseif not len and #nick>22 then
+      nick=string.sub(nick,1,19).."…"
+     end
+     fx.label.Text=nick.."  •  "..tostring(distance).." м"
      if state.warWeapons then
       local tool=player.Character and player.Character:FindFirstChildOfClass("Tool")
       fx.label.Text=fx.label.Text.."\n"..(tool and tool.Name or "Без оружия")
      end
     end
    end
-   if kind=="warAllies" then teamPlayers+=1 elseif kind=="warEnemies" then otherPlayers+=1 end
+   if kind=="warAllies" then teamPlayers+=1 elseif kind=="warEnemies" then otherPlayers+=1 else unknownPlayers+=1 end
   end
  end
  for object,highlight in pairs(warfareDrones) do
@@ -1498,7 +1529,7 @@ listen(RunService.Heartbeat,function(dt)
  end
  if selected then
   local team=warfareTeamKey(LocalPlayer)
-  warStatus.Text=team and ("Команда: "..team.."  |  Союзники: "..teamPlayers.."  |  Противники: "..otherPlayers.."  |  FPV: "..droneCount)
+  warStatus.Text=team and ("Свои: "..teamPlayers.."  •  Враги: "..otherPlayers.."  •  Не определены: "..unknownPlayers.."  •  FPV: "..droneCount)
    or "Команда не определена: нужна проверка Place ID WARFARE"
  end
 end)
