@@ -1864,10 +1864,10 @@ local function warfareTarget()
  for _,player in ipairs(Players:GetPlayers()) do
   if player~=LocalPlayer and player.Character then
    local theirTeam=warfareTeamKey(player)
-   -- Never choose a known teammate, even if strict Team Check is disabled.
-   local friend=ownTeam~=nil and theirTeam~=nil and ownTeam==theirTeam
-   local allowed=not friend and (not state.warTeamCheck or
-       (ownTeam~=nil and theirTeam~=nil and ownTeam~=theirTeam))
+   -- Team Check OFF: do not filter out any other player by team.
+   -- Team Check ON: only a positively identified opposing team may be selected.
+   local allowed=not state.warTeamCheck or
+       (ownTeam~=nil and theirTeam~=nil and ownTeam~=theirTeam)
    if allowed then
     local ch=player.Character
     -- The Head part is used at its current world position: crouching and
@@ -1897,7 +1897,9 @@ local function warfareTarget()
         local ray=lead-origin
         local params=RaycastParams.new()
         params.FilterType=Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances={LocalPlayer.Character}
+        -- Ignore our character and first-person weapon/viewmodel parented to
+        -- CurrentCamera; neither is an obstacle between us and the target.
+        params.FilterDescendantsInstances={LocalPlayer.Character,cam}
         local hit=Workspace:Raycast(origin,ray,params)
         unobstructed=not hit or hit.Instance:IsDescendantOf(ch)
        end
