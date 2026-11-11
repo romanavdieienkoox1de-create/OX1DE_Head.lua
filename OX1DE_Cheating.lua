@@ -200,7 +200,7 @@ local window=make("Frame",gui,{
  Name="OX1DEWindow",AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),
  Size=UDim2.fromOffset(1050,676),BackgroundColor3=C.bg,BorderSizePixel=0,ClipsDescendants=true
 })
-corner(window,22)
+corner(window,30)
 local windowStroke=border(window,C.green,.34,1.6)
 TweenService:Create(windowStroke,TweenInfo.new(2.8,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,-1,true),{Transparency=.12,Thickness=2}):Play()
 make("UIGradient",window,{Rotation=16,Color=ColorSequence.new({
@@ -295,15 +295,85 @@ local wave=make("Frame",sidebar,{Position=UDim2.fromOffset(-130,414),Size=UDim2.
 corner(wave,80)
 TweenService:Create(wave,TweenInfo.new(3.6,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut,-1,true),{BackgroundTransparency=.78}):Play()
 -- Game name is now the navigation item only
-local selectedNav=make("TextButton",sidebar,{Position=UDim2.fromOffset(14,34),Size=UDim2.fromOffset(178,59),BackgroundColor3=C.darkgreen,BorderSizePixel=0,Text="",AutoButtonColor=false})
-corner(selectedNav,13)
-local navStroke=border(selectedNav,C.green,.05,1.4)
-text(selectedNav,"⌂",UDim2.fromOffset(20,0),UDim2.fromOffset(30,59),27,true,C.green)
-text(selectedNav,"Район насилия",UDim2.fromOffset(51,0),UDim2.fromOffset(125,59),13,true,C.white)
-local warNav=make("TextButton",sidebar,{Position=UDim2.fromOffset(14,101),Size=UDim2.fromOffset(178,59),BackgroundColor3=C.card,Text="",BorderSizePixel=0,AutoButtonColor=false})
-corner(warNav,13);border(warNav,C.edge,.4,1)
-text(warNav,"✦",UDim2.fromOffset(19,0),UDim2.fromOffset(28,59),24,true,C.green)
-text(warNav,"WARFARE",UDim2.fromOffset(52,0),UDim2.fromOffset(120,59),15,true,C.white)
+-- Distinct visual profiles with optional Roblox-uploaded cover art.
+-- Keep these blank until a matching Roblox image asset is supplied.
+local OX1DE_COVER_IDS={violence_district="",warfare=""}
+text(sidebar,"ИГРОВЫЕ ПРОФИЛИ",UDim2.fromOffset(20,9),UDim2.fromOffset(168,17),10,true,C.muted)
+local selectedNav=make("TextButton",sidebar,{
+ Position=UDim2.fromOffset(14,33),Size=UDim2.fromOffset(178,96),
+ BackgroundColor3=C.darkgreen,BorderSizePixel=0,Text="",
+ AutoButtonColor=false,ClipsDescendants=true
+})
+corner(selectedNav,17)
+make("UIGradient",selectedNav,{
+ Rotation=18,Color=ColorSequence.new(Color3.fromRGB(18,79,46),Color3.fromRGB(12,23,27))
+})
+local navStroke=border(selectedNav,C.green,.06,1.4)
+local districtGlow=make("Frame",selectedNav,{
+ Position=UDim2.fromOffset(137,-37),Size=UDim2.fromOffset(72,153),
+ Rotation=25,BackgroundColor3=C.green,
+ BackgroundTransparency=.84,BorderSizePixel=0
+})
+local rdCover=make("ImageLabel",selectedNav,{
+ Size=UDim2.fromScale(1,1),BackgroundTransparency=1,
+ Image=OX1DE_COVER_IDS.violence_district~="" and
+  ("rbxassetid://"..OX1DE_COVER_IDS.violence_district) or "",
+ ScaleType=Enum.ScaleType.Crop,
+ ImageTransparency=.25,Visible=OX1DE_COVER_IDS.violence_district~=""
+})
+corner(rdCover,17)
+text(selectedNav,"⌂",UDim2.fromOffset(18,10),UDim2.fromOffset(33,32),24,true,C.green)
+text(selectedNav,"Район насилия",UDim2.fromOffset(19,40),UDim2.fromOffset(157,28),15,true,C.white)
+text(selectedNav,"VIOLENCE DISTRICT",UDim2.fromOffset(19,68),UDim2.fromOffset(155,20),9,false,C.muted)
+
+local warNav=make("TextButton",sidebar,{
+ Position=UDim2.fromOffset(14,140),Size=UDim2.fromOffset(178,96),
+ BackgroundColor3=C.card,BorderSizePixel=0,Text="",
+ AutoButtonColor=false,ClipsDescendants=true
+})
+corner(warNav,17)
+make("UIGradient",warNav,{
+ Rotation=18,Color=ColorSequence.new(Color3.fromRGB(27,51,45),Color3.fromRGB(12,18,28))
+})
+local warNavStroke=border(warNav,C.edge,.45,1.2)
+local warfareGlow=make("Frame",warNav,{
+ Position=UDim2.fromOffset(143,-37),Size=UDim2.fromOffset(72,150),
+ Rotation=25,BackgroundColor3=C.cyan,
+ BackgroundTransparency=.84,BorderSizePixel=0
+})
+local warCover=make("ImageLabel",warNav,{
+ Size=UDim2.fromScale(1,1),BackgroundTransparency=1,
+ Image=OX1DE_COVER_IDS.warfare~="" and
+  ("rbxassetid://"..OX1DE_COVER_IDS.warfare) or "",
+ ScaleType=Enum.ScaleType.Crop,
+ ImageTransparency=.23,Visible=OX1DE_COVER_IDS.warfare~=""
+})
+corner(warCover,17)
+text(warNav,"✦",UDim2.fromOffset(18,8),UDim2.fromOffset(36,33),25,true,C.cyan)
+text(warNav,"WARFARE",UDim2.fromOffset(19,41),UDim2.fromOffset(154,27),17,true,C.white)
+text(warNav,"TACTICAL PvP • TEAM",UDim2.fromOffset(19,68),UDim2.fromOffset(153,20),9,false,C.muted)
+
+local navIndicator=make("Frame",sidebar,{
+ Position=UDim2.fromOffset(7,57),Size=UDim2.fromOffset(4,45),
+ BackgroundColor3=C.green,BorderSizePixel=0
+})
+corner(navIndicator,4)
+TweenService:Create(navIndicator,TweenInfo.new(1.7,Enum.EasingStyle.Sine,
+ Enum.EasingDirection.InOut,-1,true),{BackgroundTransparency=.32}):Play()
+text(sidebar,"OX1DE  /  ДВА РЕЖИМА",UDim2.fromOffset(17,525),UDim2.fromOffset(177,25),11,true,C.green)
+local footerNote=text(sidebar,"Цвета, бинды и настройки\nсохраняются отдельно на устройстве",
+ UDim2.fromOffset(17,548),UDim2.fromOffset(177,52),10,false,C.muted)
+footerNote.TextWrapped=true
+
+-- A real slide transition, rather than only a change of brightness.
+for _,entry in ipairs({{button=selectedNav,glow=districtGlow},{button=warNav,glow=warfareGlow}}) do
+ listen(entry.button.MouseEnter,function()
+  tween(entry.glow,{Position=UDim2.fromOffset(118,-37),BackgroundTransparency=.68},.24)
+ end)
+ listen(entry.button.MouseLeave,function()
+  tween(entry.glow,{Position=UDim2.fromOffset(143,-37),BackgroundTransparency=.84},.24)
+ end)
+end
 local bindInfo={Text=""}
 -- Sidebar stays intentionally minimal; shortcuts remain internal.
 
@@ -311,7 +381,7 @@ local content=make("Frame",window,{Position=UDim2.fromOffset(204,87),Size=UDim2.
 local warContent=make("Frame",window,{Position=UDim2.fromOffset(204,87),Size=UDim2.fromOffset(846,589),BackgroundTransparency=1,ClipsDescendants=true,Visible=false})
 local function panel(parent,pos,size,col)
  local f=make("Frame",parent,{Position=pos,Size=size,BackgroundColor3=C.panel,BorderSizePixel=0,ClipsDescendants=true})
- corner(f,16);border(f,col or C.edge,.22,1)
+ corner(f,20);border(f,col or C.edge,.22,1)
  return f
 end
 local hero=panel(content,UDim2.fromOffset(14,14),UDim2.fromOffset(816,182),C.green)
@@ -737,6 +807,33 @@ local wh=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(816,145),C.gr
 make("UIGradient",wh,{Color=ColorSequence.new(Color3.fromRGB(9,30,18),Color3.fromRGB(9,19,24))})
 text(wh,"WARFARE",UDim2.fromOffset(27,11),UDim2.fromOffset(650,54),35,true,C.green)
 text(wh,"TEAM  •  FPV  •  WEAPON INFO",UDim2.fromOffset(30,68),UDim2.fromOffset(650,27),13,true)
+-- In-menu radar emblem made of native UI parts; no unlicensed images.
+local radar=make("Frame",wh,{
+ Position=UDim2.fromOffset(656,17),Size=UDim2.fromOffset(108,108),
+ BackgroundColor3=Color3.fromRGB(13,37,34),BackgroundTransparency=.24,
+ BorderSizePixel=0,ClipsDescendants=true
+})
+corner(radar,55);border(radar,C.green,.30,1.4)
+local radarInner=make("Frame",radar,{
+ AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),
+ Size=UDim2.fromOffset(64,64),BackgroundTransparency=1
+})
+corner(radarInner,34);border(radarInner,C.cyan,.60,1)
+make("Frame",radar,{
+ Position=UDim2.fromOffset(53,12),Size=UDim2.fromOffset(2,84),
+ BackgroundColor3=C.green,BackgroundTransparency=.47,BorderSizePixel=0
+})
+make("Frame",radar,{
+ Position=UDim2.fromOffset(12,53),Size=UDim2.fromOffset(84,2),
+ BackgroundColor3=C.green,BackgroundTransparency=.47,BorderSizePixel=0
+})
+local radarSweep=make("Frame",radar,{
+ AnchorPoint=Vector2.new(.5,1),Position=UDim2.fromOffset(54,54),
+ Size=UDim2.fromOffset(3,41),Rotation=0,
+ BackgroundColor3=C.cyan,BackgroundTransparency=.12,BorderSizePixel=0
+})
+TweenService:Create(radarSweep,TweenInfo.new(4.6,Enum.EasingStyle.Linear,
+ Enum.EasingDirection.InOut,-1),{Rotation=360}):Play()
 warStatus=text(wh,"Команды: Roblox Team • FPV: модели",UDim2.fromOffset(30,91),UDim2.fromOffset(750,24),11,false,C.muted)
 warAimStatus=text(wh,"Цель: ожидание",UDim2.fromOffset(30,117),UDim2.fromOffset(740,20),11,true,C.green)
 local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
@@ -887,6 +984,14 @@ local function setTab(tab)
  subtitleLabel.Text=GameModules[tab].subtitle
  tween(selectedNav,{BackgroundColor3=tab=="violence_district" and C.darkgreen or C.card},.22)
  tween(warNav,{BackgroundColor3=tab=="warfare" and C.darkgreen or C.card},.22)
+ tween(navIndicator,{Position=UDim2.fromOffset(7,tab=="warfare" and 164 or 57)},.28)
+ tween(navStroke,{Transparency=tab=="violence_district" and .06 or .72},.25)
+ tween(warNavStroke,{Transparency=tab=="warfare" and .06 or .72},.25)
+ if changed then
+  local newPage=tab=="warfare" and warContent or content
+  newPage.Position=UDim2.fromOffset(220,87)
+  tween(newPage,{Position=UDim2.fromOffset(204,87)},.28)
+ end
  if tab=="warfare" then
   -- Destroy unused legacy highlights and labels immediately.
   for player,fx in pairs(playerFx) do
