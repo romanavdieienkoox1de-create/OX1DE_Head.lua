@@ -12,9 +12,11 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- One module per Roblox place; future game profiles can be registered here.
 local GameModules={
  violence_district={title="Район насилия",subtitle="VIOLENCE DISTRICT"},
- warfare={title="WARFARE",subtitle="WARFARE / TEAM & FPV"}
+ warfare={title="WARFARE",subtitle="WARFARE / TEAM & FPV"},
+ settings={title="Настройки",subtitle="OX1DE / SETTINGS"}
 }
 local activeTab="violence_district"
+local auxUI={}
 local ActiveGame=GameModules.violence_district
 local GENERATOR_PREVIEW_ASSET_ID = "" -- Roblox image asset ID; supply after uploading the provided screenshot
 
@@ -23,29 +25,35 @@ local older=PlayerGui:FindFirstChild("OX1DE_Cheating")
 if older then older:Destroy() end
 
 local C={
- bg=Color3.fromRGB(8,11,13),panel=Color3.fromRGB(15,21,24),
- card=Color3.fromRGB(22,28,33),row=Color3.fromRGB(26,33,37),
- edge=Color3.fromRGB(61,87,67),green=Color3.fromRGB(119,255,48),
- cyan=Color3.fromRGB(0,223,239),orange=Color3.fromRGB(255,153,25),
- red=Color3.fromRGB(255,53,68),white=Color3.fromRGB(245,249,251),
- muted=Color3.fromRGB(158,171,176),unknown=Color3.fromRGB(185,187,193),
- darkgreen=Color3.fromRGB(20,57,25)
+ bg=Color3.fromRGB(15,16,22),panel=Color3.fromRGB(33,35,45),
+ card=Color3.fromRGB(40,42,55),row=Color3.fromRGB(35,37,49),
+ edge=Color3.fromRGB(75,72,106),green=Color3.fromRGB(141,109,255),
+ cyan=Color3.fromRGB(167,146,255),orange=Color3.fromRGB(255,153,25),
+ red=Color3.fromRGB(255,67,81),white=Color3.fromRGB(243,243,250),
+ muted=Color3.fromRGB(148,149,167),unknown=Color3.fromRGB(185,187,193),
+ darkgreen=Color3.fromRGB(63,51,103)
 }
 local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,fly=false,noclip=false,autoSkill=false,
  warAllies=false,warEnemies=false,warNames=true,warWeapons=false,warFPV=false,
  warFly=false,warNoClip=false,warAimPreview=false,warFov=true,warWallCheck=true,warTeamCheck=true,warHoldAim=true}
-local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),
+local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=Color3.fromRGB(119,255,48),generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),
  warAllies=Color3.fromRGB(119,255,48),warEnemies=Color3.fromRGB(255,67,81),warFPV=Color3.fromRGB(255,197,62),warFov=Color3.fromRGB(119,255,48),warAim=Color3.fromRGB(255,220,72)}
 -- Local, per-installation settings. No network sync is used.
 local HttpService=game:GetService("HttpService")
 local settingsFile="OX1DE_ViolenceDistrict_"..tostring(LocalPlayer.UserId)..".json"
 local settingsSupported=type(readfile)=="function" and type(writefile)=="function"
+auxUI.defaults={toggles=table.clone(state),colors=table.clone(palette),keys={},warfare={}}
+
 local savedSettings=nil
+auxUI.graphicsMode="auto"
 if settingsSupported then
  local ok,data=pcall(function() return HttpService:JSONDecode(readfile(settingsFile)) end)
  if ok and type(data)=="table" then savedSettings=data end
 end
 if savedSettings then
+ if savedSettings.graphicsMode=="low" or savedSettings.graphicsMode=="medium" or savedSettings.graphicsMode=="high" then
+  auxUI.graphicsMode=savedSettings.graphicsMode
+ end
  if type(savedSettings.toggles)=="table" then
   for name,value in pairs(savedSettings.toggles) do
    if state[name]~=nil and type(value)=="boolean" then state[name]=value end
@@ -61,16 +69,17 @@ if savedSettings then
  end
 end
 -- Keep the selected game profile across reruns on this device.
-if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.selectedTab=="violence_district") then
+if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.selectedTab=="violence_district" or savedSettings.selectedTab=="settings") then
  activeTab=savedSettings.selectedTab
 end
 local scheduleLegacyRefresh
 local hideWarfareFx
-local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20,mode="legit"}
+local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=0,height=-15,mode="legit"}
+auxUI.defaults.warfare=table.clone(warSettings)
 if savedSettings and type(savedSettings.warfare)=="table" then
- for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},smooth={5,100},drop={0,100}}) do
+ for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},smooth={5,100},drop={0,100},height={-100,100}}) do
   local v=savedSettings.warfare[name]
-  if type(v)=="number" then warSettings[name]=math.clamp(v,limits[1],limits[2]) end
+  if type(v)=="number" and (name~="drop" or (savedSettings.version or 0)>=4) then warSettings[name]=math.clamp(v,limits[1],limits[2]) end
  end
 end
 if savedSettings and type(savedSettings.warfare)=="table" then
@@ -232,6 +241,7 @@ make("Frame",window,{Position=UDim2.fromOffset(0,86),Size=UDim2.new(1,0,0,1),Bac
 text(header,"OX1DE",UDim2.fromOffset(29,13),UDim2.fromOffset(510,38),30,true,C.green)
 local subtitleLabel=text(header,ActiveGame.subtitle,UDim2.fromOffset(31,53),UDim2.fromOffset(490,18),10,false,C.muted)
 local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7,warFly=Enum.KeyCode.F9,warNoClip=Enum.KeyCode.F8,warAim=Enum.KeyCode.F10}
+auxUI.defaults.keys=table.clone(keybind)
 if savedSettings and type(savedSettings.keys)=="table" then
  for name in pairs(keybind) do
   local keyName=savedSettings.keys[name]
@@ -244,7 +254,7 @@ end
 local savedVersion=0
 local function saveSettingsNow()
  if not settingsSupported or not alive then return end
- local snapshot={version=3,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings}
+ local snapshot={version=4,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings,graphicsMode=auxUI.graphicsMode}
  for name,value in pairs(state) do if type(value)=="boolean" then snapshot.toggles[name]=value end end
  for name,color in pairs(palette) do
   snapshot.colors[name]={math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5)}
@@ -297,94 +307,51 @@ TweenService:Create(wave,TweenInfo.new(3.6,Enum.EasingStyle.Sine,Enum.EasingDire
 -- Game name is now the navigation item only
 -- Distinct visual profiles with optional Roblox-uploaded cover art.
 -- Keep these blank until a matching Roblox image asset is supplied.
-local OX1DE_COVER_IDS={violence_district="",warfare=""}
-text(sidebar,"ИГРОВЫЕ ПРОФИЛИ",UDim2.fromOffset(20,9),UDim2.fromOffset(168,17),10,true,C.muted)
-local selectedNav=make("TextButton",sidebar,{
- Position=UDim2.fromOffset(14,33),Size=UDim2.fromOffset(178,96),
- BackgroundColor3=C.darkgreen,BorderSizePixel=0,Text="",
- AutoButtonColor=false,ClipsDescendants=true
-})
-corner(selectedNav,17)
-make("UIGradient",selectedNav,{
- Rotation=18,Color=ColorSequence.new(Color3.fromRGB(18,79,46),Color3.fromRGB(12,23,27))
-})
-local navStroke=border(selectedNav,C.green,.06,1.4)
-local districtGlow=make("Frame",selectedNav,{
- Position=UDim2.fromOffset(137,-37),Size=UDim2.fromOffset(72,153),
- Rotation=25,BackgroundColor3=C.green,
- BackgroundTransparency=.84,BorderSizePixel=0
-})
-local rdCover=make("ImageLabel",selectedNav,{
- Size=UDim2.fromScale(1,1),BackgroundTransparency=1,
- Image=OX1DE_COVER_IDS.violence_district~="" and
-  ("rbxassetid://"..OX1DE_COVER_IDS.violence_district) or "",
- ScaleType=Enum.ScaleType.Crop,
- ImageTransparency=.25,Visible=OX1DE_COVER_IDS.violence_district~=""
-})
-corner(rdCover,17)
-text(selectedNav,"⌂",UDim2.fromOffset(18,10),UDim2.fromOffset(33,32),24,true,C.green)
-text(selectedNav,"Район насилия",UDim2.fromOffset(19,40),UDim2.fromOffset(157,28),15,true,C.white)
-text(selectedNav,"VIOLENCE DISTRICT",UDim2.fromOffset(19,68),UDim2.fromOffset(155,20),9,false,C.muted)
-
-local warNav=make("TextButton",sidebar,{
- Position=UDim2.fromOffset(14,140),Size=UDim2.fromOffset(178,96),
- BackgroundColor3=C.card,BorderSizePixel=0,Text="",
- AutoButtonColor=false,ClipsDescendants=true
-})
-corner(warNav,17)
-make("UIGradient",warNav,{
- Rotation=18,Color=ColorSequence.new(Color3.fromRGB(27,51,45),Color3.fromRGB(12,18,28))
-})
-local warNavStroke=border(warNav,C.edge,.45,1.2)
-local warfareGlow=make("Frame",warNav,{
- Position=UDim2.fromOffset(143,-37),Size=UDim2.fromOffset(72,150),
- Rotation=25,BackgroundColor3=C.cyan,
- BackgroundTransparency=.84,BorderSizePixel=0
-})
-local warCover=make("ImageLabel",warNav,{
- Size=UDim2.fromScale(1,1),BackgroundTransparency=1,
- Image=OX1DE_COVER_IDS.warfare~="" and
-  ("rbxassetid://"..OX1DE_COVER_IDS.warfare) or "",
- ScaleType=Enum.ScaleType.Crop,
- ImageTransparency=.23,Visible=OX1DE_COVER_IDS.warfare~=""
-})
-corner(warCover,17)
-text(warNav,"✦",UDim2.fromOffset(18,8),UDim2.fromOffset(36,33),25,true,C.cyan)
-text(warNav,"WARFARE",UDim2.fromOffset(19,41),UDim2.fromOffset(154,27),17,true,C.white)
-text(warNav,"TACTICAL PvP • TEAM",UDim2.fromOffset(19,68),UDim2.fromOffset(153,20),9,false,C.muted)
-
+-- OX1DE compact navigation, matched to the supplied screenshot.
+text(sidebar,"РАЗДЕЛЫ",UDim2.fromOffset(24,20),UDim2.fromOffset(154,22),12,true,C.muted)
+local selectedNav=make("TextButton",sidebar,{Position=UDim2.fromOffset(14,68),
+ Size=UDim2.fromOffset(178,63),BackgroundColor3=C.card,
+ Text="",AutoButtonColor=false,BorderSizePixel=0})
+corner(selectedNav,13)
+local navStroke=border(selectedNav,C.green,.4,1)
+text(selectedNav,"◆",UDim2.fromOffset(16,0),UDim2.fromOffset(26,62),19,true,C.green)
+text(selectedNav,"Район насилия",UDim2.fromOffset(43,0),UDim2.fromOffset(130,62),14,true,C.white)
+local warNav=make("TextButton",sidebar,{Position=UDim2.fromOffset(14,145),
+ Size=UDim2.fromOffset(178,63),BackgroundColor3=C.card,
+ Text="",AutoButtonColor=false,BorderSizePixel=0})
+corner(warNav,13)
+local warNavStroke=border(warNav,C.green,.80,1)
+text(warNav,"◈",UDim2.fromOffset(16,0),UDim2.fromOffset(26,62),22,true,C.green)
+text(warNav,"WARFARE",UDim2.fromOffset(48,0),UDim2.fromOffset(126,62),15,true,C.white)
+auxUI.settingsNav=make("TextButton",sidebar,{Position=UDim2.fromOffset(14,222),
+ Size=UDim2.fromOffset(178,63),BackgroundColor3=C.card,
+ Text="",AutoButtonColor=false,BorderSizePixel=0})
+corner(auxUI.settingsNav,13)
+auxUI.settingsStroke=border(auxUI.settingsNav,C.green,.80,1)
+text(auxUI.settingsNav,"⚙",UDim2.fromOffset(16,0),UDim2.fromOffset(26,62),22,true,C.green)
+text(auxUI.settingsNav,"Настройки",UDim2.fromOffset(48,0),UDim2.fromOffset(126,62),15,true,C.white)
 local navIndicator=make("Frame",sidebar,{
- Position=UDim2.fromOffset(7,57),Size=UDim2.fromOffset(4,45),
+ Position=UDim2.fromOffset(7,83),Size=UDim2.fromOffset(4,35),
  BackgroundColor3=C.green,BorderSizePixel=0
 })
 corner(navIndicator,4)
-TweenService:Create(navIndicator,TweenInfo.new(1.7,Enum.EasingStyle.Sine,
- Enum.EasingDirection.InOut,-1,true),{BackgroundTransparency=.32}):Play()
-text(sidebar,"OX1DE  /  ДВА РЕЖИМА",UDim2.fromOffset(17,525),UDim2.fromOffset(177,25),11,true,C.green)
-local footerNote=text(sidebar,"Цвета, бинды и настройки\nсохраняются отдельно на устройстве",
- UDim2.fromOffset(17,548),UDim2.fromOffset(177,52),10,false,C.muted)
+text(sidebar,"OX1DE  •  CLIENT",UDim2.fromOffset(19,512),UDim2.fromOffset(174,25),12,true,C.green)
+local footerNote=text(sidebar,"Возможности зависят от игры.\nНастройки сохраняются локально.",
+ UDim2.fromOffset(19,543),UDim2.fromOffset(174,55),11,false,C.muted)
 footerNote.TextWrapped=true
-
--- A real slide transition, rather than only a change of brightness.
-for _,entry in ipairs({{button=selectedNav,glow=districtGlow},{button=warNav,glow=warfareGlow}}) do
- listen(entry.button.MouseEnter,function()
-  tween(entry.glow,{Position=UDim2.fromOffset(118,-37),BackgroundTransparency=.68},.24)
- end)
- listen(entry.button.MouseLeave,function()
-  tween(entry.glow,{Position=UDim2.fromOffset(143,-37),BackgroundTransparency=.84},.24)
- end)
-end
 local bindInfo={Text=""}
 -- Sidebar stays intentionally minimal; shortcuts remain internal.
 
 local content=make("Frame",window,{Position=UDim2.fromOffset(204,87),Size=UDim2.fromOffset(846,589),BackgroundTransparency=1,ClipsDescendants=true})
 local warContent=make("Frame",window,{Position=UDim2.fromOffset(204,87),Size=UDim2.fromOffset(846,589),BackgroundTransparency=1,ClipsDescendants=true,Visible=false})
+auxUI.settingsContent=make("Frame",window,{Position=UDim2.fromOffset(204,87),Size=UDim2.fromOffset(846,589),BackgroundTransparency=1,ClipsDescendants=true,Visible=false})
 local function panel(parent,pos,size,col)
  local f=make("Frame",parent,{Position=pos,Size=size,BackgroundColor3=C.panel,BorderSizePixel=0,ClipsDescendants=true})
  corner(f,20);border(f,col or C.edge,.22,1)
  return f
 end
 local hero=panel(content,UDim2.fromOffset(14,14),UDim2.fromOffset(816,182),C.green)
+hero.Visible=false
 make("UIGradient",hero,{Rotation=0,Color=ColorSequence.new({
  ColorSequenceKeypoint.new(0,Color3.fromRGB(11,25,21)),
  ColorSequenceKeypoint.new(.58,Color3.fromRGB(14,20,23)),
@@ -429,8 +396,8 @@ local previewAccent=make("Frame",hero,{Position=UDim2.fromOffset(520,128),Size=U
 corner(previewAccent,5)
 text(hero,"Цвет ESP генераторов — в панели справа",UDim2.fromOffset(553,120),UDim2.fromOffset(258,37),12,false,C.muted)
 
-local functionsPanel=panel(content,UDim2.fromOffset(14,207),UDim2.fromOffset(444,368))
-local espPanel=panel(content,UDim2.fromOffset(471,207),UDim2.fromOffset(359,368))
+local functionsPanel=panel(content,UDim2.fromOffset(14,14),UDim2.fromOffset(444,560))
+local espPanel=panel(content,UDim2.fromOffset(471,14),UDim2.fromOffset(359,560))
 text(functionsPanel,"⚙",UDim2.fromOffset(16,9),UDim2.fromOffset(34,34),24,true,C.green)
 text(functionsPanel,"Основные функции",UDim2.fromOffset(51,9),UDim2.fromOffset(370,34),19,true)
 text(espPanel,"◉",UDim2.fromOffset(13,9),UDim2.fromOffset(34,34),23,true,C.green)
@@ -804,6 +771,7 @@ local warfareCleanup
 do -- WARFARE UI scoped
 -- WARFARE: separate profile, preserving all original Violence District controls.
 local wh=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(816,145),C.green)
+wh.Visible=false
 make("UIGradient",wh,{Color=ColorSequence.new(Color3.fromRGB(9,30,18),Color3.fromRGB(9,19,24))})
 text(wh,"WARFARE",UDim2.fromOffset(27,11),UDim2.fromOffset(650,54),35,true,C.green)
 text(wh,"TEAM  •  FPV  •  WEAPON INFO",UDim2.fromOffset(30,68),UDim2.fromOffset(650,27),13,true)
@@ -836,12 +804,14 @@ TweenService:Create(radarSweep,TweenInfo.new(4.6,Enum.EasingStyle.Linear,
  Enum.EasingDirection.InOut,-1),{Rotation=360}):Play()
 warStatus=text(wh,"Команды: Roblox Team • FPV: модели",UDim2.fromOffset(30,91),UDim2.fromOffset(750,24),11,false,C.muted)
 warAimStatus=text(wh,"Цель: ожидание",UDim2.fromOffset(30,117),UDim2.fromOffset(740,20),11,true,C.green)
-local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
-local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
+local wm=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(444,560))
+warStatus.Parent=wm;warStatus.Position=UDim2.fromOffset(18,465);warStatus.Size=UDim2.fromOffset(413,29)
+warAimStatus.Parent=wm;warAimStatus.Position=UDim2.fromOffset(18,496);warAimStatus.Size=UDim2.fromOffset(413,30)
+local we=panel(warContent,UDim2.fromOffset(471,14),UDim2.fromOffset(359,560))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
 text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
-local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,1130),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
-local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,345),CanvasSize=UDim2.fromOffset(0,425),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,392),CanvasSize=UDim2.fromOffset(0,1130),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,495),CanvasSize=UDim2.fromOffset(0,425),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
  local w=isMain and 398 or 322
@@ -976,24 +946,26 @@ warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",Position=UDim2.fromScale(.5,.
 corner(warFovCircle,1000)
 warFovStroke=border(warFovCircle,palette.warFov,.25,1.4)
 local function setTab(tab)
- if tab~="warfare" and tab~="violence_district" then return end
+ if tab~="warfare" and tab~="violence_district" and tab~="settings" then return end
  local changed=activeTab~=tab
  activeTab=tab
  content.Visible=tab=="violence_district"
  warContent.Visible=tab=="warfare"
+ auxUI.settingsContent.Visible=tab=="settings"
  subtitleLabel.Text=GameModules[tab].subtitle
- tween(selectedNav,{BackgroundColor3=tab=="violence_district" and C.darkgreen or C.card},.22)
- tween(warNav,{BackgroundColor3=tab=="warfare" and C.darkgreen or C.card},.22)
- tween(navIndicator,{Position=UDim2.fromOffset(7,tab=="warfare" and 164 or 57)},.28)
- tween(navStroke,{Transparency=tab=="violence_district" and .06 or .72},.25)
- tween(warNavStroke,{Transparency=tab=="warfare" and .06 or .72},.25)
+ tween(selectedNav,{BackgroundColor3=tab=="violence_district" and C.darkgreen or C.card},.20)
+ tween(warNav,{BackgroundColor3=tab=="warfare" and C.darkgreen or C.card},.20)
+ tween(auxUI.settingsNav,{BackgroundColor3=tab=="settings" and C.darkgreen or C.card},.20)
+ tween(navIndicator,{Position=UDim2.fromOffset(7,tab=="warfare" and 160 or tab=="settings" and 237 or 83)},.24)
+ tween(navStroke,{Transparency=tab=="violence_district" and .1 or .8},.20)
+ tween(warNavStroke,{Transparency=tab=="warfare" and .1 or .8},.20)
+ tween(auxUI.settingsStroke,{Transparency=tab=="settings" and .1 or .8},.20)
  if changed then
-  local newPage=tab=="warfare" and warContent or content
-  newPage.Position=UDim2.fromOffset(220,87)
-  tween(newPage,{Position=UDim2.fromOffset(204,87)},.28)
+  local page=tab=="warfare" and warContent or tab=="settings" and auxUI.settingsContent or content
+  page.Position=UDim2.fromOffset(220,87)
+  tween(page,{Position=UDim2.fromOffset(204,87)},.24)
  end
- if tab=="warfare" then
-  -- Destroy unused legacy highlights and labels immediately.
+ if tab~="violence_district" then
   for player,fx in pairs(playerFx) do
    if fx.h then fx.h:Destroy() end
    if fx.bb then fx.bb:Destroy() end
@@ -1004,8 +976,9 @@ local function setTab(tab)
    if fx.bb then fx.bb:Destroy() end
    objectFx[obj]=nil
   end
- elseif scheduleLegacyRefresh then
-  if hideWarfareFx then hideWarfareFx() end
+ end
+ if tab~="warfare" and hideWarfareFx then hideWarfareFx() end
+ if tab=="violence_district" and scheduleLegacyRefresh then
   task.defer(function()
    if alive and activeTab=="violence_district" then scheduleLegacyRefresh() end
   end)
@@ -1014,6 +987,7 @@ local function setTab(tab)
 end
 listen(selectedNav.MouseButton1Click,function()setTab("violence_district")end)
 listen(warNav.MouseButton1Click,function()setTab("warfare")end)
+listen(auxUI.settingsNav.MouseButton1Click,function()setTab("settings")end)
 setTab(activeTab)
 
 end -- WARFARE UI scoped
