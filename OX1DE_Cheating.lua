@@ -723,7 +723,8 @@ local wh=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(816,145),C.gr
 make("UIGradient",wh,{Color=ColorSequence.new(Color3.fromRGB(9,30,18),Color3.fromRGB(9,19,24))})
 text(wh,"WARFARE",UDim2.fromOffset(27,11),UDim2.fromOffset(650,54),35,true,C.green)
 text(wh,"TEAM  •  FPV  •  WEAPON INFO",UDim2.fromOffset(30,68),UDim2.fromOffset(650,27),13,true)
-local warStatus=text(wh,"Команды определяются через Roblox Team; FPV по именам моделей",UDim2.fromOffset(30,108),UDim2.fromOffset(750,26),12,false,C.muted)
+local warStatus=text(wh,"Команды: Roblox Team • FPV: модели",UDim2.fromOffset(30,91),UDim2.fromOffset(750,24),11,false,C.muted)
+local warAimStatus=text(wh,"Цель: ожидание",UDim2.fromOffset(30,117),UDim2.fromOffset(740,20),11,true,C.green)
 local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
 local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
@@ -776,7 +777,7 @@ end
 warValue(414,"fov","FOV • радиус"," px",50,400,10)
 warValue(493,"distance","Дальность"," м",10,300,10)
 warValue(572,"prediction","Prediction • визуально"," %",0,100,5)
-warValue(651,"hitChance","Hit Chance • настройка"," %",1,100,5)
+warValue(651,"hitChance","Hit Chance • только UI"," %",1,100,5)
 warRow(escroll,0,"warAllies","Союзники","Своя Team • зелёный","warAllies")
 warRow(escroll,82,"warEnemies","Противники","Другие Team • красный","warEnemies")
 warRow(escroll,164,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
@@ -1359,6 +1360,17 @@ local function warfareTarget()
  end
  return best,bestPoint,bestDist
 end
+-- FOV ring follows the viewport center; the value is the radius in pixels.
+listen(RunService.RenderStepped,function()
+ if not alive then return end
+ local camera=Workspace.CurrentCamera
+ local show=activeTab=="warfare" and state.warAimPreview and state.warFov and not isOpen
+ warFovCircle.Visible=show
+ if not camera or not show then return end
+ local size=camera.ViewportSize
+ warFovCircle.Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2)
+ warFovCircle.Position=UDim2.fromOffset(size.X*.5,size.Y*.5)
+end)
 local warUpdateClock=0
 listen(RunService.RenderStepped,function(delta)
  if not alive then return end
@@ -1369,6 +1381,9 @@ listen(RunService.RenderStepped,function(delta)
  warAimMark.Visible=false
  if not isWar or not state.warAimPreview then return end
  local target,position=warfareTarget()
+ if warAimStatus and warAimStatus.Parent then
+  warAimStatus.Text=target and ("Цель: "..target.DisplayName.." • команда проверена") or "Цель: нет доступного противника"
+ end
  if target and position then
   warAimMark.Text=target.DisplayName.."  •  ЦЕЛЬ"
   warAimMark.Position=UDim2.fromOffset(position.X,position.Y-27)
