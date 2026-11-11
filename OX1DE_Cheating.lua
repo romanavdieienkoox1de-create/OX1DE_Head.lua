@@ -1643,11 +1643,21 @@ listen(RunService.RenderStepped,function()
     local cam=Workspace.CurrentCamera
     if not cam then return end
     local cf=cam.CFrame
+    -- AIM can pitch the camera far up/down. Fly must use camera YAW only,
+    -- otherwise pressing W while aiming downward flies beneath the map.
+    local flatLook=Vector3.new(cf.LookVector.X,0,cf.LookVector.Z)
+    if flatLook.Magnitude<.001 then
+        flatLook=Vector3.new(r.CFrame.LookVector.X,0,r.CFrame.LookVector.Z)
+    end
+    if flatLook.Magnitude<.001 then flatLook=Vector3.new(0,0,-1) end
+    flatLook=flatLook.Unit
+    local flatRight=Vector3.new(-flatLook.Z,0,flatLook.X)
     local move=Vector3.zero
-    if UserInputService:IsKeyDown(Enum.KeyCode.W) then move+=cf.LookVector end
-    if UserInputService:IsKeyDown(Enum.KeyCode.S) then move-=cf.LookVector end
-    if UserInputService:IsKeyDown(Enum.KeyCode.D) then move+=cf.RightVector end
-    if UserInputService:IsKeyDown(Enum.KeyCode.A) then move-=cf.RightVector end
+    if UserInputService:IsKeyDown(Enum.KeyCode.W) then move+=flatLook end
+    if UserInputService:IsKeyDown(Enum.KeyCode.S) then move-=flatLook end
+    if UserInputService:IsKeyDown(Enum.KeyCode.D) then move+=flatRight end
+    if UserInputService:IsKeyDown(Enum.KeyCode.A) then move-=flatRight end
+    -- Only explicit vertical controls may raise/lower Fly.
     if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move+=Vector3.yAxis end
     if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move-=Vector3.yAxis end
     if auxUI.deviceMode=="mobile" then
@@ -1661,7 +1671,9 @@ listen(RunService.RenderStepped,function()
     end
     if move.Magnitude>.001 then move=move.Unit*56 end
     if flyVelocity then flyVelocity.Velocity=move end
-    if flyGyro then flyGyro.CFrame=cf end
+    -- Keep the avatar upright as well: AIM pitch should rotate the camera,
+    -- not force the character to tip into the ground.
+    if flyGyro then flyGyro.CFrame=CFrame.lookAt(r.Position,r.Position+flatLook) end
 end)
 local function recoverGui()
     if not alive then return end
