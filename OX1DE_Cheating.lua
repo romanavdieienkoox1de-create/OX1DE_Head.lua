@@ -786,7 +786,7 @@ listen(pickerX.MouseButton1Click,function() pickerLayer.Visible=false end)
 local warFovCircle,warFovStroke,warStatus,warAimStatus
 auxUI.previewFov=false
 local warfareCleanup
-do -- WARFARE UI scoped
+local function buildWarfareUi()
 -- WARFARE: separate profile, preserving all original Violence District controls.
 local wh=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(816,145),C.green)
 wh.Visible=false
@@ -1185,7 +1185,8 @@ listen(warNav.MouseButton1Click,function()setTab("warfare")end)
 listen(auxUI.settingsNav.MouseButton1Click,function()setTab("settings")end)
 setTab(activeTab)
 
-end -- WARFARE UI scoped
+end -- buildWarfareUi
+buildWarfareUi()
 
 -- ESP: world objects ------------------------------------------------------
 local function category(obj)
@@ -1368,7 +1369,7 @@ if state.generators or state.pumpkins or state.pallets then scanAll() end
 
 -- Skill Check: scoped and rate-limited to keep gameplay responsive.
 -- Client GUI cannot inspect individual pixels of a single textured meter.
-do -- Scoped skill-check worker; also avoids Luau's 200-local top-level limit.
+local function startSkillCheckWorker()
  local virtualInput
  local skillLastAt=-10
  local skillStatus="выключено"
@@ -1537,7 +1538,8 @@ do -- Scoped skill-check worker; also avoids Luau's 200-local top-level limit.
    task.wait(delaySeconds)
   end
  end)
-end -- skill-check worker
+end -- startSkillCheckWorker
+startSkillCheckWorker()
 
 -- Local movement ----------------------------------------------------------
 local function stopFly()
@@ -1629,7 +1631,7 @@ if type(queueTeleport)=="function" then
     end)
 end
 
-do -- WARFARE runtime scoped
+local function startWarfareRuntime()
 -- WARFARE local-world visualization: team, weapon and FPV outlines.
 local warfarePlayers,warfareDrones={},{}
 local function warfareTeamKey(player)
@@ -2036,7 +2038,8 @@ warfareCleanup=function()
   warfareDrones[object]=nil
  end
 end
-end -- WARFARE runtime scoped
+end -- startWarfareRuntime
+startWarfareRuntime()
 
 -- BillboardGui follows character positions directly on every render frame.
 -- No on-screen repositioning or collision-offset hopping.
