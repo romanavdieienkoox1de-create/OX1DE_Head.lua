@@ -819,6 +819,8 @@ listen(pickerX.MouseButton1Click,function() pickerLayer.Visible=false end)
 -- WARFARE shared declarations
 local warFovCircle,warFovStroke,warStatus,warAimStatus
 auxUI.previewFov=false
+auxUI.aimDebug=false
+auxUI.aimDebugReason="Ожидание проверки"
 local warfareCleanup
 local function buildWarfareUi()
 -- WARFARE: separate profile, preserving all original Violence District controls.
@@ -913,6 +915,19 @@ local aimBack=make("TextButton",aimPage,{
  AutoButtonColor=false,BorderSizePixel=0
 })
 corner(aimBack,10)
+local aimDebugButton=make("TextButton",aimPage,{
+ Position=UDim2.fromOffset(535,10),Size=UDim2.fromOffset(124,36),
+ Text="ПРОВЕРКА: ВЫКЛ",TextColor3=C.white,TextSize=10,
+ Font=Enum.Font.GothamBold,BackgroundColor3=C.card,
+ AutoButtonColor=false,BorderSizePixel=0
+})
+corner(aimDebugButton,9)
+listen(aimDebugButton.MouseButton1Click,function()
+ auxUI.aimDebug=not auxUI.aimDebug
+ aimDebugButton.Text=auxUI.aimDebug and "ПРОВЕРКА: ВКЛ" or "ПРОВЕРКА: ВЫКЛ"
+ aimDebugButton.BackgroundColor3=auxUI.aimDebug and C.darkgreen or C.card
+ if auxUI.aimDebugLabel and not auxUI.aimDebug then auxUI.aimDebugLabel.Visible=false end
+end)
 local aimOptions=make("ScrollingFrame",aimPage,{
  Position=UDim2.fromOffset(7,55),Size=UDim2.fromOffset(408,491),
  BackgroundTransparency=1,CanvasSize=UDim2.fromOffset(0,487),
@@ -1855,63 +1870,111 @@ corner(warAimMark,7)
 local function warfareTarget()
  local cam=Workspace.CurrentCamera
  local ownRoot=root()
- if not cam or not ownRoot then return nil,nil,nil end
+ if not cam or not ownRoot then
+  return nil,nil,nil,nil,"Камера или персонаж не готовы"
+ end
  local screen=cam.ViewportSize
  local center=Vector2.new(screen.X*.5,screen.Y*.5)
  local maxRange=warSettings.distance*3.57
  local best,bestPoint,bestDist,bestAimPoint=nil,nil,math.huge,nil
+ local bestPixels=math.huge
  local ownTeam=warfareTeamKey(LocalPlayer)
+ local counts={characters=0,ready=0,allowed=0,range=0,screen=0,fov=0,clear=0,nearestPixels=math.huge}
  for _,player in ipairs(Players:GetPlayers()) do
   if player~=LocalPlayer and player.Character then
-   local theirTeam=warfareTeamKey(player)
-   -- Team Check OFF: do not filter out any other player by team.
-   -- Team Check ON: only a positively identified opposing team may be selected.
-   local allowed=not state.warTeamCheck or
-       (ownTeam~=nil and theirTeam~=nil and ownTeam~=theirTeam)
-   if allowed then
-    local ch=player.Character
-    -- The Head part is used at its current world position: crouching and
-    -- prone animations shift it automatically, unlike a fixed torso offset.
-    local part=ch:FindFirstChild("Head") or ch:FindFirstChild("HumanoidRootPart")
-    local hum=ch:FindFirstChildOfClass("Humanoid")
-    if part and hum and hum.Health>0 and (ownRoot.Position-part.Position).Magnitude<=maxRange then
-     -- Roblox-only approximate correction; distance controls how far
-     -- movement lead and vertical aim offset shift the camera target.
-     -- Actual projectile physics vary per WARFARE weapon.
+   counts.characters+=1
+   local ch=player.Character
+   local head=ch:FindFirstChild("Head",true)
+   local torso=ch:FindFirstChild("HumanoidRootPart",true)
+      or ch:FindFirstChild("UpperTorso",true)
+      or ch:FindFirstChild("Torso",true)
+   local part=head or torso
+   local hum=ch:FindFirstChildOfClass("Humanoid") or ch:FindFirstChild("Humanoid",true)
+   -- Some character rigs do not replicate Humanoid. A valid visible head
+   -- is sufficient for a camera target; do not select a known dead humanoid.
+   if part and (not hum or hum.Health>0) then
+    counts.ready+=1
+    local theirTeam=warfareTeamKey(player)
+    local allowed=not state.warTeamCheck or
+        (ownTeam~=nil and theirTeam~=nil and ownTeam~=theirTeam)
+    if allowed then
+     counts.allowed+=1
      local range=(ownRoot.Position-part.Position).Magnitude
-     local distanceFactor=math.clamp(range/300,0,2.5)
-     local lead=part.Position+
-       part.AssemblyLinearVelocity*(warSettings.prediction/100)*distanceFactor*.30+
-       Vector3.new(0,(warSettings.drop/100)*distanceFactor*distanceFactor*9+(warSettings.height/100)*1.2,0)
-     local point,visible=cam:WorldToViewportPoint(lead)
-     if visible and point.Z>0 then
-      local xy=Vector2.new(point.X,point.Y)
-      local px=(xy-center).Magnitude
-      -- Choose nearest player in 3D, not the smallest pixel distance to
-      -- the crosshair. Pixel distance is used only as a tie-breaker.
-      if px<=warSettings.fov and (range<bestDist-1 or
-       (math.abs(range-bestDist)<=1 and (not bestPoint or px<(bestPoint-center).Magnitude))) then
-       local unobstructed=true
-       if state.warWallCheck then
-        local origin=cam.CFrame.Position
-        local ray=lead-origin
-        local params=RaycastParams.new()
-        params.FilterType=Enum.RaycastFilterType.Exclude
-        -- Ignore our character and first-person weapon/viewmodel parented to
-        -- CurrentCamera; neither is an obstacle between us and the target.
-        params.FilterDescendantsInstances={LocalPlayer.Character,cam}
-        local hit=Workspace:Raycast(origin,ray,params)
-        unobstructed=not hit or hit.Instance:IsDescendantOf(ch)
+     if range<=maxRange then
+      counts.range+=1
+      -- Acquire using the part of a character nearest to the screen centre:
+      -- with small FOV, the body may be inside the circle but Head outside.
+      -- AIM will still track the actual head once the player is selected.
+      local candidates={part}
+      if torso and torso~=part then candidates[#candidates+1]=torso end
+      local nearestPx=math.huge
+      local acquisitionPoint=nil
+      for _,bodyPart in ipairs(candidates) do
+       local projected,onScreen=cam:WorldToViewportPoint(bodyPart.Position)
+       if onScreen and projected.Z>0 then
+        local xy=Vector2.new(projected.X,projected.Y)
+        local pixels=(xy-center).Magnitude
+        if pixels<nearestPx then nearestPx=pixels;acquisitionPoint=xy end
        end
-       if unobstructed then best,bestPoint,bestDist,bestAimPoint=player,xy,range,lead end
+      end
+      if acquisitionPoint then
+       counts.screen+=1
+       counts.nearestPixels=math.min(counts.nearestPixels,nearestPx)
+       if nearestPx<=warSettings.fov then
+        counts.fov+=1
+        local distanceFactor=math.clamp(range/300,0,2.5)
+        local lead=part.Position+
+         part.AssemblyLinearVelocity*(warSettings.prediction/100)*distanceFactor*.30+
+         Vector3.new(0,(warSettings.drop/100)*distanceFactor*distanceFactor*9+
+          (warSettings.height/100)*1.2,0)
+        local unobstructed=true
+        if state.warWallCheck then
+         local origin=cam.CFrame.Position
+         local ray=lead-origin
+         local params=RaycastParams.new()
+         params.FilterType=Enum.RaycastFilterType.Exclude
+         params.FilterDescendantsInstances={LocalPlayer.Character,cam}
+         local hit=Workspace:Raycast(origin,ray,params)
+         unobstructed=not hit or hit.Instance:IsDescendantOf(ch)
+        end
+        if unobstructed then
+         counts.clear+=1
+         if range<bestDist-1 or
+           (math.abs(range-bestDist)<=1 and nearestPx<bestPixels) then
+          best,bestPoint,bestDist,bestAimPoint=player,acquisitionPoint,range,lead
+          bestPixels=nearestPx
+         end
+        end
+       end
       end
      end
     end
    end
   end
  end
- return best,bestPoint,bestDist,bestAimPoint
+ if best then return best,bestPoint,bestDist,bestAimPoint,"Цель: "..best.DisplayName end
+ if counts.characters==0 then return nil,nil,nil,nil,"Другие персонажи Player.Character не найдены" end
+ if counts.ready==0 then return nil,nil,nil,nil,"У других игроков нет Head / HumanoidRootPart" end
+ if counts.allowed==0 then return nil,nil,nil,nil,"Team Check не распознаёт противников" end
+ if counts.range==0 then return nil,nil,nil,nil,"Цели вне дальности ("..warSettings.distance.." м)" end
+ if counts.screen==0 then return nil,nil,nil,nil,"Игроки вне экрана или за камерой" end
+ if counts.fov==0 then
+  return nil,nil,nil,nil,"Маленький FOV "..warSettings.fov.." px; до ближайшей цели "..math.floor(counts.nearestPixels+.5).." px"
+ end
+ if counts.clear==0 then return nil,nil,nil,nil,"Wall Check блокирует видимую цель" end
+ return nil,nil,nil,nil,"Нет подходящей цели"
 end
+-- Diagnostic HUD only appears after the explicit button in AIM settings.
+local aimDebugLabel=make("TextLabel",gui,{
+ Name="OX1DE_WARFARE_AIM_CHECK",AnchorPoint=Vector2.new(.5,0),
+ Position=UDim2.new(.5,0,0,96),Size=UDim2.fromOffset(480,48),
+ BackgroundColor3=C.bg,BackgroundTransparency=.09,
+ TextColor3=C.white,TextStrokeTransparency=.5,
+ Font=Enum.Font.Gotham,TextSize=13,TextWrapped=true,
+ BorderSizePixel=0,Visible=false,Active=false,ZIndex=225
+})
+corner(aimDebugLabel,11)
+auxUI.aimDebugLabel=aimDebugLabel
 -- FOV ring follows the viewport center; the value is the radius in pixels.
 listen(RunService.RenderStepped,function()
  if not alive then return end
@@ -1931,6 +1994,10 @@ listen(RunService.RenderStepped,function(delta)
  if warUpdateClock<.07 then return end
  warUpdateClock=0
  local isWar=activeTab=="warfare"
+ aimDebugLabel.Visible=auxUI.aimDebug and isWar
+ if aimDebugLabel.Visible and not state.warAimPreview then
+  aimDebugLabel.Text="AIM • выключен в основных функциях"
+ end
  local showFov=(isWar and state.warAimPreview and state.warFov and not isOpen) or auxUI.previewFov
  warFovCircle.Visible=showFov
  warFovCircle.Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2)
@@ -1941,8 +2008,19 @@ listen(RunService.RenderStepped,function(delta)
   warCurrentTarget,warCurrentAimPoint=nil,nil
   return
  end
- local target,position,_,goal=warfareTarget()
+ local target,position,_,goal,reason=warfareTarget()
  warCurrentTarget,warCurrentAimPoint=target,goal
+ if auxUI.aimDebug then
+  local status=reason or "Проверка цели"
+  if isOpen then
+   status="Закрой меню, чтобы AIM начал наводиться"
+  elseif state.warHoldAim and auxUI.deviceMode~="mobile" and not
+    (UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or
+     UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)) then
+   status="Зажми ПКМ или ЛКМ (либо отключи удержание AIM)"
+  end
+  aimDebugLabel.Text="AIM • "..status
+ end
  if warAimStatus and warAimStatus.Parent then
   warAimStatus.Text=target and ("AIM "..string.upper(warSettings.mode).." • "..target.DisplayName.." • "..(state.warHoldAim and "ПКМ или ЛКМ" or "активен")) or "AIM: нет доступного противника"
  end
