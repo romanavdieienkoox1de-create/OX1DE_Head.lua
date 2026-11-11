@@ -343,6 +343,7 @@ for i,v in ipairs(rows) do
 end
 
 local pickerLayer
+local wheelHeld,sliderHeld=false,false
 local openPicker
 local descriptions={
  {key="players",name="ESP игроков",subtitle="Обводка • ник • метры",icon="♙"},
@@ -539,8 +540,6 @@ local pickerDone=make("TextButton",picker,{Position=UDim2.fromOffset(21,391),Siz
 corner(pickerDone,10)
 local chosenKey="generators"
 local h,s,v=0,1,1
-local wheelHeld=false
-local sliderHeld=false
 local function applyColor()
  local color=Color3.fromHSV(h,s,v)
  if editableColor(chosenKey) then palette[chosenKey]=color;paintSwatches(chosenKey) end
