@@ -219,7 +219,7 @@ make("UIGradient",window,{Rotation=16,Color=ColorSequence.new({
  ColorSequenceKeypoint.new(1,Color3.fromRGB(27,24,46))
 })})
 local scale=make("UIScale",window,{Scale=1})
-local requestedScale=auxUI.compact and .86 or 1
+local requestedScale=auxUI.compact and .80 or 1
 local function resize()
  local camera=Workspace.CurrentCamera
  if not camera then return end
@@ -364,7 +364,7 @@ local densityTitle=text(auxUI.densityButton,
  UDim2.fromOffset(14,0),UDim2.fromOffset(155,44),13,true,C.green)
 listen(auxUI.densityButton.MouseButton1Click,function()
  auxUI.compact=not auxUI.compact
- requestedScale=auxUI.compact and .86 or 1
+ requestedScale=auxUI.compact and .80 or 1
  densityTitle.Text=auxUI.compact and "▣  РАЗВЕРНУТЬ" or "▣  КОМПАКТНО"
  resize()
  scheduleSettingsSave()
@@ -840,48 +840,47 @@ TweenService:Create(radarSweep,TweenInfo.new(4.6,Enum.EasingStyle.Linear,
  Enum.EasingDirection.InOut,-1),{Rotation=360}):Play()
 warStatus=text(wh,"Команды: Roblox Team • FPV: модели",UDim2.fromOffset(30,91),UDim2.fromOffset(750,24),11,false,C.muted)
 warAimStatus=text(wh,"Цель: ожидание",UDim2.fromOffset(30,117),UDim2.fromOffset(740,20),11,true,C.green)
-local wm=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(444,560))
-warStatus.Parent=wm;warStatus.Position=UDim2.fromOffset(18,465);warStatus.Size=UDim2.fromOffset(413,29)
-warAimStatus.Parent=wm;warAimStatus.Position=UDim2.fromOffset(18,496);warAimStatus.Size=UDim2.fromOffset(413,30)
-local we=panel(warContent,UDim2.fromOffset(471,14),UDim2.fromOffset(359,560))
+local wm=panel(warContent,UDim2.fromOffset(14,14),UDim2.fromOffset(444,450))
+warStatus.Parent=wm;warStatus.Visible=false
+warAimStatus.Parent=wm;warAimStatus.Visible=false
+local we=panel(warContent,UDim2.fromOffset(471,14),UDim2.fromOffset(359,512))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
 text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
-local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,392),CanvasSize=UDim2.fromOffset(0,402),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
-local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,495),CanvasSize=UDim2.fromOffset(0,425),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,390),CanvasSize=UDim2.fromOffset(0,270),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,454),CanvasSize=UDim2.fromOffset(0,472),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
  local w=parent==escroll and 322 or 398
- local row=make("TextButton",parent,{Position=UDim2.fromOffset(5,y),Size=UDim2.fromOffset(w,74),Text="",BackgroundColor3=C.row,AutoButtonColor=false,BorderSizePixel=0})
+ local row=make("TextButton",parent,{Position=UDim2.fromOffset(5,y),Size=UDim2.fromOffset(w,59),Text="",BackgroundColor3=C.row,AutoButtonColor=false,BorderSizePixel=0})
  corner(row,10);hoverEffect(row)
- text(row,heading,UDim2.fromOffset(13,7),UDim2.fromOffset(230,27),14,true)
- text(row,details,UDim2.fromOffset(13,39),UDim2.fromOffset(252,22),10,false,C.muted)
+ text(row,heading,UDim2.fromOffset(13,5),UDim2.fromOffset(230,23),14,true)
+ text(row,details,UDim2.fromOffset(13,31),UDim2.fromOffset(252,20),10,false,C.muted)
  local x=w-54
  if colorKey then
-  local chip=make("TextButton",row,{Position=UDim2.fromOffset(x-35,10),Size=UDim2.fromOffset(23,23),BackgroundColor3=palette[colorKey],Text="",BorderSizePixel=0,AutoButtonColor=false})
+  local chip=make("TextButton",row,{Position=UDim2.fromOffset(x-35,7),Size=UDim2.fromOffset(23,23),BackgroundColor3=palette[colorKey],Text="",BorderSizePixel=0,AutoButtonColor=false})
   corner(chip,6);addSwatch(colorKey,chip)
   listen(chip.MouseButton1Click,function() if openPicker then openPicker(colorKey) end end)
  end
  if binding then
-  local keyButton=make("TextButton",row,{Position=UDim2.fromOffset(246,10),Size=UDim2.fromOffset(57,24),BackgroundColor3=C.card,Text=niceKey(keybind[binding]),TextColor3=C.green,TextSize=11,Font=Enum.Font.GothamBold,BorderSizePixel=0})
+  local keyButton=make("TextButton",row,{Position=UDim2.fromOffset(246,7),Size=UDim2.fromOffset(57,24),BackgroundColor3=C.card,Text=niceKey(keybind[binding]),TextColor3=C.green,TextSize=11,Font=Enum.Font.GothamBold,BorderSizePixel=0})
   corner(keyButton,6)
   bindButtons[binding]=keyButton
   listen(keyButton.MouseButton1Click,function() beginRebind(binding) end)
  end
- switch(row,key,x,41)
+ switch(row,key,x,30)
  listen(row.MouseButton1Click,function() toggle(key) end)
 end
-warRow(mscroll,0,"warAimPreview","AIM • наведение","Выбор цели • бинд можно поменять","warAim","warAim")
-warRow(mscroll,82,"warFly","Fly","Полёт по WASD / Space",nil,"warFly")
-warRow(mscroll,164,"warNoClip","NoClip","Проход сквозь препятствия",nil,"warNoClip")
+warRow(mscroll,0,"warAimPreview","AIM • наведение","Бинд • цвет • настройки справа","warAim","warAim")
+warRow(mscroll,67,"warFly","Fly","Полёт • WASD / Space",nil,"warFly")
+warRow(mscroll,134,"warNoClip","NoClip","Проход сквозь препятствия",nil,"warNoClip")
 local aimSettingsButton=make("TextButton",mscroll,{
- Position=UDim2.fromOffset(5,252),Size=UDim2.fromOffset(398,65),
+ Position=UDim2.fromOffset(5,207),Size=UDim2.fromOffset(398,55),
  Text="⚙   НАСТРОЙКИ AIM",TextSize=16,Font=Enum.Font.GothamBold,
  BackgroundColor3=C.darkgreen,TextColor3=C.white,
  BorderSizePixel=0,AutoButtonColor=false
 })
 corner(aimSettingsButton,14);border(aimSettingsButton,C.green,.2,1.4)
-text(mscroll,"FOV  •  Team Check  •  Wall Check  •  Legit / Hard",
- UDim2.fromOffset(11,321),UDim2.fromOffset(389,27),11,false,C.muted)
+-- Removed decorative AIM description: these controls live inside settings.
 -- Expanded two-column AIM controls, matching the provided UI style.
 local aimPage=make("Frame",warContent,{
  Position=UDim2.fromOffset(14,14),Size=UDim2.fromOffset(816,560),
@@ -918,11 +917,11 @@ listen(aimBack.MouseButton1Click,function()
  auxUI.previewFov=false
 end)
 warRow(aimOptions,0,"warFov","FOV • круг","Видимость круга и его цвет","warFov")
-warRow(aimOptions,82,"warWallCheck","Wall Check","Не выбирать цель за стеной")
-warRow(aimOptions,164,"warTeamCheck","Team Check","Не выбирать союзников")
-warRow(aimOptions,246,"warHoldAim","AIM • удержание","ПКМ или ЛКМ при стрельбе")
+warRow(aimOptions,67,"warWallCheck","Wall Check","Не выбирать цель за стеной")
+warRow(aimOptions,134,"warTeamCheck","Team Check","Не выбирать союзников")
+warRow(aimOptions,201,"warHoldAim","AIM • удержание","ПКМ или ЛКМ при стрельбе")
 local aimModeRow=make("Frame",aimOptions,{
- Position=UDim2.fromOffset(5,328),Size=UDim2.fromOffset(398,74),
+ Position=UDim2.fromOffset(5,271),Size=UDim2.fromOffset(398,74),
  BackgroundColor3=C.row,BorderSizePixel=0
 })
 corner(aimModeRow,10)
@@ -952,7 +951,7 @@ for key,button in pairs(modeButtons) do
 end
 
 local aimHint=text(aimOptions,"LEGIT — плавно. HARD — сразу к ближайшей цели.",
- UDim2.fromOffset(13,413),UDim2.fromOffset(382,48),11,false,C.muted)
+ UDim2.fromOffset(13,356),UDim2.fromOffset(382,48),11,false,C.muted)
 aimHint.TextWrapped=true
 -- Slider controls instead of plus/minus buttons. The values are display/
 -- selection preferences, not modifications to remote damage or projectiles.
@@ -1035,11 +1034,13 @@ local aimDropHint=text(aimSliders,
  "LEGIT: 5% медленнее, 100% быстрее. Поправка падения пули поднимает прицел на дальних дистанциях. Начни с 0%.",
  UDim2.fromOffset(12,486),UDim2.fromOffset(377,90),11,false,C.muted)
 aimDropHint.TextWrapped=true
-warRow(escroll,0,"warAllies","Союзники","Салатовая подсветка и контур","warAllies")
-warRow(escroll,82,"warEnemies","Противники","Красная подсветка и контур","warEnemies")
-warRow(escroll,164,"warNames","Никнеймы ESP","Цвет ника зависит от команды")
-warRow(escroll,246,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
-warRow(escroll,328,"warFPV","FPV-дроны","Контур моделей дронов","warFPV")
+warRow(escroll,0,"warAllies","Союзники","Зелёная обводка","warAllies")
+warRow(escroll,67,"warEnemies","Противники","Красная обводка","warEnemies")
+warRow(escroll,134,"warNames","Никнеймы ESP","Имя и расстояние")
+warRow(escroll,201,"warWeapons","Оружие","Название под ногами")
+warRow(escroll,268,"warFPV","FPV-дроны","Контур модели","warFPV")
+warRow(escroll,335,"warShowHP","HP игроков","Отдельная строка под ником")
+warRow(escroll,402,"warTeamHud","Мини-HUD команд","Счётчик на экране")
 bindVisual("warFly");bindVisual("warNoClip");bindVisual("warAim")
 warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",ZIndex=200,Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
 corner(warFovCircle,1000)
@@ -1110,7 +1111,7 @@ do -- OX1DE options scope
   auxUI.previewFov=false
   if not auxUI.compact then
    auxUI.compact=true
-   requestedScale=.86
+   requestedScale=.80
    densityTitle.Text="▣  РАЗВЕРНУТЬ"
    resize()
   end
