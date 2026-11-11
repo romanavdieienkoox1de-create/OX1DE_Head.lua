@@ -1133,6 +1133,7 @@ local function clearObject(obj)
 end
 -- Generator preview model cloning removed with the hero panel.
 local function addObject(obj,kind)
+    if activeTab~="violence_district" then return end
     if objectFx[obj] or not obj:IsDescendantOf(Workspace) or inactive(obj,kind) then return end
     local part=partOf(obj)
     if not part then return end
@@ -1161,6 +1162,7 @@ local function addObject(obj,kind)
     -- Safe test: no scene model cloning in the preview
 end
 local function scanOne(obj)
+    if activeTab~="violence_district" then return end
     local target,kind=candidate(obj)
     if target and state[kind] then addObject(target,kind) end
 end
@@ -1172,7 +1174,7 @@ local function scanAll()
         local ok=pcall(function()
             local items=Workspace:GetDescendants()
             for i,obj in ipairs(items) do
-                if not alive then break end
+                if not alive or activeTab~="violence_district" then break end
                 if (obj:IsA("Model") or obj:IsA("BasePart")) and category(obj) then
                     scanOne(obj)
                 end
