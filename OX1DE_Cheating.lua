@@ -60,6 +60,14 @@ if savedSettings then
   end
  end
 end
+-- Restore the last selected game profile on this device after respawn / reinjection.
+if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.selectedTab=="violence_district") then
+ activeTab=savedSettings.selectedTab
+elseif _G.OX1DE_SELECTED_TAB=="warfare" or _G.OX1DE_SELECTED_TAB=="violence_district" then
+ activeTab=_G.OX1DE_SELECTED_TAB
+end
+local refreshProfileEffects
+local queueLegacyScan
 local warSettings={fov=160,distance=50,prediction=0,hitChance=100}
 if savedSettings and type(savedSettings.warfare)=="table" then
  for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},hitChance={1,100}}) do
@@ -234,7 +242,7 @@ end
 local savedVersion=0
 local function saveSettingsNow()
  if not settingsSupported or not alive then return end
- local snapshot={version=2,toggles={},colors={},keys={},warfare=warSettings}
+ local snapshot={version=3,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings}
  for name,value in pairs(state) do if type(value)=="boolean" then snapshot.toggles[name]=value end end
  for name,color in pairs(palette) do
   snapshot.colors[name]={math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5)}
@@ -840,14 +848,30 @@ warFovStroke=border(warFovCircle,palette.warFov,.25,1.4)
 local function setTab(tab)
  if tab~="warfare" and tab~="violence_district" then return end
  activeTab=tab
+ _G.OX1DE_SELECTED_TAB=tab
  content.Visible=tab=="violence_district"
  warContent.Visible=tab=="warfare"
  subtitleLabel.Text=GameModules[tab].subtitle
  tween(selectedNav,{BackgroundColor3=tab=="violence_district" and C.darkgreen or C.card},.15)
  tween(warNav,{BackgroundColor3=tab=="warfare" and C.darkgreen or C.card},.15)
+ -- Hide old-game player/object ESP instantly, not after the next frame.
+ if tab~="violence_district" then
+  for _,fx in pairs(playerFx) do
+   if fx.bb then fx.bb.Enabled=false end
+   if fx.h then fx.h.Enabled=false end
+  end
+  for _,fx in pairs(objectFx) do
+   if fx.bb then fx.bb.Enabled=false end
+   if fx.h then fx.h.Enabled=false end
+  end
+ end
+ if refreshProfileEffects then refreshProfileEffects(tab) end
+ if tab=="violence_district" and queueLegacyScan then queueLegacyScan() end
+ scheduleSettingsSave()
 end
 listen(selectedNav.MouseButton1Click,function()setTab("violence_district")end)
 listen(warNav.MouseButton1Click,function()setTab("warfare")end)
+setTab(activeTab)
 
 end -- WARFARE UI scoped
 
@@ -980,7 +1004,7 @@ local function addObject(obj,kind)
         end
     end
     local color=palette[kind]
-    local h=make("Highlight",obj,{Name="OX1DE_Object",Adornee=obj,FillColor=color,FillTransparency=kind=="pallets" and .93 or .66,OutlineColor=color,OutlineTransparency=0,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=state[kind]})
+    local h=make("Highlight",obj,{Name="OX1DE_Object",Adornee=obj,FillColor=color,FillTransparency=kind=="pallets" and .93 or .66,OutlineColor=color,OutlineTransparency=0,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=activeTab=="violence_district" and state[kind]})
     local labels={pumpkins="Тыква",generators="Генератор"}
     local bb,lab=billboard(part,color,kind=="pallets" and "" or (labels[kind] or "Объект"))
     if kind=="pallets" then
@@ -989,6 +1013,7 @@ local function addObject(obj,kind)
         bb.MaxDistance=350
         lab.TextSize=12
     end
+    bb.Enabled=activeTab=="violence_district" and state[kind]
     objectFx[obj]={kind=kind,h=h,bb=bb,lab=lab,part=part}
     -- Safe test: no scene model cloning in the preview
 end
@@ -998,7 +1023,7 @@ local function scanOne(obj)
 end
 local scanPending=false
 local function scanAll()
-    if scanPending or not (state.generators or state.pumpkins or state.pallets) then return end
+    if scanPending or activeTab~="violence_district" or not (state.generators or state.pumpkins or state.pallets) then return end
     scanPending=true
     task.spawn(function()
         local ok=pcall(function()
@@ -1014,12 +1039,13 @@ local function scanAll()
         scanPending=false
     end)
 end
+queueLegacyScan=scanAll
 onEspToggle=function(key,enabled)
- if enabled and (key=="generators" or key=="pumpkins" or key=="pallets") then scanAll() end
+ if enabled and activeTab=="violence_district" and (key=="generators" or key=="pumpkins" or key=="pallets") then scanAll() end
  if enabled and key=="warFPV" and warFpvStart then warFpvStart() end
 end
 listen(Workspace.DescendantAdded,function(obj)
-    if not alive or not (state.generators or state.pumpkins or state.pallets) then return end
+    if not alive or activeTab~="violence_district" or not (state.generators or state.pumpkins or state.pallets) then return end
     if category(obj) then scanOne(obj) end
     if obj.Parent and category(obj.Parent) then scanOne(obj.Parent) end
 end)
@@ -1568,6 +1594,23 @@ task.spawn(function()
  end
 end)
 
+refreshProfileEffects=function(tab)
+ -- Ensure previous WARFARE highlights, labels and weapon tags disappear
+ -- as soon as another game profile is selected.
+ if tab~="warfare" then
+  for _,fx in pairs(warfarePlayers) do
+   if fx.highlight then fx.highlight.Enabled=false end
+   if fx.billboard then fx.billboard.Enabled=false end
+   if fx.weaponBillboard then fx.weaponBillboard.Enabled=false end
+  end
+  for _,highlight in pairs(warfareDrones) do
+   if highlight then highlight.Enabled=false end
+  end
+  if warAimMark then warAimMark.Visible=false end
+  if warFovCircle then warFovCircle.Visible=false end
+ end
+end
+
 warfareCleanup=function()
  if warFovCircle then warFovCircle.Visible=false end
  if warAimMark then warAimMark.Visible=false end
@@ -1606,7 +1649,7 @@ listen(RunService.Heartbeat,function(dt)
         else
             nPlayer+=1
             local r=role(player)
-            local shown=(r=="killer" and state.killers) or (r~="killer" and state.players)
+            local shown=activeTab=="violence_district" and ((r=="killer" and state.killers) or (r~="killer" and state.players))
             fx.bb.Enabled=shown
             fx.h.Enabled=shown
             fx.h.OutlineColor=palette.players
@@ -1629,8 +1672,8 @@ listen(RunService.Heartbeat,function(dt)
         if inactive(obj,fx.kind) or not fx.part.Parent then
             clearObject(obj)
         else
-            fx.h.Enabled=state[fx.kind]
-            fx.bb.Enabled=state[fx.kind]
+            fx.h.Enabled=activeTab=="violence_district" and state[fx.kind]
+            fx.bb.Enabled=activeTab=="violence_district" and state[fx.kind]
             fx.h.FillColor=palette[fx.kind]
             fx.h.OutlineColor=palette[fx.kind]
             fx.lab.TextColor3=palette[fx.kind]
@@ -1661,7 +1704,7 @@ task.spawn(function()
             recoverGui()
             -- Changed map objects are normally discovered through DescendantAdded.
             -- A slow fallback scan handles streaming / reparented collections.
-            scanAll()
+            if activeTab=="violence_district" then scanAll() end
         end
     end
 end)
