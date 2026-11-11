@@ -1308,6 +1308,7 @@ local function clearWarfarePlayer(player)
  if not fx then return end
  if fx.highlight then fx.highlight:Destroy() end
  if fx.billboard then fx.billboard:Destroy() end
+ if fx.weaponBillboard then fx.weaponBillboard:Destroy() end
  warfarePlayers[player]=nil
 end
 local function addWarfarePlayer(player)
@@ -1328,7 +1329,22 @@ local function addWarfarePlayer(player)
  label.TextStrokeTransparency=.05
  label.TextWrapped=true
  label.TextTruncate=Enum.TextTruncate.AtEnd
- local fx={character=character,head=head,highlight=highlight,billboard=bill,label=label}
+ -- Separate weapon label below the character's feet; name stays over the head.
+ local footRoot=character:FindFirstChild("HumanoidRootPart") or head
+ local humanoid=character:FindFirstChildOfClass("Humanoid")
+ local footOffset=math.max(1.8,(humanoid and humanoid.HipHeight or 1.5)+footRoot.Size.Y*.5)+.55
+ local weaponBillboard,weaponLabel=billboard(footRoot,C.white,"")
+ weaponBillboard.Name="OX1DE_WARFARE_Weapon_"..tostring(player.UserId)
+ weaponBillboard.Size=UDim2.fromOffset(170,23)
+ weaponBillboard.StudsOffsetWorldSpace=Vector3.new(0,-footOffset,0)
+ weaponBillboard.MaxDistance=270
+ weaponBillboard.Enabled=false
+ weaponLabel.TextSize=12
+ weaponLabel.TextWrapped=false
+ weaponLabel.TextTruncate=Enum.TextTruncate.AtEnd
+ weaponLabel.TextStrokeTransparency=.08
+ local fx={character=character,head=head,highlight=highlight,billboard=bill,label=label,
+   weaponBillboard=weaponBillboard,weaponLabel=weaponLabel}
  warfarePlayers[player]=fx
  return fx
 end
@@ -1489,7 +1505,7 @@ listen(RunService.Heartbeat,function(dt)
    local outlined=selected and (kind~=nil and state[kind] or false)
    local unknown=selected and kind==nil and state.warNames and (state.warAllies or state.warEnemies)
    local named=selected and state.warNames and (outlined or unknown or state.warWeapons)
-   local need=outlined or named
+   local need=outlined or named or (selected and state.warWeapons)
    if need and not fx then fx=addWarfarePlayer(player) end
    if fx then
     fx.billboard.Enabled=named and true or false
@@ -1497,6 +1513,22 @@ listen(RunService.Heartbeat,function(dt)
     fx.highlight.OutlineColor=kind and palette[kind] or C.white
     fx.highlight.FillColor=kind and palette[kind] or C.white
     fx.label.TextColor3=kind and palette[kind] or C.white
+    fx.weaponLabel.TextColor3=kind and palette[kind] or C.white
+    local heldWeapon=nil
+    if selected and state.warWeapons then
+     local character=player.Character
+     local tool=character and character:FindFirstChildOfClass("Tool")
+     if tool then
+      heldWeapon=tool.Name
+     elseif character then
+      for _,key in ipairs({"EquippedWeapon","WeaponName","CurrentWeapon","HeldWeapon"}) do
+       local value=character:GetAttribute(key)
+       if type(value)=="string" and value~="" then heldWeapon=value;break end
+      end
+     end
+    end
+    fx.weaponBillboard.Enabled=selected and state.warWeapons and heldWeapon~=nil
+    fx.weaponLabel.Text=heldWeapon or ""
     if named then
      local distance=my and fmtDistance(my.Position,fx.head.Position) or "?"
      local nick=player.DisplayName
@@ -1509,10 +1541,6 @@ listen(RunService.Heartbeat,function(dt)
       nick=string.sub(nick,1,19).."…"
      end
      fx.label.Text=nick.."  •  "..tostring(distance).." м"
-     if state.warWeapons then
-      local tool=player.Character and player.Character:FindFirstChildOfClass("Tool")
-      fx.label.Text=fx.label.Text.."\n"..(tool and tool.Name or "Без оружия")
-     end
     end
    end
    if kind=="warAllies" then teamPlayers+=1 elseif kind=="warEnemies" then otherPlayers+=1 else unknownPlayers+=1 end
