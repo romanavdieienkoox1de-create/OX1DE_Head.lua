@@ -33,7 +33,7 @@ local C={
 }
 local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,fly=false,noclip=false,autoSkill=true,
  warAllies=false,warEnemies=false,warWeapons=false,warFPV=false,
- warFly=false,warAimPreview=false,warFov=true,warWallCheck=true}
+ warFly=false,warAimPreview=false,warFov=true,warWallCheck=true,warTeamCheck=true}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),
  warAllies=Color3.fromRGB(119,255,48),warEnemies=Color3.fromRGB(255,67,81),warFPV=Color3.fromRGB(255,197,62)}
 -- Local, per-installation settings. No network sync is used.
@@ -90,6 +90,7 @@ local collisions=setmetatable({}, {__mode="k"})
 local flyVelocity,flyGyro
 local foundText,countText
 local onEspToggle
+local warFpvStart
 local function listen(signal,callback)
  local connection=signal:Connect(callback)
  table.insert(connections,connection)
@@ -519,7 +520,12 @@ listen(UserInputService.InputBegan,function(input,handled)
   return
  end
  for _,name in ipairs({"fly","noclip","warFly","warAim"}) do
-  if keybind[name]~=Enum.KeyCode.Unknown and key==keybind[name] then toggle(name);return end
+  if keybind[name]~=Enum.KeyCode.Unknown and key==keybind[name] then
+   if (name=="fly" or name=="noclip") and activeTab~="violence_district" then return end
+   if (name=="warFly" or name=="warAim") and activeTab~="warfare" then return end
+   toggle(name=="warAim" and "warAimPreview" or name)
+   return
+  end
  end
 end)
 
@@ -722,7 +728,7 @@ local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
 local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
 text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
-local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,705),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,800),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,345),CanvasSize=UDim2.fromOffset(0,344),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
@@ -746,10 +752,11 @@ local function warRow(parent,y,key,heading,details,colorKey,binding)
  switch(row,key,x,41)
  listen(row.MouseButton1Click,function() toggle(key) end)
 end
-warRow(mscroll,0,"warAimPreview","Silent Aim • визуально","FOV-подсказка; не меняет выстрелы",nil,"warAim")
+warRow(mscroll,0,"warAimPreview","Silent Aim • цель","Выбор цели; не меняет выстрелы",nil,"warAim")
 warRow(mscroll,82,"warFly","Fly","Полёт по WASD / Space",nil,"warFly")
 warRow(mscroll,164,"warFov","FOV • круг","Показывать границу радиуса")
-warRow(mscroll,246,"warWallCheck","Wall Check","Препятствия для визуальной цели")
+warRow(mscroll,246,"warWallCheck","Wall Check","Проверять препятствия")
+warRow(mscroll,328,"warTeamCheck","Team Check","Не выбирать своих тиммейтов")
 local function warValue(y,key,title,unit,minV,maxV,step)
  local f=make("Frame",mscroll,{Position=UDim2.fromOffset(5,y),Size=UDim2.fromOffset(398,72),BackgroundColor3=C.row,BorderSizePixel=0})
  corner(f,9)
@@ -766,10 +773,10 @@ local function warValue(y,key,title,unit,minV,maxV,step)
  end
  render()
 end
-warValue(330,"fov","FOV • радиус"," px",50,400,10)
-warValue(409,"distance","Дальность"," м",10,300,10)
-warValue(488,"prediction","Prediction • визуально"," %",0,100,5)
-warValue(567,"hitChance","Hit Chance • настройка"," %",1,100,5)
+warValue(414,"fov","FOV • радиус"," px",50,400,10)
+warValue(493,"distance","Дальность"," м",10,300,10)
+warValue(572,"prediction","Prediction • визуально"," %",0,100,5)
+warValue(651,"hitChance","Hit Chance • настройка"," %",1,100,5)
 warRow(escroll,0,"warAllies","Союзники","Своя Team • зелёный","warAllies")
 warRow(escroll,82,"warEnemies","Противники","Другие Team • красный","warEnemies")
 warRow(escroll,164,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
@@ -954,6 +961,7 @@ local function scanAll()
 end
 onEspToggle=function(key,enabled)
  if enabled and (key=="generators" or key=="pumpkins" or key=="pallets") then scanAll() end
+ if enabled and key=="warFPV" and warFpvStart then warFpvStart() end
 end
 listen(Workspace.DescendantAdded,function(obj)
     if not alive or not (state.generators or state.pumpkins or state.pallets) then return end
@@ -1135,7 +1143,7 @@ local function restore()
     end
 end
 listen(RunService.Stepped,function()
-    if not state.noclip then return end
+    if not state.noclip or activeTab~="violence_district" then return end
     local ch=LocalPlayer.Character
     if not ch then return end
     for _,v in ipairs(ch:GetDescendants()) do
@@ -1146,7 +1154,7 @@ listen(RunService.Stepped,function()
     end
 end)
 listen(RunService.RenderStepped,function()
-    if not alive or not state.fly then return end
+    if not alive or not ((activeTab=="violence_district" and state.fly) or (activeTab=="warfare" and state.warFly)) then return end
     local r=root()
     if not r then return end
     if not flyVelocity or not flyVelocity.Parent then startFly() end
@@ -1184,7 +1192,7 @@ listen(LocalPlayer.CharacterAdded,function()
     task.delay(.6,function()
         if alive then
             recoverGui()
-            if state.fly then startFly() end
+            if (activeTab=="violence_district" and state.fly) or (activeTab=="warfare" and state.warFly) then startFly() end
         end
     end)
 end)
@@ -1206,12 +1214,14 @@ local lastFly,lastNoClip=false,false
 local accumulated=0
 listen(RunService.Heartbeat,function(dt)
     if not alive then return end
-    if state.fly~=lastFly then
-        lastFly=state.fly
+    local flyNow=(activeTab=="violence_district" and state.fly) or (activeTab=="warfare" and state.warFly)
+    if flyNow~=lastFly then
+        lastFly=flyNow
         if lastFly then startFly() else stopFly() end
     end
-    if state.noclip~=lastNoClip then
-        lastNoClip=state.noclip
+    local noclipNow=activeTab=="violence_district" and state.noclip
+    if noclipNow~=lastNoClip then
+        lastNoClip=noclipNow
         if not lastNoClip then restore() end
     end
     accumulated+=dt
@@ -1286,7 +1296,7 @@ task.spawn(function()
 end)
 _G.OX1DE_CHEATING_STOP=function()
     saveSettingsNow()
-    alive=false;state.fly=false;state.noclip=false
+    alive=false;state.fly=false;state.noclip=false;state.warFly=false;state.warAimPreview=false
     state.autoSkill=false
     stopFly();restore()
     if isOpen then stopMenuMouse() end
