@@ -1084,6 +1084,7 @@ do -- OX1DE options scope
    bindVisual(key)
   end
   for key,value in pairs(auxUI.defaults.warfare) do warSettings[key]=value end
+  if auxUI.resetGraphics then auxUI.resetGraphics() end
   for _,refresh in pairs(auxUI.aimRefresh or {}) do refresh() end
   for key,button in pairs(modeButtons) do
    button.BackgroundColor3=key==warSettings.mode and C.darkgreen or C.card
@@ -1103,6 +1104,8 @@ do -- OX1DE options scope
  local graphicsChoices={}
  local light=game:GetService("Lighting")
  local originalShadows=light.GlobalShadows
+ local originalQuality=nil
+ pcall(function() originalQuality=settings().Rendering.QualityLevel end)
  local qualityMap={low=Enum.QualityLevel.Level01,medium=Enum.QualityLevel.Level05,high=Enum.QualityLevel.Level10}
  local gfxStatus=text(graphics,"Режим: автоматически",
   UDim2.fromOffset(19,398),UDim2.fromOffset(317,57),12,false,C.muted)
@@ -1137,6 +1140,18 @@ do -- OX1DE options scope
   text(choice,item.tip,UDim2.fromOffset(14,38),UDim2.fromOffset(293,26),11,false,C.muted)
   graphicsChoices[item.key]=choice
   listen(choice.MouseButton1Click,function() chooseGraphics(item.key) end)
+ end
+ auxUI.resetGraphics=function()
+  auxUI.graphicsMode="auto"
+  pcall(function()
+   if originalQuality then settings().Rendering.QualityLevel=originalQuality end
+   light.GlobalShadows=originalShadows
+  end)
+  for _,button in pairs(graphicsChoices) do
+   button.BackgroundColor3=C.row
+   button.TextColor3=C.white
+  end
+  gfxStatus.Text="Режим: автоматически • параметры Roblox восстановлены, если доступно"
  end
  if qualityMap[auxUI.graphicsMode] then chooseGraphics(auxUI.graphicsMode) end
 end -- OX1DE options scope
