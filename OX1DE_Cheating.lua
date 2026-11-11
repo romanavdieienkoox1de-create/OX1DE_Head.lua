@@ -2239,45 +2239,42 @@ end)
 -- One dashboard for PC, phones and tablets. Only the input scale differs.
 -- There is no duplicated mobile feature list or second mobile settings panel.
 local function startDeviceChooser()
+ -- Black-and-white chooser; the game menu keeps its own theme.
  local boot=make("Frame",gui,{
   Name="OX1DE_DeviceChoice",AnchorPoint=Vector2.new(.5,.5),
-  Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(490,209),
-  BackgroundColor3=C.bg,BorderSizePixel=0,ZIndex=180
+  Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(490,156),
+  BackgroundColor3=Color3.fromRGB(17,17,17),
+  BorderSizePixel=0,ZIndex=180
  })
- corner(boot,22);border(boot,C.green,.20,1.4)
+ corner(boot,20);border(boot,Color3.fromRGB(255,255,255),.24,1.3)
  local bootScale=make("UIScale",boot,{Scale=1})
  local function resizeChooser()
   local cam=Workspace.CurrentCamera
   if not cam then return end
   local view=cam.ViewportSize
-  bootScale.Scale=math.min(1,(view.X-20)/490,(view.Y-20)/209)
+  bootScale.Scale=math.min(1,(view.X-20)/490,(view.Y-20)/156)
  end
  resizeChooser()
  listen(Workspace:GetPropertyChangedSignal("CurrentCamera"),resizeChooser)
- local bootTitle=text(boot,"OX1DE  •  ВЫБОР УСТРОЙСТВА",
-  UDim2.fromOffset(20,13),UDim2.fromOffset(449,37),22,true,C.white)
+ local bootTitle=text(boot,"OX1DE",
+  UDim2.fromOffset(20,12),UDim2.fromOffset(450,39),24,true,Color3.fromRGB(255,255,255))
  bootTitle.ZIndex=181
- local bootHint=text(boot,"Один интерфейс со всеми функциями",
-  UDim2.fromOffset(21,49),UDim2.fromOffset(448,25),12,false,C.muted)
- bootHint.ZIndex=181
  local pcChoice=make("TextButton",boot,{
-  Position=UDim2.fromOffset(20,86),Size=UDim2.fromOffset(216,73),
-  Text="▣   ПК",BackgroundColor3=C.darkgreen,
-  TextColor3=C.white,Font=Enum.Font.GothamBold,TextSize=20,
+  Position=UDim2.fromOffset(20,64),Size=UDim2.fromOffset(216,67),
+  Text="ПК",BackgroundColor3=Color3.fromRGB(0,0,0),
+  TextColor3=Color3.fromRGB(255,255,255),
+  Font=Enum.Font.GothamBold,TextSize=22,
   BorderSizePixel=0,AutoButtonColor=false,ZIndex=181
  })
- corner(pcChoice,13);border(pcChoice,C.green,.23,1)
+ corner(pcChoice,13);border(pcChoice,Color3.fromRGB(255,255,255),.38,1.2)
  local mobileChoice=make("TextButton",boot,{
-  Position=UDim2.fromOffset(252,86),Size=UDim2.fromOffset(218,73),
-  Text="▯   ТЕЛЕФОН",BackgroundColor3=C.card,
-  TextColor3=C.white,Font=Enum.Font.GothamBold,TextSize=18,
+  Position=UDim2.fromOffset(252,64),Size=UDim2.fromOffset(218,67),
+  Text="ТЕЛ",BackgroundColor3=Color3.fromRGB(0,0,0),
+  TextColor3=Color3.fromRGB(255,255,255),
+  Font=Enum.Font.GothamBold,TextSize=22,
   BorderSizePixel=0,AutoButtonColor=false,ZIndex=181
  })
- corner(mobileChoice,13);border(mobileChoice,C.green,.42,1)
- local bootBottom=text(boot,
-  "На телефоне удобнее играть с горизонтальным экраном",
-  UDim2.fromOffset(20,174),UDim2.fromOffset(445,23),11,false,C.muted)
- bootBottom.ZIndex=181
+ corner(mobileChoice,13);border(mobileChoice,Color3.fromRGB(255,255,255),.38,1.2)
 
  -- Draggable button opens and closes the SAME main menu, not a second GUI.
  local bubble=make("TextButton",gui,{
