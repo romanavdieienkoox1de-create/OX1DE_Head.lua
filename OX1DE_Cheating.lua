@@ -27,7 +27,7 @@ local C={
  muted=Color3.fromRGB(158,171,176),unknown=Color3.fromRGB(185,187,193),
  darkgreen=Color3.fromRGB(20,57,25)
 }
-local state={players=false,killers=false,generators=false,pumpkins=false,fly=false,noclip=false,fastVault=false,autoSkill=false}
+local state={players=false,killers=false,generators=false,pumpkins=false,fly=false,noclip=false,fastVault=false,autoSkill=true}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange}
 local function editableColor(key)
  return key=="players" or key=="generators" or key=="pumpkins"
@@ -175,10 +175,8 @@ listen(Workspace:GetPropertyChangedSignal("CurrentCamera"),updateCamera)
 
 local header=make("Frame",window,{Position=UDim2.fromOffset(0,0),Size=UDim2.new(1,0,0,86),BackgroundTransparency=1,Active=true})
 make("Frame",window,{Position=UDim2.fromOffset(0,86),Size=UDim2.new(1,0,0,1),BackgroundColor3=Color3.fromRGB(51,81,41),BorderSizePixel=0})
-local shadowX=text(header,"X",UDim2.fromOffset(27,19),UDim2.fromOffset(38,39),36,true,C.green)
-shadowX.TextStrokeColor3=C.green;shadowX.TextStrokeTransparency=.63
-text(header,"OX1DE",UDim2.fromOffset(76,12),UDim2.fromOffset(500,40),29,true)
-text(header,ActiveGame.subtitle,UDim2.fromOffset(78,52),UDim2.fromOffset(490,21),11,false,C.muted)
+text(header,"OX1DE",UDim2.fromOffset(29,13),UDim2.fromOffset(510,38),30,true,C.green)
+text(header,ActiveGame.subtitle,UDim2.fromOffset(31,53),UDim2.fromOffset(490,18),10,false,C.muted)
 local keybind={menu=Enum.KeyCode.RightShift,fly=Enum.KeyCode.F6,noclip=Enum.KeyCode.F7,fastVault=Enum.KeyCode.F8}
 local bindButtons={}
 local waitingFor=nil
@@ -218,52 +216,9 @@ local function panel(parent,pos,size,col)
  corner(f,16);border(f,col or C.edge,.22,1)
  return f
 end
-local hero=panel(content,UDim2.fromOffset(14,14),UDim2.fromOffset(816,182),C.green)
-make("UIGradient",hero,{Rotation=0,Color=ColorSequence.new({
- ColorSequenceKeypoint.new(0,Color3.fromRGB(11,25,21)),
- ColorSequenceKeypoint.new(.58,Color3.fromRGB(14,20,23)),
- ColorSequenceKeypoint.new(1,Color3.fromRGB(12,30,19))
-})})
-local heroAccent=make("Frame",hero,{Position=UDim2.fromOffset(773,-10),Size=UDim2.fromOffset(20,100),Rotation=36,BackgroundColor3=C.green,BackgroundTransparency=.72,BorderSizePixel=0})
-make("Frame",hero,{Position=UDim2.fromOffset(495,24),Size=UDim2.fromOffset(1,132),BackgroundColor3=Color3.fromRGB(49,94,71),BorderSizePixel=0})
-local generatorPhoto=make("ImageLabel",hero,{
- Position=UDim2.fromOffset(13,12),Size=UDim2.fromOffset(470,158),
- BackgroundColor3=Color3.fromRGB(11,18,21),BorderSizePixel=0,
- Image=GENERATOR_PREVIEW_ASSET_ID~="" and ("rbxassetid://"..GENERATOR_PREVIEW_ASSET_ID) or "",
- ScaleType=Enum.ScaleType.Fit,Visible=GENERATOR_PREVIEW_ASSET_ID~="",ZIndex=2
-})
-corner(generatorPhoto,12)
-local viewport=make("ViewportFrame",hero,{
- Position=UDim2.fromOffset(13,12),Size=UDim2.fromOffset(470,158),Visible=GENERATOR_PREVIEW_ASSET_ID=="",
- BackgroundColor3=Color3.fromRGB(11,18,21),BorderSizePixel=0,
- Ambient=Color3.fromRGB(145,166,175),LightColor=Color3.fromRGB(220,238,240),LightDirection=Vector3.new(-1,-1,-1)
-})
-corner(viewport,12)
-local world=make("WorldModel",viewport,{})
-local previewCamera=make("Camera",viewport,{CFrame=CFrame.lookAt(Vector3.new(8,4,12),Vector3.zero),FieldOfView=35})
-viewport.CurrentCamera=previewCamera
--- Until Workspace provides a generator model, show a restrained placeholder, not a fake machine.
-local placeholder=make("Model",world,{Name="PreviewLoading"})
-local function previewBlock(name,pos,size,color)
- return make("Part",placeholder,{Name=name,Size=size,Anchored=true,CanCollide=false,Color=color,Material=Enum.Material.Metal,CFrame=CFrame.new(pos)})
-end
-previewBlock("Body",Vector3.new(0,0,0),Vector3.new(5.7,2.0,2),Color3.fromRGB(119,42,36))
-previewBlock("Front",Vector3.new(0,-.2,1.04),Vector3.new(4,1.14,.08),Color3.fromRGB(55,63,65))
-for i=-2,2 do
- local v=previewBlock("PanelWire",Vector3.new(i*.6,-.24,1.1),Vector3.new(.11,.93,.08),C.cyan)
- v.Material=Enum.Material.Neon
-end
-for i=-1,1 do previewBlock("Piston",Vector3.new(i*1.28,1.27,.0),Vector3.new(.7,.83,.75),Color3.fromRGB(77,90,94)) end
-local previewLabel=text(hero,"ГЕНЕРАТОР",UDim2.fromOffset(26,16),UDim2.fromOffset(420,24),12,true,C.cyan)
-previewLabel.ZIndex=4
-local generatorTitle=text(hero,"Генератор",UDim2.fromOffset(518,30),UDim2.fromOffset(276,41),27,true,C.white)
-local distanceLabel=text(hero,"Модель в радиусе загрузки",UDim2.fromOffset(519,73),UDim2.fromOffset(270,24),12,false,C.muted)
-local heroSwatch=make("TextButton",hero,{Position=UDim2.fromOffset(520,124),Size=UDim2.fromOffset(25,25),BackgroundColor3=C.cyan,Text="",AutoButtonColor=false,BorderSizePixel=0})
-corner(heroSwatch,6);addSwatch("generators",heroSwatch)
-local heroLegend=text(hero,"ESP генераторов • цвет",UDim2.fromOffset(555,119),UDim2.fromOffset(235,35),14,true,C.cyan)
-
-local functionsPanel=panel(content,UDim2.fromOffset(14,207),UDim2.fromOffset(444,368))
-local espPanel=panel(content,UDim2.fromOffset(471,207),UDim2.fromOffset(359,368))
+-- Generator hero removed: main tools and ESP now start at top.
+local functionsPanel=panel(content,UDim2.fromOffset(14,14),UDim2.fromOffset(444,558))
+local espPanel=panel(content,UDim2.fromOffset(471,14),UDim2.fromOffset(359,558))
 text(functionsPanel,"⚙",UDim2.fromOffset(16,9),UDim2.fromOffset(34,34),24,true,C.green)
 text(functionsPanel,"Основные функции",UDim2.fromOffset(51,9),UDim2.fromOffset(370,34),19,true)
 text(espPanel,"◉",UDim2.fromOffset(13,9),UDim2.fromOffset(34,34),23,true,C.green)
@@ -318,27 +273,27 @@ local function hoverEffect(o)
  listen(o.MouseLeave,function() tween(o,{BackgroundColor3=C.row},.2) end)
 end
 local rows={
- {key="fly",name="Fly",subtitle="Полёт • WASD / Space",icon="✈",bind=false},
- {key="noclip",name="NoClip",subtitle="Проход без столкновений",icon="◇",bind=false},
- {key="fastVault",name="Fast Vault",subtitle="Ускоренный перелаз • ×1.8",icon="↟",bind=false},
- {key="autoSkill",name="Auto Skill Check",subtitle="Проверка белой зоны",icon="◎",bind=false}
+ {key="fly",name="Fly",subtitle="Полёт • WASD / Space",icon="✈",bind=true},
+ {key="noclip",name="NoClip",subtitle="Проход сквозь препятствия",icon="◇",bind=true},
+ {key="fastVault",name="Fast Vault",subtitle="Перелаз • анимация ×1.8",icon="↟",bind=true},
+ {key="autoSkill",name="Auto Skill Check",subtitle="Отслеживание тёмной зоны (эксп.)",icon="◎",bind=false}
 }
 for i,v in ipairs(rows) do
- local y=48+(i-1)*61
- local f=make("TextButton",functionsPanel,{Position=UDim2.fromOffset(12,y),Size=UDim2.fromOffset(420,55),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
+ local y=66+(i-1)*112
+ local f=make("TextButton",functionsPanel,{Position=UDim2.fromOffset(12,y),Size=UDim2.fromOffset(420,91),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
  corner(f,11);hoverEffect(f)
- local ib=make("Frame",f,{Position=UDim2.fromOffset(7,8),Size=UDim2.fromOffset(38,38),BackgroundColor3=C.card,BorderSizePixel=0})
+ local ib=make("Frame",f,{Position=UDim2.fromOffset(12,24),Size=UDim2.fromOffset(40,40),BackgroundColor3=C.card,BorderSizePixel=0})
  corner(ib,9)
  text(ib,v.icon,UDim2.fromScale(0,0),UDim2.fromScale(1,1),23,true,C.green,Enum.TextXAlignment.Center)
- text(f,v.name,UDim2.fromOffset(53,5),UDim2.fromOffset(220,26),15,true)
- text(f,v.subtitle,UDim2.fromOffset(53,29),UDim2.fromOffset(249,18),11,false,C.muted)
+ text(f,v.name,UDim2.fromOffset(61,17),UDim2.fromOffset(228,27),16,true)
+ text(f,v.subtitle,UDim2.fromOffset(61,48),UDim2.fromOffset(245,21),11,false,C.muted)
  if v.bind then
-  local binding=make("TextButton",f,{Name=v.key.."Bind",Position=UDim2.fromOffset(303,15),Size=UDim2.fromOffset(55,25),BackgroundColor3=C.card,Text=niceKey(keybind[v.key]),TextColor3=C.green,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0,AutoButtonColor=false})
+  local binding=make("TextButton",f,{Name=v.key.."Bind",Position=UDim2.fromOffset(306,32),Size=UDim2.fromOffset(53,27),BackgroundColor3=C.card,Text=niceKey(keybind[v.key]),TextColor3=C.green,Font=Enum.Font.GothamBold,TextSize=11,BorderSizePixel=0,AutoButtonColor=false})
   corner(binding,6);border(binding,C.edge,.4,1)
   bindButtons[v.key]=binding
   listen(binding.MouseButton1Click,function() beginRebind(v.key) end)
  end
- switch(f,v.key,365,15)
+ switch(f,v.key,369,32)
  listen(f.MouseButton1Click,function() toggle(v.key) end)
 end
 
@@ -346,18 +301,23 @@ local pickerLayer
 local wheelHeld,sliderHeld=false,false
 local openPicker
 local descriptions={
- {key="players",name="ESP игроков",subtitle="Обводка • ник • метры",icon="♙"},
+ {key="players",name="ESP игроков",subtitle="Белая обводка • ник • метры",icon=""},
  {key="killers",name="ESP маньяка",subtitle="Ник красный • фиксирован",icon="☠"},
  {key="generators",name="ESP генераторов",subtitle="Генераторы на карте",icon=""},
  {key="pumpkins",name="ESP тыкв",subtitle="Тыквы на карте",icon="🎃"}
 }
 for i,v in ipairs(descriptions) do
- local y=49+(i-1)*77
- local f=make("TextButton",espPanel,{Position=UDim2.fromOffset(11,y),Size=UDim2.fromOffset(337,71),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
+ local y=66+(i-1)*112
+ local f=make("TextButton",espPanel,{Position=UDim2.fromOffset(11,y),Size=UDim2.fromOffset(337,93),BackgroundColor3=C.row,Text="",AutoButtonColor=false,BorderSizePixel=0})
  corner(f,11);hoverEffect(f)
- local iconBox=make("Frame",f,{Position=UDim2.fromOffset(9,17),Size=UDim2.fromOffset(35,35),BackgroundColor3=C.card,BorderSizePixel=0})
+ local iconBox=make("Frame",f,{Position=UDim2.fromOffset(11,26),Size=UDim2.fromOffset(38,38),BackgroundColor3=C.card,BorderSizePixel=0})
  corner(iconBox,9)
- if v.key=="generators" then
+ if v.key=="players" then
+  local head=make("Frame",iconBox,{Position=UDim2.fromOffset(13,7),Size=UDim2.fromOffset(12,12),BackgroundColor3=C.white,BorderSizePixel=0})
+  corner(head,12)
+  local shoulders=make("Frame",iconBox,{Position=UDim2.fromOffset(6,23),Size=UDim2.fromOffset(26,11),BackgroundColor3=C.white,BorderSizePixel=0})
+  corner(shoulders,8)
+ elseif v.key=="generators" then
   local body=make("Frame",iconBox,{Position=UDim2.fromOffset(5,11),Size=UDim2.fromOffset(25,19),BackgroundColor3=Color3.fromRGB(25,47,52),BorderSizePixel=0})
   corner(body,3);border(body,C.cyan,.1,1)
   for n=0,2 do
@@ -367,9 +327,9 @@ for i,v in ipairs(descriptions) do
  else
   text(iconBox,v.icon,UDim2.fromScale(0,0),UDim2.fromScale(1,1),21,true,v.key=="players" and C.white or palette[v.key],Enum.TextXAlignment.Center)
  end
- text(f,v.name,UDim2.fromOffset(51,10),UDim2.fromOffset(197,27),14,true)
- text(f,v.subtitle,UDim2.fromOffset(51,37),UDim2.fromOffset(198,24),10,false,C.muted)
- local swatch=make("TextButton",f,{Position=UDim2.fromOffset(252,21),Size=UDim2.fromOffset(27,27),Text="",BackgroundColor3=palette[v.key],BorderSizePixel=0,AutoButtonColor=false})
+ text(f,v.name,UDim2.fromOffset(55,17),UDim2.fromOffset(195,27),15,true)
+ text(f,v.subtitle,UDim2.fromOffset(55,51),UDim2.fromOffset(195,22),10,false,C.muted)
+ local swatch=make("TextButton",f,{Position=UDim2.fromOffset(252,15),Size=UDim2.fromOffset(27,27),Text="",BackgroundColor3=palette[v.key],BorderSizePixel=0,AutoButtonColor=false})
  corner(swatch,7)
  if editableColor(v.key) then
   addSwatch(v.key,swatch)
@@ -384,10 +344,9 @@ for i,v in ipairs(descriptions) do
    task.delay(.12,function() if alive and swatch.Parent then tween(swatch,{BackgroundTransparency=0},.15) end end)
   end)
  end
- switch(f,v.key,286,24)
+ switch(f,v.key,286,57)
  listen(f.MouseButton1Click,function() toggle(v.key) end)
 end
-listen(heroSwatch.MouseButton1Click,function() if openPicker then openPicker("generators") end end)
 
 -- Rebind keys. Escape cancels; Backspace clears action binds, not menu bind.
 listen(UserInputService.InputBegan,function(input,handled)
@@ -678,47 +637,7 @@ local function clearObject(obj)
     if fx.bb then fx.bb:Destroy() end
     objectFx[obj]=nil
 end
-local shownRealGenerator=false
-local function realPreview(obj)
-    if shownRealGenerator or not obj or not obj.Parent then return end
-    local parts={}
-    if obj:IsA("BasePart") then table.insert(parts,obj) end
-    for _,desc in ipairs(obj:GetDescendants()) do
-        if desc:IsA("BasePart") and desc.Transparency<1 then
-            table.insert(parts,desc)
-            if #parts>=48 then break end
-        end
-    end
-    if #parts==0 then return end
-    local success=pcall(function()
-        local pivot=obj:IsA("Model") and obj:GetPivot() or obj.CFrame
-        local bounds=obj:IsA("Model") and obj:GetExtentsSize() or obj.Size
-        local maxAxis=math.max(bounds.X,bounds.Y,bounds.Z,1)
-        local factor=math.min(1,6.5/maxAxis)
-        local mini=Instance.new("Model")
-        mini.Name="RealGenerator"
-        for _,original in ipairs(parts) do
-            local copy=original:Clone()
-            for _,child in ipairs(copy:GetDescendants()) do
-                if child:IsA("Script") or child:IsA("LocalScript") or child:IsA("ModuleScript") or child:IsA("Sound") or child:IsA("Constraint") then child:Destroy() end
-            end
-            local offset=pivot:ToObjectSpace(original.CFrame)
-            copy.CFrame=CFrame.new(offset.Position*factor)*offset.Rotation
-            copy.Size=original.Size*factor
-            copy.Anchored=true
-            copy.CanCollide=false
-            copy.Parent=mini
-        end
-        if #mini:GetChildren()==0 then mini:Destroy();return end
-        world:ClearAllChildren()
-        mini.Parent=world
-        previewCamera.CFrame=CFrame.lookAt(Vector3.new(8,4,10),Vector3.zero)
-        previewCamera.FieldOfView=38
-        previewLabel.Text="ГЕНЕРАТОР  •  МОДЕЛЬ ИЗ ИГРЫ"
-        shownRealGenerator=true
-    end)
-    if not success then return end
-end
+-- Generator preview model cloning removed with the hero panel.
 local function addObject(obj,kind)
     if objectFx[obj] or not obj:IsDescendantOf(Workspace) or inactive(obj,kind) then return end
     local part=partOf(obj)
