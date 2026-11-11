@@ -168,6 +168,12 @@ pcall(function()
  if parent then gui.Parent=parent;guiParent=parent end
 end)
 if not gui.Parent then gui.Parent=PlayerGui;guiParent=PlayerGui end
+-- Dedicated screen-space name tags. Window is created after this frame,
+-- so its controls remain above the tags.
+local playerTags=make("Frame",gui,{
+ Name="OX1DE_PlayerTags",Size=UDim2.fromScale(1,1),
+ BackgroundTransparency=1,ClipsDescendants=true,Active=false
+})
 local window=make("Frame",gui,{
  Name="OX1DEWindow",AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),
  Size=UDim2.fromOffset(1050,676),BackgroundColor3=C.bg,BorderSizePixel=0,ClipsDescendants=true
@@ -759,6 +765,7 @@ local function clearPlayer(p)
     if not fx then return end
     if fx.h then fx.h:Destroy() end
     if fx.bb then fx.bb:Destroy() end
+    if fx.lab then fx.lab:Destroy() end
     playerFx[p]=nil
 end
 local function addPlayer(p)
@@ -766,11 +773,20 @@ local function addPlayer(p)
     clearPlayer(p)
     local ch=p.Character
     if not ch then return end
-    local h=ch:FindFirstChild("Head") or ch:FindFirstChild("HumanoidRootPart")
-    if not h then return end
+    local head=ch:FindFirstChild("Head") or ch:FindFirstChild("HumanoidRootPart")
+    if not head then return end
     local highlight=make("Highlight",ch,{Name="OX1DE_Person",Adornee=ch,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,OutlineColor=palette.players,OutlineTransparency=0,FillTransparency=1,Enabled=true})
-    local bb,lab=billboard(h,C.unknown,p.DisplayName)
-    playerFx[p]={h=highlight,bb=bb,lab=lab,part=h}
+    local label=make("TextLabel",playerTags,{
+      Name="Tag_"..tostring(p.UserId),AnchorPoint=Vector2.new(.5,1),
+      Position=UDim2.fromOffset(-400,-400),Size=UDim2.fromOffset(144,31),
+      BackgroundColor3=Color3.fromRGB(9,14,13),BackgroundTransparency=.34,
+      BorderSizePixel=0,Text=p.DisplayName,TextColor3=C.white,
+      Font=Enum.Font.GothamBold,TextSize=12,TextStrokeColor3=C.bg,
+      TextStrokeTransparency=.12,TextTruncate=Enum.TextTruncate.AtEnd,
+      TextWrapped=true,Visible=false,Active=false
+    })
+    corner(label,6)
+    playerFx[p]={h=highlight,lab=label,part=head,wantsLabel=false}
 end
 local function watchPlayer(p)
     if p==LocalPlayer then return end
@@ -1087,6 +1103,63 @@ if type(queueTeleport)=="function" then
         if st==Enum.TeleportState.Started then pcall(queueTeleport,rejoinSource) end
     end)
 end
+-- Arrange player labels in screen space to avoid overlap at long distances.
+-- When all nearby positions are occupied, farther labels are hidden temporarily.
+local tagRenderClock=0
+local tagOffsets={
+ {0,0},{0,-34},{0,34},{-85,-16},{85,-16},
+ {-85,20},{85,20},{0,-68},{0,68},{-165,-34},{165,-34},
+ {-165,36},{165,36},{-85,-67},{85,-67},{-85,70},{85,70}
+}
+listen(RunService.RenderStepped,function(dt)
+ if not alive then return end
+ tagRenderClock+=dt
+ if tagRenderClock<.055 then return end
+ tagRenderClock=0
+ local camera=Workspace.CurrentCamera
+ if not camera then return end
+ local viewport=camera.ViewportSize
+ local candidates={}
+ for p,fx in pairs(playerFx) do
+  if fx.lab and fx.lab.Parent then
+   fx.lab.Visible=false
+   if fx.wantsLabel and fx.part and fx.part.Parent then
+    local pos,onScreen=camera:WorldToViewportPoint(fx.part.Position+Vector3.new(0,1.6,0))
+    if onScreen and pos.Z>0 and pos.Z<=800 then
+     table.insert(candidates,{fx=fx,x=pos.X,y=pos.Y,distance=pos.Z})
+    end
+   end
+  end
+ end
+ table.sort(candidates,function(a,b) return a.distance<b.distance end)
+ local placed={}
+ local width,height=144,31
+ for _,entry in ipairs(candidates) do
+  local label=entry.fx.lab
+  for _,off in ipairs(tagOffsets) do
+   local x=math.floor(entry.x+off[1])
+   local y=math.floor(entry.y+off[2])
+   local left=x-width*.5
+   local top=y-height
+   if left>=3 and top>=5 and left+width<viewport.X-3 and y<viewport.Y-5 then
+    local overlap=false
+    for _,box in ipairs(placed) do
+     if left<box.right+6 and left+width+6>box.left and top<box.bottom+5 and y+5>box.top then
+      overlap=true
+      break
+     end
+    end
+    if not overlap then
+     label.Position=UDim2.fromOffset(x,y)
+     label.Visible=true
+     placed[#placed+1]={left=left,top=top,right=left+width,bottom=y}
+     break
+    end
+   end
+  end
+ end
+end)
+
 local lastFly,lastNoClip=false,false
 local accumulated=0
 listen(RunService.Heartbeat,function(dt)
@@ -1110,14 +1183,22 @@ listen(RunService.Heartbeat,function(dt)
         else
             nPlayer+=1
             local r=role(player)
-            local shown=state.players or state.killers
-            fx.bb.Enabled=shown and (r~="killer" and state.players or r=="killer" and state.killers)
-            fx.h.Enabled=fx.bb.Enabled
+            local shown=(r=="killer" and state.killers) or (r~="killer" and state.players)
+            fx.wantsLabel=shown
+            fx.h.Enabled=shown
             fx.h.OutlineColor=palette.players
-            -- Only role nickname colors differ; contour remains the selected white color.
-            -- Unknown roles are neutral white rather than incorrectly shown as killers.
+            -- Show one compact nickname instead of DisplayName plus repeated username.
+            local nickname=player.DisplayName
+            if nickname=="" then nickname=player.Name end
+            local maxChars=19
+            if utf8 and utf8.len and utf8.len(nickname) and utf8.len(nickname)>maxChars then
+                nickname=utf8.sub and utf8.sub(nickname,1,maxChars) or string.sub(nickname,1,maxChars)
+                nickname=nickname.."…"
+            elseif #nickname>25 then
+                nickname=string.sub(nickname,1,22).."…"
+            end
             fx.lab.TextColor3=r=="killer" and C.red or r=="survivor" and C.green or C.white
-            fx.lab.Text=player.DisplayName.." ["..player.Name.."]\n"..(my and fmtDistance(my.Position,fx.part.Position) or "?").." м"
+            fx.lab.Text=nickname.."\n"..(my and fmtDistance(my.Position,fx.part.Position) or "?").." м"
         end
     end
     for obj,fx in pairs(objectFx) do
