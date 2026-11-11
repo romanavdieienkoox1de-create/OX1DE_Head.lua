@@ -880,6 +880,15 @@ local function setTab(tab)
  subtitleLabel.Text=GameModules[tab].subtitle
  tween(selectedNav,{BackgroundColor3=tab=="violence_district" and C.darkgreen or C.card},.15)
  tween(warNav,{BackgroundColor3=tab=="warfare" and C.darkgreen or C.card},.15)
+ if tab=="warfare" then
+  -- Avoid two Highlights on the same model and reclaim inactive slots.
+  -- The old mode recreates its effects on demand when selected again.
+  for player,fx in pairs(playerFx) do
+   if fx.h then fx.h:Destroy() end
+   if fx.bb then fx.bb:Destroy() end
+   playerFx[player]=nil
+  end
+ end
 end
 listen(selectedNav.MouseButton1Click,function()setTab("violence_district")end)
 listen(warNav.MouseButton1Click,function()setTab("warfare")end)
@@ -959,7 +968,7 @@ local function clearPlayer(p)
     playerFx[p]=nil
 end
 local function addPlayer(p)
-    if p==LocalPlayer then return end
+    if p==LocalPlayer or activeTab~="violence_district" then return end
     clearPlayer(p)
     local ch=p.Character
     if not ch then return end
@@ -1375,9 +1384,12 @@ local function addWarfarePlayer(player)
  local character=player.Character
  local head=character and (character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart"))
  if not head then return nil end
- local highlight=make("Highlight",character,{
-  Name="OX1DE_WARFARE_Player",Adornee=character,
-  DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,FillTransparency=.78,
+ -- Put the Highlight outside the player's rig. This avoids nested
+ -- Highlight rendering conflicts and survives custom character hierarchy.
+ local highlight=make("Highlight",Workspace,{
+  Name="OX1DE_WARFARE_Player_"..tostring(player.UserId),
+  Adornee=character,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,
+  FillColor=C.white,FillTransparency=.42,
   OutlineColor=C.white,OutlineTransparency=0,Enabled=false
  })
  local bill,label=billboard(head,C.white,player.DisplayName)
@@ -1632,7 +1644,8 @@ listen(RunService.Heartbeat,function(dt)
   if player~=LocalPlayer then
    local kind=warfareTeamKind(player)
    local fx=warfarePlayers[player]
-   if fx and (fx.character~=player.Character or not fx.head.Parent) then
+   if fx and (fx.character~=player.Character or not fx.head.Parent
+      or not fx.highlight or not fx.highlight.Parent) then
     clearWarfarePlayer(player);fx=nil
    end
    local outlined=selected and (kind~=nil and state[kind] or false)
@@ -1740,7 +1753,8 @@ listen(RunService.Heartbeat,function(dt)
         else
             nPlayer+=1
             local r=role(player)
-            local shown=(r=="killer" and state.killers) or (r~="killer" and state.players)
+            local shown=activeTab=="violence_district" and
+              ((r=="killer" and state.killers) or (r~="killer" and state.players))
             fx.bb.Enabled=shown
             fx.h.Enabled=shown
             fx.h.OutlineColor=palette.players
@@ -1778,8 +1792,10 @@ listen(RunService.Heartbeat,function(dt)
             if fx.kind=="pumpkins" then nPumpkin+=1 elseif fx.kind=="generators" then nGenerator+=1 end
         end
     end
-    for _,p in ipairs(Players:GetPlayers()) do
-        if p~=LocalPlayer and p.Character and not playerFx[p] then addPlayer(p) end
+    if activeTab=="violence_district" then
+        for _,p in ipairs(Players:GetPlayers()) do
+            if p~=LocalPlayer and p.Character and not playerFx[p] then addPlayer(p) end
+        end
     end
     if foundText and foundText.Parent then
         foundText.Text=string.format("Найдено: игроков %d  •  генераторов %d  •  тыкв %d",nPlayer,nGenerator,nPumpkin)
