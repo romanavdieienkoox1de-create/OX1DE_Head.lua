@@ -767,6 +767,7 @@ listen(pickerX.MouseButton1Click,function() pickerLayer.Visible=false end)
 
 -- WARFARE shared declarations
 local warFovCircle,warFovStroke,warStatus,warAimStatus
+auxUI.previewFov=false
 local warfareCleanup
 do -- WARFARE UI scoped
 -- WARFARE: separate profile, preserving all original Violence District controls.
@@ -814,7 +815,7 @@ local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDi
 local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,495),CanvasSize=UDim2.fromOffset(0,425),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
- local w=isMain and 398 or 322
+ local w=parent==escroll and 322 or 398
  local row=make("TextButton",parent,{Position=UDim2.fromOffset(5,y),Size=UDim2.fromOffset(w,74),Text="",BackgroundColor3=C.row,AutoButtonColor=false,BorderSizePixel=0})
  corner(row,10);hoverEffect(row)
  text(row,heading,UDim2.fromOffset(13,7),UDim2.fromOffset(230,27),14,true)
@@ -834,15 +835,59 @@ local function warRow(parent,y,key,heading,details,colorKey,binding)
  switch(row,key,x,41)
  listen(row.MouseButton1Click,function() toggle(key) end)
 end
-warRow(mscroll,0,"warAimPreview","AIM • наведение","Legit / Hard • бинд F10","warAim","warAim")
+warRow(mscroll,0,"warAimPreview","AIM • наведение","Выбор цели • бинд можно поменять","warAim","warAim")
 warRow(mscroll,82,"warFly","Fly","Полёт по WASD / Space",nil,"warFly")
 warRow(mscroll,164,"warNoClip","NoClip","Проход сквозь препятствия",nil,"warNoClip")
-warRow(mscroll,246,"warFov","FOV • круг","Цвет и радиус FOV","warFov")
-warRow(mscroll,328,"warWallCheck","Wall Check","Проверять препятствия")
-warRow(mscroll,410,"warTeamCheck","Team Check","Не выбирать своих тиммейтов")
-warRow(mscroll,492,"warHoldAim","AIM • удержание","ПКМ или ЛКМ при стрельбе")
-local aimModeRow=make("Frame",mscroll,{
- Position=UDim2.fromOffset(5,574),Size=UDim2.fromOffset(398,74),
+local aimSettingsButton=make("TextButton",mscroll,{
+ Position=UDim2.fromOffset(5,252),Size=UDim2.fromOffset(398,65),
+ Text="⚙   НАСТРОЙКИ AIM",TextSize=16,Font=Enum.Font.GothamBold,
+ BackgroundColor3=C.darkgreen,TextColor3=C.white,
+ BorderSizePixel=0,AutoButtonColor=false
+})
+corner(aimSettingsButton,14);border(aimSettingsButton,C.green,.2,1.4)
+text(mscroll,"FOV  •  Team Check  •  Wall Check  •  Legit / Hard",
+ UDim2.fromOffset(11,321),UDim2.fromOffset(389,27),11,false,C.muted)
+-- Expanded two-column AIM controls, matching the provided UI style.
+local aimPage=make("Frame",warContent,{
+ Position=UDim2.fromOffset(14,14),Size=UDim2.fromOffset(816,560),
+ BackgroundColor3=C.bg,BorderSizePixel=0,
+ ClipsDescendants=true,Visible=false,ZIndex=40
+})
+corner(aimPage,16);border(aimPage,C.green,.30,1)
+text(aimPage,"AIM   /   НАСТРОЙКИ",
+ UDim2.fromOffset(20,9),UDim2.fromOffset(530,35),20,true,C.white)
+local aimBack=make("TextButton",aimPage,{
+ Position=UDim2.fromOffset(670,10),Size=UDim2.fromOffset(126,36),
+ Text="← НАЗАД",TextColor3=C.white,TextSize=13,
+ Font=Enum.Font.GothamBold,BackgroundColor3=C.card,
+ AutoButtonColor=false,BorderSizePixel=0
+})
+corner(aimBack,10)
+local aimOptions=make("ScrollingFrame",aimPage,{
+ Position=UDim2.fromOffset(7,55),Size=UDim2.fromOffset(408,491),
+ BackgroundTransparency=1,CanvasSize=UDim2.fromOffset(0,487),
+ ScrollBarThickness=3,ScrollBarImageColor3=C.green,BorderSizePixel=0
+})
+local aimSliders=make("ScrollingFrame",aimPage,{
+ Position=UDim2.fromOffset(411,55),Size=UDim2.fromOffset(399,491),
+ BackgroundTransparency=1,CanvasSize=UDim2.fromOffset(0,627),
+ ScrollBarThickness=3,ScrollBarImageColor3=C.green,BorderSizePixel=0
+})
+listen(aimSettingsButton.MouseButton1Click,function()
+ aimPage.Visible=true
+ aimPage.Position=UDim2.fromOffset(34,14)
+ tween(aimPage,{Position=UDim2.fromOffset(14,14)},.24)
+end)
+listen(aimBack.MouseButton1Click,function()
+ aimPage.Visible=false
+ auxUI.previewFov=false
+end)
+warRow(aimOptions,0,"warFov","FOV • круг","Видимость круга и его цвет","warFov")
+warRow(aimOptions,82,"warWallCheck","Wall Check","Не выбирать цель за стеной")
+warRow(aimOptions,164,"warTeamCheck","Team Check","Не выбирать союзников")
+warRow(aimOptions,246,"warHoldAim","AIM • удержание","ПКМ или ЛКМ при стрельбе")
+local aimModeRow=make("Frame",aimOptions,{
+ Position=UDim2.fromOffset(5,328),Size=UDim2.fromOffset(398,74),
  BackgroundColor3=C.row,BorderSizePixel=0
 })
 corner(aimModeRow,10)
@@ -870,11 +915,15 @@ for key,button in pairs(modeButtons) do
  button.BackgroundColor3=key==warSettings.mode and C.darkgreen or C.card
  button.TextColor3=key==warSettings.mode and C.green or C.white
 end
+
+local aimHint=text(aimOptions,"LEGIT — плавно. HARD — сразу к ближайшей цели.",
+ UDim2.fromOffset(13,413),UDim2.fromOffset(382,48),11,false,C.muted)
+aimHint.TextWrapped=true
 -- Slider controls instead of plus/minus buttons. The values are display/
 -- selection preferences, not modifications to remote damage or projectiles.
 local warSliderState={dragging=false}
 local function warValue(y,key,title,unit,minV,maxV,step)
- local row=make("Frame",mscroll,{
+ local row=make("Frame",aimSliders,{
   Position=UDim2.fromOffset(5,y),Size=UDim2.fromOffset(398,73),
   BackgroundColor3=C.row,BorderSizePixel=0
  })
@@ -910,6 +959,7 @@ local function warValue(y,key,title,unit,minV,maxV,step)
   local alpha=math.clamp((x-slider.AbsolutePosition.X)/width,0,1)
   local raw=minV+alpha*(maxV-minV)
   warSettings[key]=math.clamp(math.floor(raw/step+.5)*step,minV,maxV)
+  if key=="fov" then auxUI.previewFov=true end
   render();scheduleSettingsSave()
  end
  listen(slider.InputBegan,function(input)
@@ -926,23 +976,35 @@ local function warValue(y,key,title,unit,minV,maxV,step)
  end)
  listen(UserInputService.InputEnded,function(input)
   if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
-   if warSliderState.dragging==key then warSliderState.dragging=false end
+   if warSliderState.dragging==key then
+    warSliderState.dragging=false
+    if key=="fov" then
+     task.delay(1,function()
+      if warSliderState.dragging~="fov" then auxUI.previewFov=false end
+     end)
+    end
+   end
   end
  end)
  render()
 end
-warValue(660,"fov","FOV • радиус"," px",20,400,5)
-warValue(739,"distance","Макс. дальность"," м",10,300,5)
-warValue(818,"prediction","Упреждение движения"," %",0,100,5)
-warValue(897,"smooth","Скорость Legit"," %",5,100,5)
-warValue(976,"drop","Поправка по дальности"," %",0,100,5)
+warValue(0,"fov","FOV • радиус"," px",20,400,5)
+warValue(79,"distance","Дальность захвата"," м",10,300,5)
+warValue(158,"prediction","Упреждение движения"," %",0,100,5)
+warValue(237,"smooth","LEGIT • скорость наведения"," %",5,100,5)
+warValue(316,"height","Высота прицела (- ниже)"," %",-100,100,5)
+warValue(395,"drop","Поправка падения пули"," %",0,100,5)
+local aimDropHint=text(aimSliders,
+ "LEGIT: 5% медленнее, 100% быстрее. Поправка падения пули поднимает прицел на дальних дистанциях. Начни с 0%.",
+ UDim2.fromOffset(12,486),UDim2.fromOffset(377,90),11,false,C.muted)
+aimDropHint.TextWrapped=true
 warRow(escroll,0,"warAllies","Союзники","Салатовая подсветка и контур","warAllies")
 warRow(escroll,82,"warEnemies","Противники","Красная подсветка и контур","warEnemies")
 warRow(escroll,164,"warNames","Никнеймы ESP","Цвет ника зависит от команды")
 warRow(escroll,246,"warWeapons","Оружие в руках","Показывать Tool у персонажа")
 warRow(escroll,328,"warFPV","FPV-дроны","Контур моделей дронов","warFPV")
 bindVisual("warFly");bindVisual("warNoClip");bindVisual("warAim")
-warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
+warFovCircle=make("Frame",gui,{Name="OX1DE_WarFOV",ZIndex=200,Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2),BackgroundTransparency=1,Visible=false,Active=false})
 corner(warFovCircle,1000)
 warFovStroke=border(warFovCircle,palette.warFov,.25,1.4)
 local function setTab(tab)
@@ -1609,7 +1671,7 @@ local function warfareTarget()
      local distanceFactor=math.clamp(range/300,0,2.5)
      local lead=part.Position+
        part.AssemblyLinearVelocity*(warSettings.prediction/100)*distanceFactor*.30+
-       Vector3.new(0,(warSettings.drop/100)*distanceFactor*distanceFactor*9,0)
+       Vector3.new(0,(warSettings.drop/100)*distanceFactor*distanceFactor*9+(warSettings.height/100)*1.2,0)
      local point,visible=cam:WorldToViewportPoint(lead)
      if visible and point.Z>0 then
       local xy=Vector2.new(point.X,point.Y)
@@ -1641,7 +1703,7 @@ end
 listen(RunService.RenderStepped,function()
  if not alive then return end
  local camera=Workspace.CurrentCamera
- local show=activeTab=="warfare" and state.warAimPreview and state.warFov and not isOpen
+ local show=(activeTab=="warfare" and state.warAimPreview and state.warFov and not isOpen) or auxUI.previewFov
  warFovCircle.Visible=show
  if not camera or not show then return end
  local size=camera.ViewportSize
@@ -1656,7 +1718,7 @@ listen(RunService.RenderStepped,function(delta)
  if warUpdateClock<.07 then return end
  warUpdateClock=0
  local isWar=activeTab=="warfare"
- local showFov=isWar and state.warAimPreview and state.warFov and not isOpen
+ local showFov=(isWar and state.warAimPreview and state.warFov and not isOpen) or auxUI.previewFov
  warFovCircle.Visible=showFov
  warFovCircle.Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2)
  warFovStroke.Color=palette.warFov
@@ -1711,7 +1773,7 @@ local registered=pcall(function()
   local distanceFactor=math.clamp(range/300,0,2.5)
   goal=head.Position+
    head.AssemblyLinearVelocity*(warSettings.prediction/100)*distanceFactor*.30+
-   Vector3.new(0,(warSettings.drop/100)*distanceFactor*distanceFactor*9,0)
+   Vector3.new(0,(warSettings.drop/100)*distanceFactor*distanceFactor*9+(warSettings.height/100)*1.2,0)
   warCurrentAimPoint=goal
   local dir=goal-cam.CFrame.Position
   if dir.Magnitude<.01 then return end
