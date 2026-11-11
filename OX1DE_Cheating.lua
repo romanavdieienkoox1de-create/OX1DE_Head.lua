@@ -1191,10 +1191,11 @@ listen(RunService.Heartbeat,function(dt)
             local nickname=player.DisplayName
             if nickname=="" then nickname=player.Name end
             local maxChars=19
-            if utf8 and utf8.len and utf8.len(nickname) and utf8.len(nickname)>maxChars then
-                nickname=utf8.sub and utf8.sub(nickname,1,maxChars) or string.sub(nickname,1,maxChars)
-                nickname=nickname.."…"
-            elseif #nickname>25 then
+            local chars=utf8 and utf8.len and utf8.len(nickname)
+            if chars and chars>maxChars then
+                local cut=utf8.offset(nickname,maxChars+1)
+                if cut then nickname=string.sub(nickname,1,cut-1).."…" end
+            elseif not chars and #nickname>25 then
                 nickname=string.sub(nickname,1,22).."…"
             end
             fx.lab.TextColor3=r=="killer" and C.red or r=="survivor" and C.green or C.white
