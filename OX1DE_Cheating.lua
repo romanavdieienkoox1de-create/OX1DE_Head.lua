@@ -33,7 +33,7 @@ local C={
 }
 local state={players=false,killers=false,generators=false,pumpkins=false,pallets=false,fly=false,noclip=false,autoSkill=false,
  warAllies=false,warEnemies=false,warNames=true,warWeapons=false,warFPV=false,
- warFly=false,warNoClip=false,warAimPreview=false,warFov=true,warWallCheck=true,warTeamCheck=true}
+ warFly=false,warNoClip=false,warAimPreview=false,warFov=true,warWallCheck=true,warTeamCheck=true,warHoldAim=true}
 local palette={players=Color3.fromRGB(255,255,255),killers=C.red,survivors=C.green,generators=C.cyan,pumpkins=C.orange,pallets=Color3.fromRGB(245,192,65),
  warAllies=Color3.fromRGB(119,255,48),warEnemies=Color3.fromRGB(255,67,81),warFPV=Color3.fromRGB(255,197,62),warFov=Color3.fromRGB(119,255,48),warAim=Color3.fromRGB(255,220,72)}
 -- Local, per-installation settings. No network sync is used.
@@ -60,9 +60,9 @@ if savedSettings then
   end
  end
 end
-local warSettings={fov=160,distance=50,prediction=0,hitChance=100}
+local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20}
 if savedSettings and type(savedSettings.warfare)=="table" then
- for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},hitChance={1,100}}) do
+ for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},smooth={5,100},drop={0,100}}) do
   local v=savedSettings.warfare[name]
   if type(v)=="number" then warSettings[name]=math.clamp(v,limits[1],limits[2]) end
  end
@@ -733,7 +733,7 @@ local wm=panel(warContent,UDim2.fromOffset(14,172),UDim2.fromOffset(444,402))
 local we=panel(warContent,UDim2.fromOffset(471,172),UDim2.fromOffset(359,402))
 text(wm,"Основные функции",UDim2.fromOffset(18,8),UDim2.fromOffset(370,33),19,true,C.white)
 text(we,"ESP • Подсветка",UDim2.fromOffset(18,8),UDim2.fromOffset(327,33),18,true,C.white)
-local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,885),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
+local mscroll=make("ScrollingFrame",wm,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(427,345),CanvasSize=UDim2.fromOffset(0,1010),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local escroll=make("ScrollingFrame",we,{Position=UDim2.fromOffset(8,46),Size=UDim2.fromOffset(342,345),CanvasSize=UDim2.fromOffset(0,425),ScrollBarThickness=3,ScrollBarImageColor3=C.green,BackgroundTransparency=1,BorderSizePixel=0})
 local function warRow(parent,y,key,heading,details,colorKey,binding)
  local isMain=parent==mscroll
@@ -757,12 +757,13 @@ local function warRow(parent,y,key,heading,details,colorKey,binding)
  switch(row,key,x,41)
  listen(row.MouseButton1Click,function() toggle(key) end)
 end
-warRow(mscroll,0,"warAimPreview","Silent Aim • цель","Визуальный выбор, не попадания","warAim","warAim")
+warRow(mscroll,0,"warAimPreview","AIM • наведение","ПКМ для плавного наведения на врага","warAim","warAim")
 warRow(mscroll,82,"warFly","Fly","Полёт по WASD / Space",nil,"warFly")
 warRow(mscroll,164,"warNoClip","NoClip","Проход сквозь препятствия",nil,"warNoClip")
 warRow(mscroll,246,"warFov","FOV • круг","Цвет и радиус FOV","warFov")
 warRow(mscroll,328,"warWallCheck","Wall Check","Проверять препятствия")
 warRow(mscroll,410,"warTeamCheck","Team Check","Не выбирать своих тиммейтов")
+warRow(mscroll,492,"warHoldAim","AIM • удержание ПКМ","Работает, пока зажата ПКМ")
 -- Slider controls instead of plus/minus buttons. The values are display/
 -- selection preferences, not modifications to remote damage or projectiles.
 local warSliderState={dragging=false}
@@ -824,10 +825,11 @@ local function warValue(y,key,title,unit,minV,maxV,step)
  end)
  render()
 end
-warValue(496,"fov","FOV • радиус"," px",20,400,5)
-warValue(575,"distance","Дальность цели"," м",10,300,5)
-warValue(654,"prediction","Prediction • метка"," %",0,100,5)
-warValue(733,"hitChance","Hit Chance • параметр UI"," %",1,100,1)
+warValue(578,"fov","FOV • радиус"," px",20,400,5)
+warValue(657,"distance","Дальность AIM"," м",10,300,5)
+warValue(736,"prediction","Упреждение • движение"," %",0,100,5)
+warValue(815,"smooth","Плавность камеры"," %",5,100,5)
+warValue(894,"drop","Поправка по дальности"," %",0,100,5)
 warRow(escroll,0,"warAllies","Союзники","Салатовая подсветка и контур","warAllies")
 warRow(escroll,82,"warEnemies","Противники","Красная подсветка и контур","warEnemies")
 warRow(escroll,164,"warNames","Никнеймы ESP","Цвет ника зависит от команды")
@@ -1437,7 +1439,7 @@ local function warfareTarget()
  local screen=cam.ViewportSize
  local center=Vector2.new(screen.X*.5,screen.Y*.5)
  local maxRange=warSettings.distance*3.57
- local best,bestPoint,bestDist=nil,nil,math.huge
+ local best,bestPoint,bestDist,bestAimPoint=nil,nil,math.huge,nil
  local ownTeam=warfareTeamKey(LocalPlayer)
  for _,player in ipairs(Players:GetPlayers()) do
   if player~=LocalPlayer and player.Character then
@@ -1451,7 +1453,14 @@ local function warfareTarget()
     local part=ch:FindFirstChild("Head") or ch:FindFirstChild("HumanoidRootPart")
     local hum=ch:FindFirstChildOfClass("Humanoid")
     if part and hum and hum.Health>0 and (ownRoot.Position-part.Position).Magnitude<=maxRange then
-     local lead=part.Position+part.AssemblyLinearVelocity*(warSettings.prediction/100*.18)
+     -- Roblox-only approximate correction; distance controls how far
+     -- movement lead and vertical aim offset shift the camera target.
+     -- Actual projectile physics vary per WARFARE weapon.
+     local range=(ownRoot.Position-part.Position).Magnitude
+     local distanceFactor=math.clamp(range/300,0,2.5)
+     local lead=part.Position+
+       part.AssemblyLinearVelocity*(warSettings.prediction/100)*distanceFactor*.30+
+       Vector3.new(0,(warSettings.drop/100)*distanceFactor*distanceFactor*9,0)
      local point,visible=cam:WorldToViewportPoint(lead)
      if visible and point.Z>0 then
       local xy=Vector2.new(point.X,point.Y)
@@ -1467,14 +1476,14 @@ local function warfareTarget()
         local hit=Workspace:Raycast(origin,ray,params)
         unobstructed=not hit or hit.Instance:IsDescendantOf(ch)
        end
-       if unobstructed then best,bestPoint,bestDist=player,xy,px end
+       if unobstructed then best,bestPoint,bestDist,bestAimPoint=player,xy,px,lead end
       end
      end
     end
    end
   end
  end
- return best,bestPoint,bestDist
+ return best,bestPoint,bestDist,bestAimPoint
 end
 -- FOV ring follows the viewport center; the value is the radius in pixels.
 listen(RunService.RenderStepped,function()
@@ -1488,6 +1497,7 @@ listen(RunService.RenderStepped,function()
  warFovCircle.Position=UDim2.fromOffset(size.X*.5,size.Y*.5)
 end)
 local warUpdateClock=0
+local warCurrentTarget,warCurrentAimPoint=nil,nil
 listen(RunService.RenderStepped,function(delta)
  if not alive then return end
  warUpdateClock+=delta
@@ -1500,10 +1510,14 @@ listen(RunService.RenderStepped,function(delta)
  warFovStroke.Color=palette.warFov
  warAimMark.TextColor3=palette.warAim
  warAimMark.Visible=false
- if not isWar or not state.warAimPreview then return end
- local target,position=warfareTarget()
+ if not isWar or not state.warAimPreview then
+  warCurrentTarget,warCurrentAimPoint=nil,nil
+  return
+ end
+ local target,position,_,goal=warfareTarget()
+ warCurrentTarget,warCurrentAimPoint=target,goal
  if warAimStatus and warAimStatus.Parent then
-  warAimStatus.Text=target and ("Цель: "..target.DisplayName.." • команда проверена") or "Цель: нет доступного противника"
+  warAimStatus.Text=target and ("AIM: "..target.DisplayName.." • "..(state.warHoldAim and "зажми ПКМ" or "наведение включено")) or "AIM: нет доступного противника"
  end
  if target and position then
   warAimMark.Text=target.DisplayName.."  •  ЦЕЛЬ"
@@ -1511,6 +1525,30 @@ listen(RunService.RenderStepped,function(delta)
   warAimMark.Visible=not isOpen
  end
 end)
+-- Run after Roblox's normal camera update so the AIM actually follows a
+-- visible avatar. It never fires weapons or changes game hit detection.
+local aimRenderName="OX1DE_WARFARE_AIM_"..tostring(LocalPlayer.UserId)
+local aimRenderEnabled=false
+local registered=pcall(function()
+ RunService:BindToRenderStep(aimRenderName,Enum.RenderPriority.Camera.Value+1,function(dt)
+  if not alive or isOpen or activeTab~="warfare" or not state.warAimPreview then return end
+  if state.warHoldAim and not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
+  local target,goal=warCurrentTarget,warCurrentAimPoint
+  if not target or not target.Character or not goal then return end
+  local cam=Workspace.CurrentCamera
+  if not cam then return end
+  local dir=goal-cam.CFrame.Position
+  if dir.Magnitude<.01 then return end
+  local aimFrame=CFrame.lookAt(cam.CFrame.Position,goal)
+  local alpha=math.clamp(dt*(1.5+warSettings.smooth*.20),0,1)
+  cam.CFrame=cam.CFrame:Lerp(aimFrame,alpha)
+ end)
+ aimRenderEnabled=true
+end)
+if not registered or not aimRenderEnabled then
+ warAimStatus.Text="AIM: управление камерой недоступно"
+end
+
 local warStatusClock=0
 listen(RunService.Heartbeat,function(dt)
  if not alive then return end
@@ -1594,6 +1632,7 @@ task.spawn(function()
 end)
 
 warfareCleanup=function()
+ pcall(function() RunService:UnbindFromRenderStep(aimRenderName) end)
  if warFovCircle then warFovCircle.Visible=false end
  if warAimMark then warAimMark.Visible=false end
  for player in pairs(warfarePlayers) do clearWarfarePlayer(player) end
