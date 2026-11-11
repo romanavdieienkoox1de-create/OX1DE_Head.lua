@@ -60,6 +60,11 @@ if savedSettings then
   end
  end
 end
+-- Keep the selected game profile across reruns on this device.
+if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.selectedTab=="violence_district") then
+ activeTab=savedSettings.selectedTab
+end
+local scheduleLegacyRefresh
 local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20,mode="legit"}
 if savedSettings and type(savedSettings.warfare)=="table" then
  for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},smooth={5,100},drop={0,100}}) do
@@ -238,7 +243,7 @@ end
 local savedVersion=0
 local function saveSettingsNow()
  if not settingsSupported or not alive then return end
- local snapshot={version=2,toggles={},colors={},keys={},warfare=warSettings}
+ local snapshot={version=3,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings}
  for name,value in pairs(state) do if type(value)=="boolean" then snapshot.toggles[name]=value end end
  for name,color in pairs(palette) do
   snapshot.colors[name]={math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5)}
@@ -874,24 +879,35 @@ corner(warFovCircle,1000)
 warFovStroke=border(warFovCircle,palette.warFov,.25,1.4)
 local function setTab(tab)
  if tab~="warfare" and tab~="violence_district" then return end
+ local changed=activeTab~=tab
  activeTab=tab
  content.Visible=tab=="violence_district"
  warContent.Visible=tab=="warfare"
  subtitleLabel.Text=GameModules[tab].subtitle
- tween(selectedNav,{BackgroundColor3=tab=="violence_district" and C.darkgreen or C.card},.15)
- tween(warNav,{BackgroundColor3=tab=="warfare" and C.darkgreen or C.card},.15)
+ tween(selectedNav,{BackgroundColor3=tab=="violence_district" and C.darkgreen or C.card},.22)
+ tween(warNav,{BackgroundColor3=tab=="warfare" and C.darkgreen or C.card},.22)
  if tab=="warfare" then
-  -- Avoid two Highlights on the same model and reclaim inactive slots.
-  -- The old mode recreates its effects on demand when selected again.
+  -- Destroy unused legacy highlights and labels immediately.
   for player,fx in pairs(playerFx) do
    if fx.h then fx.h:Destroy() end
    if fx.bb then fx.bb:Destroy() end
    playerFx[player]=nil
   end
+  for obj,fx in pairs(objectFx) do
+   if fx.h then fx.h:Destroy() end
+   if fx.bb then fx.bb:Destroy() end
+   objectFx[obj]=nil
+  end
+ elseif scheduleLegacyRefresh then
+  task.defer(function()
+   if alive and activeTab=="violence_district" then scheduleLegacyRefresh() end
+  end)
  end
+ if changed then scheduleSettingsSave() end
 end
 listen(selectedNav.MouseButton1Click,function()setTab("violence_district")end)
 listen(warNav.MouseButton1Click,function()setTab("warfare")end)
+setTab(activeTab)
 
 end -- WARFARE UI scoped
 
@@ -1024,7 +1040,7 @@ local function addObject(obj,kind)
         end
     end
     local color=palette[kind]
-    local h=make("Highlight",obj,{Name="OX1DE_Object",Adornee=obj,FillColor=color,FillTransparency=kind=="pallets" and .93 or .66,OutlineColor=color,OutlineTransparency=0,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=state[kind]})
+    local h=make("Highlight",obj,{Name="OX1DE_Object",Adornee=obj,FillColor=color,FillTransparency=kind=="pallets" and .93 or .66,OutlineColor=color,OutlineTransparency=0,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=activeTab=="violence_district" and state[kind]})
     local labels={pumpkins="Тыква",generators="Генератор"}
     local bb,lab=billboard(part,color,kind=="pallets" and "" or (labels[kind] or "Объект"))
     if kind=="pallets" then
@@ -1033,6 +1049,7 @@ local function addObject(obj,kind)
         bb.MaxDistance=350
         lab.TextSize=12
     end
+    bb.Enabled=activeTab=="violence_district" and state[kind]
     objectFx[obj]={kind=kind,h=h,bb=bb,lab=lab,part=part}
     -- Safe test: no scene model cloning in the preview
 end
@@ -1042,7 +1059,7 @@ local function scanOne(obj)
 end
 local scanPending=false
 local function scanAll()
-    if scanPending or not (state.generators or state.pumpkins or state.pallets) then return end
+    if scanPending or activeTab~="violence_district" or not (state.generators or state.pumpkins or state.pallets) then return end
     scanPending=true
     task.spawn(function()
         local ok=pcall(function()
@@ -1058,12 +1075,13 @@ local function scanAll()
         scanPending=false
     end)
 end
+scheduleLegacyRefresh=scanAll
 onEspToggle=function(key,enabled)
- if enabled and (key=="generators" or key=="pumpkins" or key=="pallets") then scanAll() end
+ if enabled and activeTab=="violence_district" and (key=="generators" or key=="pumpkins" or key=="pallets") then scanAll() end
  if enabled and key=="warFPV" and warFpvStart then warFpvStart() end
 end
 listen(Workspace.DescendantAdded,function(obj)
-    if not alive or not (state.generators or state.pumpkins or state.pallets) then return end
+    if not alive or activeTab~="violence_district" or not (state.generators or state.pumpkins or state.pallets) then return end
     if category(obj) then scanOne(obj) end
     if obj.Parent and category(obj.Parent) then scanOne(obj.Parent) end
 end)
@@ -1777,8 +1795,8 @@ listen(RunService.Heartbeat,function(dt)
         if inactive(obj,fx.kind) or not fx.part.Parent then
             clearObject(obj)
         else
-            fx.h.Enabled=state[fx.kind]
-            fx.bb.Enabled=state[fx.kind]
+            fx.h.Enabled=activeTab=="violence_district" and state[fx.kind]
+            fx.bb.Enabled=activeTab=="violence_district" and state[fx.kind]
             fx.h.FillColor=palette[fx.kind]
             fx.h.OutlineColor=palette[fx.kind]
             fx.lab.TextColor3=palette[fx.kind]
@@ -1811,7 +1829,7 @@ task.spawn(function()
             recoverGui()
             -- Changed map objects are normally discovered through DescendantAdded.
             -- A slow fallback scan handles streaming / reparented collections.
-            scanAll()
+            if activeTab=="violence_district" then scanAll() end
         end
     end
 end)
