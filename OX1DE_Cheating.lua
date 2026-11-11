@@ -1208,6 +1208,233 @@ if type(queueTeleport)=="function" then
         if st==Enum.TeleportState.Started then pcall(queueTeleport,rejoinSource) end
     end)
 end
+
+-- WARFARE local-world visualization: team, weapon and FPV outlines.
+local warfarePlayers,warfareDrones={},{}
+local function warfareTeamKey(player)
+ if not player then return nil end
+ if player.Team and not player.Neutral then return "T:"..player.Team.Name end
+ for _,key in ipairs({"TeamId","Faction","Side","Squad"}) do
+  local value=player:GetAttribute(key)
+  if type(value)=="number" or (type(value)=="string" and value~="") then
+   return key..":"..tostring(value)
+  end
+ end
+ return nil
+end
+local function warfareTeamKind(player)
+ local mine,theirs=warfareTeamKey(LocalPlayer),warfareTeamKey(player)
+ if mine and theirs then
+  return mine==theirs and "warAllies" or "warEnemies"
+ end
+ return nil
+end
+local function clearWarfarePlayer(player)
+ local fx=warfarePlayers[player]
+ if not fx then return end
+ if fx.highlight then fx.highlight:Destroy() end
+ if fx.billboard then fx.billboard:Destroy() end
+ warfarePlayers[player]=nil
+end
+local function addWarfarePlayer(player)
+ local character=player.Character
+ local head=character and (character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart"))
+ if not head then return nil end
+ local highlight=make("Highlight",character,{
+  Name="OX1DE_WARFARE_Player",Adornee=character,
+  DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,FillTransparency=1,
+  OutlineColor=C.white,OutlineTransparency=0,Enabled=false
+ })
+ local bill,label=billboard(head,C.white,player.DisplayName)
+ bill.MaxDistance=275
+ bill.Size=UDim2.fromOffset(180,41)
+ bill.StudsOffsetWorldSpace=Vector3.new(0,2.6,0)
+ bill.Enabled=false
+ label.TextSize=11
+ label.TextWrapped=true
+ local fx={character=character,head=head,highlight=highlight,billboard=bill,label=label}
+ warfarePlayers[player]=fx
+ return fx
+end
+local droneWords={"fpv","drone","uav","copter","quadrocopter","quadcopter","дрон","бпла","квадрокоптер"}
+local function isWarfareDrone(object)
+ if not object or not object:IsA("Model") then return false end
+ local name=string.lower(object.Name)
+ for _,word in ipairs(droneWords) do
+  if name:find(word,1,true) then return true end
+ end
+ return false
+end
+local function deadWarfareDrone(object)
+ if not object or not object:IsDescendantOf(Workspace) then return true end
+ if readFlag(object,{"Destroyed","IsDestroyed","Broken","Exploded"})==true then return true end
+ return partOf(object)==nil
+end
+local function addWarfareDrone(object)
+ if not alive or not state.warFPV or not isWarfareDrone(object)
+    or deadWarfareDrone(object) or warfareDrones[object] then return end
+ local parent=object.Parent
+ while parent and parent~=Workspace do
+  if isWarfareDrone(parent) then return end
+  parent=parent.Parent
+ end
+ warfareDrones[object]=make("Highlight",object,{
+  Name="OX1DE_WARFARE_FPV",Adornee=object,FillTransparency=1,
+  OutlineColor=palette.warFPV,OutlineTransparency=0,
+  DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=false
+ })
+end
+local warScanBusy=false
+warFpvStart=function()
+ if warScanBusy or not state.warFPV then return end
+ warScanBusy=true
+ task.spawn(function()
+  pcall(function()
+   for i,object in ipairs(Workspace:GetDescendants()) do
+    if not alive or not state.warFPV then break end
+    if isWarfareDrone(object) then addWarfareDrone(object) end
+    if i%96==0 then task.wait() end
+   end
+  end)
+  warScanBusy=false
+ end)
+end
+listen(Workspace.DescendantAdded,function(object)
+ if alive and state.warFPV and isWarfareDrone(object) then addWarfareDrone(object) end
+end)
+if state.warFPV then warFpvStart() end
+
+local warAimMark=make("TextLabel",gui,{
+ Name="OX1DE_WARFARE_Target",AnchorPoint=Vector2.new(.5,1),
+ Position=UDim2.fromOffset(-500,-500),Size=UDim2.fromOffset(176,27),
+ BackgroundColor3=Color3.fromRGB(22,24,26),BackgroundTransparency=.22,
+ TextColor3=palette.warEnemies,TextStrokeTransparency=.3,TextSize=12,
+ Font=Enum.Font.GothamBold,Text="",
+ BorderSizePixel=0,Visible=false,Active=false
+})
+corner(warAimMark,7)
+local function warfareTarget()
+ local cam=Workspace.CurrentCamera
+ local ownRoot=root()
+ if not cam or not ownRoot then return nil,nil,nil end
+ local screen=cam.ViewportSize
+ local center=Vector2.new(screen.X*.5,screen.Y*.5)
+ local maxRange=warSettings.distance*3.57
+ local best,bestPoint,bestDist=nil,nil,math.huge
+ local ownTeam=warfareTeamKey(LocalPlayer)
+ for _,player in ipairs(Players:GetPlayers()) do
+  if player~=LocalPlayer and player.Character then
+   local theirTeam=warfareTeamKey(player)
+   -- Never choose a known teammate, even if strict Team Check is disabled.
+   local friend=ownTeam~=nil and theirTeam~=nil and ownTeam==theirTeam
+   local allowed=not friend and (not state.warTeamCheck or
+       (ownTeam~=nil and theirTeam~=nil and ownTeam~=theirTeam))
+   if allowed then
+    local ch=player.Character
+    local part=ch:FindFirstChild("Head") or ch:FindFirstChild("HumanoidRootPart")
+    local hum=ch:FindFirstChildOfClass("Humanoid")
+    if part and hum and hum.Health>0 and (ownRoot.Position-part.Position).Magnitude<=maxRange then
+     local lead=part.Position+part.AssemblyLinearVelocity*(warSettings.prediction/100*.18)
+     local point,visible=cam:WorldToViewportPoint(lead)
+     if visible and point.Z>0 then
+      local xy=Vector2.new(point.X,point.Y)
+      local px=(xy-center).Magnitude
+      if px<=warSettings.fov and px<bestDist then
+       local unobstructed=true
+       if state.warWallCheck then
+        local origin=cam.CFrame.Position
+        local ray=lead-origin
+        local params=RaycastParams.new()
+        params.FilterType=Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances={LocalPlayer.Character}
+        local hit=Workspace:Raycast(origin,ray,params)
+        unobstructed=not hit or hit.Instance:IsDescendantOf(ch)
+       end
+       if unobstructed then best,bestPoint,bestDist=player,xy,px end
+      end
+     end
+    end
+   end
+  end
+ end
+ return best,bestPoint,bestDist
+end
+local warUpdateClock=0
+listen(RunService.RenderStepped,function(delta)
+ if not alive then return end
+ warUpdateClock+=delta
+ if warUpdateClock<.07 then return end
+ warUpdateClock=0
+ local isWar=activeTab=="warfare"
+ warAimMark.Visible=false
+ if not isWar or not state.warAimPreview then return end
+ local target,position=warfareTarget()
+ if target and position then
+  warAimMark.Text=target.DisplayName.."  •  ЦЕЛЬ"
+  warAimMark.Position=UDim2.fromOffset(position.X,position.Y-27)
+  warAimMark.Visible=not isOpen
+ end
+end)
+local warStatusClock=0
+listen(RunService.Heartbeat,function(dt)
+ if not alive then return end
+ warStatusClock+=dt
+ if warStatusClock<.24 then return end
+ warStatusClock=0
+ local selected=activeTab=="warfare"
+ local my=root()
+ local teamPlayers,otherPlayers,droneCount=0,0,0
+ for _,player in ipairs(Players:GetPlayers()) do
+  if player~=LocalPlayer then
+   local kind=warfareTeamKind(player)
+   local fx=warfarePlayers[player]
+   if fx and (fx.character~=player.Character or not fx.head.Parent) then
+    clearWarfarePlayer(player);fx=nil
+   end
+   local need=selected and (state.warWeapons or (kind and state[kind]))
+   if need and not fx then fx=addWarfarePlayer(player) end
+   if fx then
+    local show=selected and (state.warWeapons or (kind and state[kind]))
+    fx.billboard.Enabled=show and true or false
+    fx.highlight.Enabled=selected and (kind~=nil and state[kind] or false)
+    fx.highlight.OutlineColor=kind and palette[kind] or C.white
+    fx.label.TextColor3=kind and palette[kind] or C.white
+    if show then
+     local distance=my and fmtDistance(my.Position,fx.head.Position) or "?"
+     local nick=player.DisplayName
+     if #nick>24 then nick=string.sub(nick,1,21).."…" end
+     fx.label.Text=nick.." • "..tostring(distance).." м"
+     if state.warWeapons then
+      local tool=player.Character and player.Character:FindFirstChildOfClass("Tool")
+      fx.label.Text=fx.label.Text.."\n"..(tool and tool.Name or "Без оружия")
+     end
+    end
+   end
+   if kind=="warAllies" then teamPlayers+=1 elseif kind=="warEnemies" then otherPlayers+=1 end
+  end
+ end
+ for object,highlight in pairs(warfareDrones) do
+  if deadWarfareDrone(object) then
+   highlight:Destroy();warfareDrones[object]=nil
+  else
+   highlight.Enabled=selected and state.warFPV
+   highlight.OutlineColor=palette.warFPV
+   if highlight.Enabled then droneCount+=1 end
+  end
+ end
+ if selected then
+  local team=warfareTeamKey(LocalPlayer)
+  warStatus.Text=team and ("Команда: "..team.."  |  Союзники: "..teamPlayers.."  |  Противники: "..otherPlayers.."  |  FPV: "..droneCount)
+   or "Команда не определена: нужна проверка Place ID WARFARE"
+ end
+end)
+task.spawn(function()
+ while alive do
+  task.wait(18)
+  if alive and state.warFPV then warFpvStart() end
+ end
+end)
+
 -- BillboardGui follows character positions directly on every render frame.
 -- No on-screen repositioning or collision-offset hopping.
 local lastFly,lastNoClip=false,false
@@ -1305,6 +1532,11 @@ _G.OX1DE_CHEATING_STOP=function()
     for _,c in ipairs(connections) do c:Disconnect() end
     for p in pairs(playerFx) do clearPlayer(p) end
     for obj in pairs(objectFx) do clearObject(obj) end
+    for player in pairs(warfarePlayers) do clearWarfarePlayer(player) end
+    for object,highlight in pairs(warfareDrones) do
+     if highlight then highlight:Destroy() end
+     warfareDrones[object]=nil
+    end
     _G.OX1DE_CHEATING_STOP=nil
     _G.OX1DE_LOCAL_TOGGLE=nil
     if gui then gui:Destroy() end
