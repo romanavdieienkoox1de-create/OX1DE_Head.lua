@@ -106,6 +106,19 @@ local function gameplay()
 end
 -- Licensed Roblox library samples. Actual playback depends on audio permissions.
 local tracks={
+ -- New genres: music asset IDs listed on Roblox Creator Store.
+ {id="136932193331774",name="ROBLOX PHONK — Misutra",genre="Phonk"},
+ {id="125476440612900",name="67 KID PHONK — DRIFTGØD",genre="Phonk"},
+ {id="92733699101708",name="Pretty Rave Girl — Vilaxxs",genre="Synthwave"},
+ {id="14145621151",name="Emotional Damage — Phonk Vol. 1",genre="Phonk"},
+ {id="14145621445",name="Raven's Theme — Phonk Vol. 1",genre="Phonk"},
+ {id="14145626744",name="Unbreakable — Phonk Vol. 2",genre="Phonk"},
+ {id="1837116095",name="Vast Array — Synthwave",genre="Synthwave"},
+ {id="97684046608381",name="Cold Synthwave Style",genre="Electronic"},
+ {id="1836105293",name="Tender Tropical House — AXS",genre="House"},
+ {id="1846368080",name="Stadium Rave (A)",genre="Dance"},
+ {id="1837015626",name="Tokyo Drift",genre="Electronic"},
+ {id="9043887091",name="Lo-fi Chill",genre="Lo-fi"},
  {id="1837848642",name="Crystal Clear",genre="Electronic"},
  {id="1836842889",name="Solar Flares",genre="Electronic"},
  {id="1847853099",name="Robotic Dance C",genre="Dance"},
@@ -127,11 +140,15 @@ if cfg.quality=="potato" or cfg.quality=="standard" or cfg.quality=="ultra" then
 if type(cfg.aspect)=="string" then aspect=cfg.aspect end
 if type(cfg.volume)=="number" then volume=math.clamp(cfg.volume,0,100) end
 if type(cfg.tracks)=="table" and #cfg.tracks>0 then
- tracks={}
+ local existing={}
+ for _,item in ipairs(tracks) do existing[item.id]=true end
  for i,item in ipairs(cfg.tracks) do
   if i>120 then break end
   if type(item)=="table" and type(item.id)=="string" and item.id:match("^%d+$") and type(item.name)=="string" then
-   tracks[#tracks+1]={id=item.id,name=item.name:sub(1,75),genre=type(item.genre)=="string" and item.genre or "Roblox Audio"}
+   if not existing[item.id] then
+    tracks[#tracks+1]={id=item.id,name=item.name:sub(1,75),genre=type(item.genre)=="string" and item.genre or "Roblox Audio"}
+    existing[item.id]=true
+   end
   end
  end
 end
@@ -171,33 +188,18 @@ local function changeGraphics(preset)
  end
  local settingsOK=pcall(function()
   settings().Rendering.QualityLevel=({potato=Enum.QualityLevel.Level01,
-   standard=Enum.QualityLevel.Level05,ultra=Enum.QualityLevel.Level10})[preset]
+   standard=Enum.QualityLevel.Level05,ultra=Enum.QualityLevel.Level21})[preset]
  end)
  local lightingChanged=pcall(function()
-  Lighting.GlobalShadows=preset=="potato" and false or originalShadows
+  Lighting.GlobalShadows=preset=="potato" and false or (preset=="ultra" and true or originalShadows)
  end)
- if preset=="ultra" then
-  pcall(function()
-   local correction=Instance.new("ColorCorrectionEffect")
-   correction.Name="OX1DE_Preview_Colors"
-   correction.Contrast=.16
-   correction.Saturation=.17
-   correction.Brightness=.015
-   correction.Parent=Lighting
-   table.insert(activeFX,correction)
-   local bloom=Instance.new("BloomEffect")
-   bloom.Name="OX1DE_Preview_Bloom"
-   bloom.Intensity=.18
-   bloom.Size=18
-   bloom.Threshold=1.5
-   bloom.Parent=Lighting
-   table.insert(activeFX,bloom)
-  end)
- elseif preset=="potato" then
+ -- Ultra requests Roblox's highest permitted rendering quality, not an
+ -- artificial color filter. Only Potato uses optional lightweight color FX.
+ if preset=="potato" then
   pcall(function()
    local correction=Instance.new("ColorCorrectionEffect")
    correction.Name="OX1DE_Preview_LowColor"
-   correction.Saturation=-.12
+   correction.Saturation=-.1
    correction.Parent=Lighting
    table.insert(activeFX,correction)
   end)
@@ -536,7 +538,7 @@ local function renderQuality()
  for i,cfg in ipairs({
   {"potato","POTATO",T("Минимум теней","Less shadows")},
   {"standard",T("Стандарт","Standard"),T("Без доп. эффектов","No extra effects")},
-  {"ultra",T("Ультра","Ultra"),T("Свечение и цвета","Bloom + color")}
+  {"ultra",T("Ультра • MAX","Ultra • MAX"),T("Максимум Roblox","Roblox maximum")}
  }) do
   local id=cfg[1]
   local x=4+(i-1)*247
@@ -545,6 +547,7 @@ local function renderQuality()
   if selected then stroke(card,C.purple,.10,1.5) else stroke(card,C.alt,.6,1) end
   button(card,cfg[2],8,8,222,39,function()
    changeGraphics(id)
+   savePrefs()
    show("settings")
   end,selected,8)
   label(card,cfg[3],10,52,217,26,11,false,C.sub,true)
@@ -553,18 +556,20 @@ local function renderQuality()
  local status=label(result,graphicsMessage,13,6,705,45,13,false,C.sub)
  status.TextWrapped=true
  label(content,T("Соотношение сторон • справка","Aspect ratio • reference"),11,284,704,31,17,true)
- for i,opt in ipairs({"4:3","16:9","16:10","5:4","5:3","3:2","3:4"}) do
-  local b=button(content,opt,4+(i-1)*104,325,97,41,function()
-   aspect=opt;show("settings")
+ for i,opt in ipairs({"3:4","5:4","4:3","3:2","16:10","5:3","16:9","21:9","32:9"}) do
+  local col=(i-1)%5
+  local row=math.floor((i-1)/5)
+  local b=button(content,opt,4+col*148,325+row*47,141,40,function()
+   aspect=opt;savePrefs();show("settings")
   end,aspect==opt)
   if aspect~=opt then b.BackgroundColor3=C.panel end
  end
- local warn=block(content,4,383,734,68,Color3.fromRGB(56,27,41),10,6)
+ local warn=block(content,4,432,734,68,Color3.fromRGB(56,27,41),10,6)
  local msg=label(warn,T("Растянуть весь Roblox через Lua нельзя. ПК: Windows / драйвер. Телефон: недоступно.",
   "Lua cannot change full Roblox stretching. PC: Windows / GPU driver. Mobile: unavailable."),
   12,6,705,56,13,false,C.text)
  msg.TextWrapped=true
- content.CanvasSize=UDim2.fromOffset(0,468)
+ content.CanvasSize=UDim2.fromOffset(0,520)
 end
 local function startTrack(i)
  local track=tracks[i]
