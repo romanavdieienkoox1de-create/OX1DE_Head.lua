@@ -610,6 +610,10 @@ listen(UserInputService.InputBegan,function(input,handled)
  end
  if UserInputService:GetFocusedTextBox() then return end
  if key==keybind.menu then
+  if _G.OX1DE_SHELL_TOGGLE then
+   _G.OX1DE_SHELL_TOGGLE()
+   return
+  end
   -- A touch profile is opened by its floating launcher, never by a second
   -- desktop-menu shortcut. One shared window is used for both devices.
   if auxUI.deviceMode~="mobile" and _G.OX1DE_LOCAL_TOGGLE then
@@ -2419,15 +2423,48 @@ local function startDeviceChooser()
  isOpen=false
  window.Visible=false
 end
-local bootOk,bootError=pcall(startDeviceChooser)
-if not bootOk then
- -- Recover PC access on unexpected GUI API failure; never stay hidden.
- warn("[OX1DE] Device chooser unavailable: "..tostring(bootError))
- auxUI.deviceMode="pc"
+-- OX1DE launcher bridge: keep the proven game runtimes and binds in
+-- this file; offer safe controls to the separate, lightweight menu.
+local env=_G
+if type(getgenv)=="function" then
+ local ok,result=pcall(getgenv)
+ if ok and type(result)=="table" then env=result end
+end
+local shellMode=(_G.OX1DE_SHELL_MODE==true or env.OX1DE_SHELL_MODE==true)
+local bridge={
+ alive=function()return alive end,
+ setOption=setOption,
+ getOption=function(k)return state[k] end,
+ warSettings=warSettings,
+ keybind=keybind,
+ setTab=auxUI.activateTab,
+ getTab=function()return activeTab end,
+ save=scheduleSettingsSave,
+ saveNow=saveSettingsNow,
+ stop=function()
+  if type(_G.OX1DE_CHEATING_STOP)=="function" then
+   _G.OX1DE_CHEATING_STOP()
+  end
+ end
+}
+_G.OX1DE_BRIDGE=bridge
+env.OX1DE_BRIDGE=bridge
+if shellMode then
+ auxUI.deviceMode=UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and "mobile" or "pc"
+ stopMenuMouse()
  isOpen=false
  window.Visible=false
  resize()
- setVisible(true)
+else
+ local bootOk,bootError=pcall(startDeviceChooser)
+ if not bootOk then
+  warn("[OX1DE] Device chooser unavailable: "..tostring(bootError))
+  auxUI.deviceMode="pc"
+  isOpen=false
+  window.Visible=false
+  resize()
+  setVisible(true)
+ end
 end
 
 _G.OX1DE_CHEATING_STOP=function()
@@ -2442,6 +2479,8 @@ _G.OX1DE_CHEATING_STOP=function()
     for p in pairs(playerFx) do clearPlayer(p) end
     for obj in pairs(objectFx) do clearObject(obj) end
     if warfareCleanup then pcall(warfareCleanup) end
+    if _G.OX1DE_BRIDGE==bridge then _G.OX1DE_BRIDGE=nil end
+    if env.OX1DE_BRIDGE==bridge then env.OX1DE_BRIDGE=nil end
     _G.OX1DE_CHEATING_STOP=nil
     _G.OX1DE_LOCAL_TOGGLE=nil
     if gui then gui:Destroy() end
