@@ -2322,7 +2322,8 @@ end)
 local function startUnifiedLauncher()
  auxUI.deviceMode=(UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled) and "mobile" or "pc"
  -- Self-contained UI bundle (generated from OX1DE_Launcher_UI.lua).
- local source=[==[
+ -- Inline launcher module: no second loadstring / executor compiler dependency.
+ local factory=(function()
 -- OX1DE Launcher UI / client-only companion for OX1DE_Cheating.lua
 -- This file owns only the user interface. The original game's runtimes remain intact.
 return function(api)
@@ -2985,10 +2986,7 @@ return function(api)
  end
 end
 
-]==]
- local loader=loadstring(source)
- if type(loader)~="function" then error("OX1DE UI source did not compile") end
- local factory=loader()
+ end)()
  if type(factory)~="function" then error("OX1DE UI module did not return a function") end
  auxUI.launcherCleanup=factory({
   gui=gui,window=window,player=LocalPlayer,
@@ -3024,13 +3022,41 @@ end
 end
 local launcherOK,launcherError=pcall(startUnifiedLauncher)
 if not launcherOK then
- warn("[OX1DE] Unified launcher failed, restoring original menu: "..tostring(launcherError))
+ local reason=tostring(launcherError)
+ warn("[OX1DE] Unified launcher failed: "..reason)
  local shell=window:FindFirstChild("OX1DE_LauncherShell")
  if shell then shell:Destroy() end
+ -- Avoid silently showing the old dashboard. A visible diagnostic helps
+ -- identify any unsupported Roblox UI API or executor environment.
  for _,obj in ipairs(window:GetChildren()) do
-  if obj:IsA("GuiObject") then obj.Visible=true end
+  if obj:IsA("GuiObject") then obj.Visible=false end
  end
- if auxUI.activateTab then auxUI.activateTab(activeTab) end
+ local report=make("Frame",window,{
+  Name="OX1DE_Launcher_Error",
+  Position=UDim2.fromOffset(85,140),Size=UDim2.fromOffset(880,325),
+  BackgroundColor3=Color3.fromRGB(18,16,25),BorderSizePixel=0,Visible=true
+ })
+ corner(report,17);border(report,C.green,.16,1.5)
+ text(report,"OX1DE • Ошибка загрузки нового меню",
+  UDim2.fromOffset(23,20),UDim2.fromOffset(830,45),26,true,C.white)
+ local detail=text(report,reason,UDim2.fromOffset(22,75),
+  UDim2.fromOffset(834,175),16,false,Color3.fromRGB(255,165,170))
+ detail.TextWrapped=true
+ detail.TextTruncate=Enum.TextTruncate.None
+ local back=make("TextButton",report,{
+  Position=UDim2.fromOffset(22,265),Size=UDim2.fromOffset(835,45),
+  Text="ОТКРЫТЬ СТАРОЕ МЕНЮ",TextSize=15,Font=Enum.Font.GothamBold,
+  BackgroundColor3=C.card,TextColor3=C.white,BorderSizePixel=0
+ })
+ corner(back,10)
+ listen(back.MouseButton1Click,function()
+  report:Destroy()
+  for _,obj in ipairs(window:GetChildren()) do
+   if obj:IsA("GuiObject") then obj.Visible=true end
+  end
+  if auxUI.activateTab then auxUI.activateTab(activeTab) end
+ end)
+ stopMenuMouse()
  isOpen=false
  window.Visible=false
  resize()
