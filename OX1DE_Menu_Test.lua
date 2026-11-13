@@ -3,6 +3,7 @@
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local SoundService=game:GetService("SoundService")
+local Lighting=game:GetService("Lighting")
 local RunService=game:GetService("RunService")
 local p=Players.LocalPlayer
 if not p then error("OX1DE: LocalPlayer unavailable") end
@@ -73,14 +74,89 @@ local aspect="16:9"
 local language="ru"
 local previousGame=nil
 local history={}
+-- Licensed Roblox library samples. Actual playback depends on audio permissions.
 local tracks={
- {id="1837849285",name="Демо-аудио Roblox 1"},
- {id="1848183670",name="Демо-аудио Roblox 2"},
- {id="1843463175",name="Демо-аудио Roblox 3"}
+ {id="1837849285",name="Upbeat Electronica",genre="Electronic"},
+ {id="1848183670",name="Grandiose Fantasy",genre="Cinematic"},
+ {id="1843463175",name="Creepy Organ / Dungeon",genre="Atmosphere"},
+ {id="1837848642",name="Crystal Clear",genre="Electronic"},
+ {id="1836842889",name="Solar Flares",genre="Electronic"},
+ {id="1847853099",name="Robotic Dance C",genre="Dance"},
+ {id="1841647093",name="Life in an Elevator",genre="Lounge"},
+ {id="1848354536",name="Relaxed Scene",genre="Ambient"}
 }
 local songIndex=1
 local musicEnabled=false
 local volume=65
+local musicMessage=""
+local activeFX={}
+local graphicsMessage="Выбери профиль графики"
+local originalShadows=Lighting.GlobalShadows
+local originalQuality=nil
+pcall(function()originalQuality=UserSettings():GetService("UserGameSettings").SavedQualityLevel end)
+local function clearFX()
+ for _,effect in ipairs(activeFX) do pcall(function()effect:Destroy()end) end
+ table.clear(activeFX)
+end
+local function changeGraphics(preset)
+ clearFX()
+ chosenQuality=preset
+ local requested=({potato=1,standard=5,ultra=10})[preset]
+ local qualityOk=false
+ if requested then
+  local attempted=pcall(function()
+   UserSettings():GetService("UserGameSettings").SavedQualityLevel=
+    Enum.SavedQualitySetting["QualityLevel"..requested]
+  end)
+  if attempted then
+   qualityOk=pcall(function()
+    local current=UserSettings():GetService("UserGameSettings").SavedQualityLevel
+    assert(current==Enum.SavedQualitySetting["QualityLevel"..requested])
+   end)
+  end
+ end
+ local settingsOK=pcall(function()
+  settings().Rendering.QualityLevel=({potato=Enum.QualityLevel.Level01,
+   standard=Enum.QualityLevel.Level05,ultra=Enum.QualityLevel.Level10})[preset]
+ end)
+ local lightingChanged=pcall(function()
+  Lighting.GlobalShadows=preset=="potato" and false or originalShadows
+ end)
+ if preset=="ultra" then
+  pcall(function()
+   local correction=Instance.new("ColorCorrectionEffect")
+   correction.Name="OX1DE_Preview_Colors"
+   correction.Contrast=.16
+   correction.Saturation=.17
+   correction.Brightness=.015
+   correction.Parent=Lighting
+   table.insert(activeFX,correction)
+   local bloom=Instance.new("BloomEffect")
+   bloom.Name="OX1DE_Preview_Bloom"
+   bloom.Intensity=.18
+   bloom.Size=18
+   bloom.Threshold=1.5
+   bloom.Parent=Lighting
+   table.insert(activeFX,bloom)
+  end)
+ elseif preset=="potato" then
+  pcall(function()
+   local correction=Instance.new("ColorCorrectionEffect")
+   correction.Name="OX1DE_Preview_LowColor"
+   correction.Saturation=-.12
+   correction.Parent=Lighting
+   table.insert(activeFX,correction)
+  end)
+ end
+ local visual=#activeFX>0 or lightingChanged
+ if qualityOk or settingsOK then
+  graphicsMessage="Уровень качества запрошен; эффекты применены локально"
+ elseif visual then
+  graphicsMessage="Локальные эффекты применены; Roblox запретил уровень качества"
+ else
+  graphicsMessage="Roblox не разрешил изменение. Меняй качество через Esc → Настройки"
+ end
+end
 local music=mk("Sound",SoundService,{
  Name="OX1DE_LocalMusicPreview",Volume=.65,Looped=false})
 local function T(ru,en) return language=="en" and en or ru end
