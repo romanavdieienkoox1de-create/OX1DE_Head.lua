@@ -100,7 +100,8 @@ return function(api)
  prime.BackgroundColor3=Color3.fromRGB(91,61,25)
  prime.TextColor3=C.yellow
  border(prime,C.yellow,.30,1)
- local hide=btn(header,"×",989,22,43,41,function()api.setVisible(false)end,false,z+7)
+ local hide=btn(header,"×",989,22,43,41,nil,false,z+7)
+ api.listen(hide.MouseButton1Click,function()api.setVisible(false)end)
  hide.TextSize=24
  local side=pane(shell,12,90,219,515,Color3.fromRGB(18,17,28),15,z+3)
  local nav={}
@@ -110,11 +111,13 @@ return function(api)
   {id="settings",ru="Настройки",en="Settings",icon="⚙",y=151},
   {id="telegram",ru="Телеграм",en="Telegram",icon="➤",y=216}}
  for _,item in ipairs(navItems) do
-  local b=btn(side,"",13,item.y,194,53,function()show(item.id)end,false,z+7)
+  local b=btn(side,"",13,item.y,194,53,nil,false,z+7)
+  api.listen(b.MouseButton1Click,function()show(item.id)end)
   nav[item.id]=b
  end
  pane(side,14,417,190,1,C.edge,nil,z+4)
- local exitButton=btn(side,"",13,443,194,53,function()show("exit")end,false,z+7)
+ local exitButton=btn(side,"",13,443,194,53,nil,false,z+7)
+ api.listen(exitButton.MouseButton1Click,function()show("exit")end)
  local pageTitle=lbl(shell,"",251,97,750,34,22,true)
  local pageCaption=lbl(shell,"",252,129,752,23,12,false,C.muted)
  local scroll=create(shell,"ScrollingFrame",{
@@ -125,7 +128,8 @@ return function(api)
   ZIndex=z+4})
  pane(shell,18,614,1015,1,C.edge,nil,z+4)
  local version=lbl(shell,"OX1DE  v0.4 • TEST",24,625,260,28,12,true,C.muted)
- local footer=btn(shell,"➤  t.me/playox1de",786,620,240,37,function()show("telegram")end,false,z+6)
+ local footer=btn(shell,"➤  t.me/playox1de",786,620,240,37,nil,false,z+6)
+ api.listen(footer.MouseButton1Click,function()show("telegram")end)
  local loading=pane(shell,0,0,1050,676,C.bg,26,z+20)
  loading.Visible=false
  lbl(loading,"OX1DE",0,181,1050,67,46,true,C.light,Enum.TextXAlignment.Center,z+22)
@@ -141,8 +145,10 @@ return function(api)
  lbl(confirmBox,T("Выключить OX1DE?","Exit OX1DE?"),25,22,435,48,25,true,C.light,nil,z+29)
  lbl(confirmBox,T("Скрипт и меню будут отключены до повторного запуска.",
    "The script and menu will stop until you run it again."),25,78,432,62,14,false,C.muted,nil,z+29).TextWrapped=true
- local cancel=btn(confirmBox,T("Отмена","Cancel"),23,172,208,51,function()confirm.Visible=false;show(currentGame and "game" or "scripts")end,false,z+30)
- local accept=btn(confirmBox,T("Подтвердить","Confirm"),249,172,208,51,function()api.stop()end,true,z+30)
+ local cancel=btn(confirmBox,T("Отмена","Cancel"),23,172,208,51,nil,false,z+30)
+ local accept=btn(confirmBox,T("Подтвердить","Confirm"),249,172,208,51,nil,true,z+30)
+ api.listen(cancel.MouseButton1Click,function()confirm.Visible=false;show(currentGame and "game" or "scripts")end)
+ api.listen(accept.MouseButton1Click,function()api.stop()end)
  local function store()
   api.uiData.language=lang
   api.uiData.musicVolume=musicVolume
@@ -218,6 +224,7 @@ return function(api)
   for i,id in ipairs({"violence_district","warfare"}) do
    local y=7+(i-1)*171
    local card=pane(scroll,4,y,737,155,C.panel,14,z+5)
+   card.Name="GameCard_"..id
    border(card,C.violet,.39,1)
    local art=pane(card,15,14,115,125,Color3.fromRGB(12,8,22),12,z+6)
    lbl(art,id=="warfare" and "W" or "OX1DE",2,33,111,55,id=="warfare" and 40 or 22,true,C.light,Enum.TextXAlignment.Center,z+8)
@@ -413,30 +420,29 @@ return function(api)
   sound:Play()
  end
  local function renderMusic()
-  heading(T("Настройки • Музыка","Settings • Music"),
-   T("Звук слышен только на твоём клиенте","Audio plays only on your client"))
-  lbl(scroll,T("Локальный музыкальный плеер","Local music player"),7,8,598,34,19,true)
-  local toggle=btn(scroll,musicEnabled and T("■  Стоп","■  Stop") or T("▶  Включить","▶  Play"),564,5,177,46,function()
+  -- Called within Settings; preserve the single shared settings header/tabs.
+  lbl(scroll,T("Локальный музыкальный плеер","Local music player"),7,71,598,34,19,true)
+  local toggle=btn(scroll,musicEnabled and T("■  Стоп","■  Stop") or T("▶  Включить","▶  Play"),564,68,177,46,function()
    if musicEnabled then musicEnabled=false;sound:Pause() else
     if sound.SoundId~="" then musicEnabled=true;sound:Resume()
     else playTrack(musicIndex) end
    end
    show("settings")
   end,musicEnabled)
-  lbl(scroll,T("Громкость музыки","Music volume"),10,77,680,29,16,true)
-  sliderRow(T("Громкость музыки","Music volume"),"volume",0,100,5,"%",116,function()return musicVolume end,function(n)
+  lbl(scroll,T("Громкость музыки","Music volume"),10,135,680,29,16,true)
+  sliderRow(T("Громкость музыки","Music volume"),"volume",0,100,5,"%",175,function()return musicVolume end,function(n)
    musicVolume=n;sound.Volume=n/100;api.uiData.musicVolume=n
   end)
-  lbl(scroll,T("Roblox Audio ID (только доступные аудио)","Roblox Audio ID (permitted audio only)"),10,216,680,30,14,true)
+  lbl(scroll,T("Roblox Audio ID (только доступные аудио)","Roblox Audio ID (permitted audio only)"),10,273,680,30,14,true)
   local audioID=create(scroll,"TextBox",{
-   Position=UDim2.fromOffset(6,253),Size=UDim2.fromOffset(497,49),
+   Position=UDim2.fromOffset(6,310),Size=UDim2.fromOffset(497,49),
    BackgroundColor3=C.row,TextColor3=C.light,PlaceholderColor3=C.muted,
    PlaceholderText=T("Вставь числовой Audio ID","Enter numeric Audio ID"),
    Text="",TextSize=15,Font=Enum.Font.Gotham,
    ClearTextOnFocus=false,BorderSizePixel=0,ZIndex=z+7})
   corner(audioID,10)
-  local notice=lbl(scroll,"",6,314,730,31,12,false,C.muted)
-  btn(scroll,T("+  Добавить","+  Add"),518,253,224,49,function()
+  local notice=lbl(scroll,"",6,368,730,31,12,false,C.muted)
+  btn(scroll,T("+  Добавить","+  Add"),518,310,224,49,function()
    local id=audioID.Text:gsub("%D","")
    if #id<6 or #id>15 then
     notice.Text=T("Укажи числовой Roblox Audio ID.","Please enter a valid Roblox Audio ID.")
@@ -447,23 +453,23 @@ return function(api)
    store()
    show("settings")
   end,true)
-  btn(scroll,"◀◀",4,360,115,46,function()
+  btn(scroll,"◀◀",4,415,115,46,function()
    if #tracks>0 then playTrack((musicIndex-2)%#tracks+1);show("settings")end
   end)
-  btn(scroll,"▶ / ▌▌",128,360,140,46,function()
+  btn(scroll,"▶ / ▌▌",128,415,140,46,function()
    if musicEnabled then musicEnabled=false;sound:Pause()
    elseif sound.SoundId~="" then musicEnabled=true;sound:Resume()
    else playTrack(musicIndex) end
    show("settings")
   end,true)
-  btn(scroll,"▶▶",277,360,115,46,function()
+  btn(scroll,"▶▶",277,415,115,46,function()
    if #tracks>0 then playTrack(musicIndex%#tracks+1);show("settings")end
   end)
   local current=tracks[musicIndex]
-  lbl(scroll,current and current.name or T("Добавь трек по ID","Add a track by ID"),403,361,330,44,13,true,C.light)
-  lbl(scroll,T("Плейлист","Playlist"),8,432,660,31,18,true)
+  lbl(scroll,current and current.name or T("Добавь трек по ID","Add a track by ID"),403,415,330,44,13,true,C.light)
+  lbl(scroll,T("Плейлист","Playlist"),8,494,660,31,18,true)
   for i,item in ipairs(tracks) do
-   local y=468+(i-1)*62
+   local y=531+(i-1)*62
    local r=pane(scroll,4,y,739,55,C.row,9)
    lbl(r,item.name,13,5,468,41,14,true)
    btn(r,"▶",526,9,79,36,function()playTrack(i);show("settings")end,i==musicIndex and musicEnabled)
@@ -476,9 +482,9 @@ return function(api)
    end,false)
   end
   local warn=lbl(scroll,T("Песни Google напрямую не поддерживаются: Roblox требует разрешённый Audio ID.",
-   "Direct Google music streaming is unsupported. Roblox requires an allowed Audio ID."),9,469+#tracks*62,729,48,12,false,C.muted)
+   "Direct Google music streaming is unsupported. Roblox requires an allowed Audio ID."),9,532+#tracks*62,729,48,12,false,C.muted)
   warn.TextWrapped=true
-  scroll.CanvasSize=UDim2.fromOffset(0,math.max(660,529+#tracks*62))
+  scroll.CanvasSize=UDim2.fromOffset(0,math.max(710,592+#tracks*62))
  end
  local function renderSettings()
   heading(T("Настройки","Settings"),T("Графика, музыка и язык","Graphics, music and language"))
