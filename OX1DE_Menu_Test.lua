@@ -223,7 +223,7 @@ task.spawn(function()
  if ok and avatar.Parent then avatar.Image=img end
 end)
 local content=mk("ScrollingFrame",win,{
- Position=UDim2.fromOffset(235,94),Size=UDim2.fromOffset(754,466),
+ Position=UDim2.fromOffset(235,169),Size=UDim2.fromOffset(754,390),
  BackgroundTransparency=1,ScrollBarThickness=4,ScrollBarImageColor3=C.purple,
  BorderSizePixel=0,CanvasSize=UDim2.fromOffset(0,463),
  ScrollingDirection=Enum.ScrollingDirection.Y,ZIndex=4})
@@ -370,8 +370,8 @@ local function renderScripts()
   {id="warfare",symbol="W",category="TEAM • FPS"}}
  for i,entry in ipairs(defs) do
   local id=entry.id
-  local y=10+(i-1)*169
-  local r=block(content,4,y,734,154,C.panel,14,6)
+  local y=5+(i-1)*157
+  local r=block(content,4,y,734,145,C.panel,14,6)
   r.Name="GameCard_"..id
   stroke(r,C.purple,.52,1.1)
   mk("UIGradient",r,{Color=ColorSequence.new({
@@ -379,8 +379,8 @@ local function renderScripts()
    ColorSequenceKeypoint.new(.52,Color3.fromRGB(26,24,37)),
    ColorSequenceKeypoint.new(1,Color3.fromRGB(20,19,30))}),Rotation=0})
   cards[id]=r
-  local stripe=block(r,0,14,4,125,C.purple,2,7)
-  local art=block(r,14,15,115,124,Color3.fromRGB(15,12,26),11,7)
+  local stripe=block(r,0,12,4,120,C.purple,2,7)
+  local art=block(r,14,15,115,114,Color3.fromRGB(15,12,26),11,7)
   stroke(art,C.purple,.62,1)
   label(art,entry.symbol,0,14,115,76,57,true,C.text,true,9)
   label(art,"OX1DE",0,88,115,22,11,true,C.purple,true,9)
@@ -391,17 +391,17 @@ local function renderScripts()
   local primeTag=block(r,614,12,106,33,Color3.fromRGB(45,36,22),8,8)
   stroke(primeTag,C.yellow,.31,.9)
   label(primeTag,"♛ PRIME",0,4,106,23,13,true,C.yellow,true,9)
-  button(r,T("▶   ОТКРЫТЬ","▶   OPEN"),518,90,201,47,
+  button(r,T("▶   ОТКРЫТЬ","▶   OPEN"),518,84,201,46,
    function()launchGame(id)end,true,9)
  end
  local search=mk("TextBox",content,{
-  Position=UDim2.fromOffset(4,356),Size=UDim2.fromOffset(490,48),
+  Position=UDim2.fromOffset(4,322),Size=UDim2.fromOffset(490,45),
   BackgroundColor3=C.card,BorderSizePixel=0,
   PlaceholderColor3=C.sub,PlaceholderText=T("  Поиск по названию...","  Search games..."),
   ClearTextOnFocus=false,Text="",TextSize=15,TextColor3=C.text,
   Font=Enum.Font.Gotham,ZIndex=8})
  rounded(search,10)
- local note=label(content,"",4,412,727,31,12,false,C.sub)
+ local note=label(content,"",4,370,727,27,12,false,C.sub)
  local function filter(q)
   q=q:lower()
   local count=0
@@ -415,7 +415,7 @@ local function renderScripts()
    or T("Найдено профилей: ","Profiles found: ")..count
  end
  search:GetPropertyChangedSignal("Text"):Connect(function()filter(search.Text)end)
- button(content,T("⟳   ОБНОВИТЬ","⟳   REFRESH"),507,356,231,48,function()
+ button(content,T("⟳   ОБНОВИТЬ","⟳   REFRESH"),507,322,231,45,function()
   search.Text="";filter("")
   note.Text=T("Список обновлён • доступны 2 профиля","List refreshed • 2 profiles available")
  end,false)
