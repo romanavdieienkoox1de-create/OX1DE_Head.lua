@@ -167,7 +167,11 @@ local function setVisible(open)
 end
 restore.MouseButton1Click:Connect(function()setVisible(false)end)
 hide.MouseButton1Click:Connect(function()setVisible(false)end)
-balloon.MouseButton1Click:Connect(function()setVisible(true);show(current)end)
+local bubbleDragged=false
+balloon.MouseButton1Click:Connect(function()
+ if bubbleDragged then bubbleDragged=false;return end
+ setVisible(true);show(current)
+end)
 telegramFooter.MouseButton1Click:Connect(function()show("telegram")end)
 local closeConfirm=block(win,0,0,1000,620,Color3.fromRGB(10,8,18),nil,35)
 closeConfirm.BackgroundTransparency=.07
@@ -545,7 +549,7 @@ do
  balloon.InputBegan:Connect(function(i)
   if i.UserInputType==Enum.UserInputType.Touch or i.UserInputType==Enum.UserInputType.MouseButton1 then
    pressed=true;finger=i.UserInputType==Enum.UserInputType.Touch and i or nil
-   startInput=i.Position;startPosition=balloon.AbsolutePosition;moved=0
+   startInput=i.Position;startPosition=balloon.AbsolutePosition;moved=0;bubbleDragged=false
   end
  end)
  UIS.InputChanged:Connect(function(i)
@@ -555,6 +559,7 @@ do
   local delta=i.Position-startInput
   moved=math.max(moved,delta.Magnitude)
   if moved<8 then return end
+  bubbleDragged=true
   local camera=workspace.CurrentCamera
   local vp=camera and camera.ViewportSize or Vector2.new(1200,700)
   balloon.Position=UDim2.fromOffset(
