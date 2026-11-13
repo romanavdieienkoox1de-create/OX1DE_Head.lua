@@ -1,4 +1,4 @@
--- OX1DE AIM/ESP v0.2 visible FOV
+-- OX1DE AIM/ESP v0.4 visible FOV segments
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
@@ -16,6 +16,7 @@ local gui=Instance.new("ScreenGui")
 gui.Name="OX1DE_Head_Menu"
 gui.ResetOnSpawn=false
 gui.IgnoreGuiInset=true
+gui.DisplayOrder=950
 gui.Parent=localPlayer:WaitForChild("PlayerGui")
 local function connect(signal,fn)
  local c=signal:Connect(fn)
@@ -80,28 +81,37 @@ dragHit.Position=UDim2.fromOffset(0,-12)
 dragHit.Text=""
 dragHit.BackgroundTransparency=1
 dragHit.Parent=slider
-local fovCircle=Instance.new("Frame")
-fovCircle.Name="VisibleFOVCircle"
-fovCircle.AnchorPoint=Vector2.new(0.5,0.5)
-fovCircle.Position=UDim2.fromScale(0.5,0.5)
-fovCircle.Size=UDim2.fromOffset(fov*6,fov*6)
-fovCircle.BackgroundTransparency=1
-fovCircle.BorderSizePixel=0
-fovCircle.ZIndex=2
-fovCircle.Parent=gui
-Instance.new("UICorner",fovCircle).CornerRadius=UDim.new(1,0)
-local circleStroke=Instance.new("UIStroke")
-circleStroke.Thickness=2
-circleStroke.Color=Color3.fromRGB(190,135,255)
-circleStroke.Transparency=0.1
-circleStroke.Parent=fovCircle
+-- Visible FOV ring drawn as 72 explicit UI line segments
+local circleSegments={}
+for i=1,72 do
+ local segment=Instance.new("Frame")
+ segment.Name="FOV_Segment_"..i
+ segment.AnchorPoint=Vector2.new(0.5,0.5)
+ segment.BackgroundColor3=Color3.fromRGB(200,125,255)
+ segment.BackgroundTransparency=0
+ segment.BorderSizePixel=0
+ segment.ZIndex=100
+ segment.Parent=gui
+ circleSegments[i]=segment
+end
+local function updateCircle()
+ local radius=fov*3
+ local segmentLength=math.max(2,2*math.pi*radius/72+1)
+ for i,segment in ipairs(circleSegments) do
+  local angle=(i-0.5)*2*math.pi/72
+  segment.Visible=radius>0
+  segment.Size=UDim2.fromOffset(segmentLength,3)
+  segment.Position=UDim2.new(0.5,math.cos(angle)*radius,0.5,math.sin(angle)*radius)
+  segment.Rotation=math.deg(angle)+90
+ end
+end
 local function setFov(value)
  fov=math.clamp(math.floor(value+0.5),0,100)
  fovTitle.Text="FOV: "..fov.." / 100"
  fill.Size=UDim2.fromScale(fov/100,1)
- fovCircle.Size=UDim2.fromOffset(fov*6,fov*6)
- fovCircle.Visible=fov>0
+ updateCircle()
 end
+updateCircle()
 local dragging=false
 local function readSlider(x)
  if slider.AbsoluteSize.X>0 then
