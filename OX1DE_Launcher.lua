@@ -250,8 +250,8 @@ stroke(logo,C.text,.35,1)
 label(logo,"OX1DE",3,3,49,47,13,true,C.text,true,8)
 label(head,"OX1DE",81,8,320,35,27,true)
 label(head,"SCRIPT MENU",83,43,290,17,10,true,C.sub)
-local account=label(head,p.DisplayName,678,10,190,27,14,true)
-local username=label(head,"@"..p.Name,678,38,194,20,11,false,C.sub)
+local account=label(head,p.DisplayName,711,10,206,27,13,true)
+local username=label(head,"@"..p.Name,711,38,207,20,11,false,C.sub)
 local show
 local restore=button(head,"−",941,18,24,39,nil,false)
 local hide=button(head,"×",970,18,25,39,nil,false)
@@ -298,9 +298,9 @@ block(side,13,395,182,1,C.alt,nil,4)
 local leave=button(side,"⏻  "..T("Выход","Exit"),12,404,184,51,function()show("exit")end)
 -- HUD is embedded beside the minimize/close buttons, rather than floating
 -- above Roblox or covering the top-right of the launcher.
-local statsPanel=block(head,463,18,190,39,C.panel,10,9)
+local statsPanel=block(head,434,18,231,39,C.panel,10,9)
 stroke(statsPanel,C.purple,.5,1)
-local statsText=label(statsPanel,"",7,1,176,37,12,true,C.text,true,11)
+local statsText=label(statsPanel,"",7,1,217,37,12,true,C.text,true,11)
 statsPanel.Visible=fpsEnabled or pingEnabled
 local sampledFrames=0
 local elapsedStats=0
@@ -974,6 +974,8 @@ local function renderControls()
    609,12,111,43,function()
     if key=="fps" then fpsEnabled=not fpsEnabled
     else pingEnabled=not pingEnabled end
+    statsText.Text=""
+    statsPanel.Visible=win.Visible and (fpsEnabled or pingEnabled)
     savePrefs()
     show("settings")
    end,enabled)
