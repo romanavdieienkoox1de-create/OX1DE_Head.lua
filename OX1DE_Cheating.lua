@@ -69,10 +69,20 @@ if savedSettings then
   end
  end
 end
--- Keep the selected game profile across reruns on this device.
-if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.selectedTab=="violence_district" or savedSettings.selectedTab=="settings") then
+-- Keep the selected GAME profile even if the last open launcher page was Settings.
+-- Settings is a launcher view, not a third game profile.
+if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.selectedTab=="violence_district") then
  activeTab=savedSettings.selectedTab
+elseif savedSettings and savedSettings.lastGame=="warfare" then
+ activeTab="warfare"
 end
+auxUI.launcherData={
+ language=(savedSettings and type(savedSettings.uiData)=="table" and savedSettings.uiData.language) or "ru",
+ musicTracks=(savedSettings and type(savedSettings.uiData)=="table" and type(savedSettings.uiData.musicTracks)=="table" and savedSettings.uiData.musicTracks) or {},
+ musicVolume=(savedSettings and type(savedSettings.uiData)=="table" and savedSettings.uiData.musicVolume) or 70,
+ graphicsMode=(savedSettings and savedSettings.graphicsMode) or "medium",
+ history=(savedSettings and type(savedSettings.uiData)=="table" and type(savedSettings.uiData.history)=="table" and savedSettings.uiData.history) or {}
+}
 local scheduleLegacyRefresh
 local hideWarfareFx
 local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20,height=0,mode="legit"}
@@ -285,7 +295,7 @@ end
 local savedVersion=0
 local function saveSettingsNow()
  if not settingsSupported or not alive then return end
- local snapshot={version=6,selectedTab=activeTab,toggles={},colors={},keys={},warfare=warSettings,graphicsMode=auxUI.graphicsMode,compact=auxUI.compact}
+ local snapshot={version=7,selectedTab=activeTab,lastGame=activeTab,toggles={},colors={},keys={},warfare=warSettings,graphicsMode=auxUI.graphicsMode,compact=auxUI.compact,uiData=auxUI.launcherData}
  for name,value in pairs(state) do if type(value)=="boolean" then snapshot.toggles[name]=value end end
  for name,color in pairs(palette) do
   snapshot.colors[name]={math.floor(color.R*255+.5),math.floor(color.G*255+.5),math.floor(color.B*255+.5)}
@@ -658,6 +668,7 @@ local function setVisible(show)
  closeRevision+=1
  local revision=closeRevision
  isOpen=show
+ if not show and auxUI.onMenuClosing then pcall(auxUI.onMenuClosing) end
  if show then
   window.Visible=true
   window.BackgroundTransparency=.18
@@ -2306,124 +2317,53 @@ end)
 -- surfaces, but share the same working feature state and saved colours.
 -- One dashboard for PC, phones and tablets. Only the input scale differs.
 -- There is no duplicated mobile feature list or second mobile settings panel.
-local function startDeviceChooser()
- -- Black-and-white chooser; the game menu keeps its own theme.
- local boot=make("Frame",gui,{
-  Name="OX1DE_DeviceChoice",AnchorPoint=Vector2.new(.5,.5),
-  Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(490,156),
-  BackgroundColor3=Color3.fromRGB(17,17,17),
-  BorderSizePixel=0,ZIndex=180
- })
- corner(boot,20);border(boot,Color3.fromRGB(255,255,255),.24,1.3)
- local bootScale=make("UIScale",boot,{Scale=1})
- local function resizeChooser()
-  local cam=Workspace.CurrentCamera
-  if not cam then return end
-  local view=cam.ViewportSize
-  bootScale.Scale=math.min(1,(view.X-20)/490,(view.Y-20)/156)
- end
- resizeChooser()
- listen(Workspace:GetPropertyChangedSignal("CurrentCamera"),resizeChooser)
- local bootTitle=text(boot,"OX1DE",
-  UDim2.fromOffset(20,12),UDim2.fromOffset(450,39),24,true,Color3.fromRGB(255,255,255))
- bootTitle.ZIndex=181
- local pcChoice=make("TextButton",boot,{
-  Position=UDim2.fromOffset(20,64),Size=UDim2.fromOffset(216,67),
-  Text="ПК",BackgroundColor3=Color3.fromRGB(0,0,0),
-  TextColor3=Color3.fromRGB(255,255,255),
-  Font=Enum.Font.GothamBold,TextSize=22,
-  BorderSizePixel=0,AutoButtonColor=false,ZIndex=181
- })
- corner(pcChoice,13);border(pcChoice,Color3.fromRGB(255,255,255),.38,1.2)
- local mobileChoice=make("TextButton",boot,{
-  Position=UDim2.fromOffset(252,64),Size=UDim2.fromOffset(218,67),
-  Text="ТЕЛ",BackgroundColor3=Color3.fromRGB(0,0,0),
-  TextColor3=Color3.fromRGB(255,255,255),
-  Font=Enum.Font.GothamBold,TextSize=22,
-  BorderSizePixel=0,AutoButtonColor=false,ZIndex=181
- })
- corner(mobileChoice,13);border(mobileChoice,Color3.fromRGB(255,255,255),.38,1.2)
-
- -- Draggable button opens and closes the SAME main menu, not a second GUI.
- local bubble=make("TextButton",gui,{
-  Name="OX1DE_Floating",Position=UDim2.new(1,-68,.45,0),
-  Size=UDim2.fromOffset(52,52),BackgroundColor3=C.darkgreen,
-  Text="OX",TextColor3=C.white,Font=Enum.Font.GothamBold,
-  TextSize=17,BorderSizePixel=0,AutoButtonColor=false,
-  Active=true,Visible=false,ZIndex=190
- })
- corner(bubble,26);border(bubble,C.green,.05,1.7)
- local pointerDown=false
- local startFinger=nil
- local startBubble=nil
- local movedPixels=0
- local dragTouch=nil
- listen(bubble.InputBegan,function(input)
-  if input.UserInputType==Enum.UserInputType.Touch or
-     input.UserInputType==Enum.UserInputType.MouseButton1 then
-   pointerDown=true
-   startFinger=input.Position
-   startBubble=bubble.AbsolutePosition
-   movedPixels=0
-   dragTouch=(input.UserInputType==Enum.UserInputType.Touch) and input or nil
+-- Unified OX1DE launcher: a separate UI module with access to the original
+-- state, toggles, binds, and game-profile runtime. Same loader URL as before.
+local function startUnifiedLauncher()
+ auxUI.deviceMode=(UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled) and "mobile" or "pc"
+ local source=game:HttpGet("https://raw.githubusercontent.com/romanavdieienkoox1de-create/OX1DE_Head.lua/main/OX1DE_Launcher_UI.lua")
+ local loader=loadstring(source)
+ if type(loader)~="function" then error("OX1DE UI source did not compile") end
+ local factory=loader()
+ if type(factory)~="function" then error("OX1DE UI module did not return a function") end
+ auxUI.launcherCleanup=factory({
+  gui=gui,window=window,player=LocalPlayer,
+  make=make,corner=corner,border=border,listen=listen,
+  state=state,warSettings=warSettings,uiData=auxUI.launcherData,
+  save=scheduleSettingsSave,
+  setOption=setOption,
+  activateTab=auxUI.activateTab,
+  isAlive=function()return alive end,
+  isOpen=function()return isOpen end,
+  setVisible=setVisible,
+  onClose=function(callback)auxUI.onMenuClosing=callback end,
+  stop=function()
+   if type(_G.OX1DE_CHEATING_STOP)=="function" then _G.OX1DE_CHEATING_STOP() end
+  end,
+  graphicsMode=function(mode)
+   local quality=({low=Enum.QualityLevel.Level01,medium=Enum.QualityLevel.Level05,high=Enum.QualityLevel.Level10})[mode]
+   if not quality then return end
+   auxUI.graphicsMode=mode
+   local ok=pcall(function() settings().Rendering.QualityLevel=quality end)
+   if not ok then warn("[OX1DE] Roblox denied graphics quality change") end
+   scheduleSettingsSave()
   end
- end)
- listen(UserInputService.InputChanged,function(input)
-  if not pointerDown or not startFinger or not startBubble then return end
-  if dragTouch then
-   if input~=dragTouch then return end
-  elseif input.UserInputType~=Enum.UserInputType.MouseMovement then return end
-  local offset=input.Position-startFinger
-  movedPixels=math.max(movedPixels,offset.Magnitude)
-  if movedPixels<=6 then return end
-  local cam=Workspace.CurrentCamera
-  if not cam then return end
-  local viewport=cam.ViewportSize
-  local nextPosition=startBubble+offset
-  bubble.Position=UDim2.fromOffset(
-   math.clamp(nextPosition.X,0,math.max(0,viewport.X-52)),
-   math.clamp(nextPosition.Y,0,math.max(0,viewport.Y-52))
-  )
- end)
- listen(UserInputService.InputEnded,function(input)
-  if input.UserInputType==Enum.UserInputType.MouseButton1 or
-     (dragTouch and input==dragTouch) then
-   pointerDown=false
-   dragTouch=nil
-  end
- end)
- listen(bubble.MouseButton1Click,function()
-  if movedPixels>6 then movedPixels=0;return end
-  setVisible(not isOpen)
- end)
- listen(UserInputService.JumpRequest,function()
-  if auxUI.deviceMode=="mobile" then
-   auxUI.mobileJumpUntil=os.clock()+.22
-  end
- end)
- local function selectDevice(mode)
-  if not alive then return end
-  auxUI.deviceMode=mode
-  boot:Destroy()
-  isOpen=false
-  window.Visible=false
-  resize()
-  bubble.Visible=mode=="mobile"
-  -- All profile tabs, sliders, colors, keyboard binds and reset actions
-  -- are shared with the regular PC menu, so no functions are missing.
-  setVisible(true)
- end
- listen(pcChoice.MouseButton1Click,function() selectDevice("pc") end)
- listen(mobileChoice.MouseButton1Click,function() selectDevice("mobile") end)
- if isOpen then stopMenuMouse() end
+ })
+ if type(auxUI.launcherCleanup)~="function" then error("OX1DE UI cleanup handler missing") end
  isOpen=false
  window.Visible=false
+ resize()
+ setVisible(true)
 end
-local bootOk,bootError=pcall(startDeviceChooser)
-if not bootOk then
- -- Recover PC access on unexpected GUI API failure; never stay hidden.
- warn("[OX1DE] Device chooser unavailable: "..tostring(bootError))
- auxUI.deviceMode="pc"
+local launcherOK,launcherError=pcall(startUnifiedLauncher)
+if not launcherOK then
+ warn("[OX1DE] Unified launcher failed, restoring original menu: "..tostring(launcherError))
+ local shell=window:FindFirstChild("OX1DE_LauncherShell")
+ if shell then shell:Destroy() end
+ for _,obj in ipairs(window:GetChildren()) do
+  if obj:IsA("GuiObject") then obj.Visible=true end
+ end
+ if auxUI.activateTab then auxUI.activateTab(activeTab) end
  isOpen=false
  window.Visible=false
  resize()
@@ -2432,6 +2372,7 @@ end
 
 _G.OX1DE_CHEATING_STOP=function()
     saveSettingsNow()
+    if auxUI.launcherCleanup then pcall(auxUI.launcherCleanup);auxUI.launcherCleanup=nil end
     alive=false;state.fly=false;state.noclip=false;state.warFly=false;state.warNoClip=false;state.warAimPreview=false
     state.autoSkill=false
     stopFly();restore()
