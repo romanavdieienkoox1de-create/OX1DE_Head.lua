@@ -2441,6 +2441,10 @@ local bridge={
  getTab=function()return activeTab end,
  save=scheduleSettingsSave,
  saveNow=saveSettingsNow,
+ hideNative=function()
+  if isOpen then setVisible(false) end
+  window.Visible=false
+ end,
  stop=function()
   if type(_G.OX1DE_CHEATING_STOP)=="function" then
    _G.OX1DE_CHEATING_STOP()
