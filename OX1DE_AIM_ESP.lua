@@ -1,4 +1,4 @@
--- OX1DE AIM/ESP v0.4 visible FOV segments
+-- OX1DE AIM/ESP v0.5 red FOV, separate name and feet distance
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
@@ -70,7 +70,7 @@ Instance.new("UICorner",slider).CornerRadius=UDim.new(1,0)
 local fill=Instance.new("Frame")
 fill.Name="Fill"
 fill.Size=UDim2.fromScale(0.5,1)
-fill.BackgroundColor3=Color3.fromRGB(182,125,255)
+fill.BackgroundColor3=Color3.fromRGB(255,35,35)
 fill.BorderSizePixel=0
 fill.Parent=slider
 Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
@@ -87,7 +87,7 @@ for i=1,72 do
  local segment=Instance.new("Frame")
  segment.Name="FOV_Segment_"..i
  segment.AnchorPoint=Vector2.new(0.5,0.5)
- segment.BackgroundColor3=Color3.fromRGB(200,125,255)
+ segment.BackgroundColor3=Color3.fromRGB(255,35,35)
  segment.BackgroundTransparency=0
  segment.BorderSizePixel=0
  segment.ZIndex=100
@@ -137,7 +137,10 @@ closeBtn.Size=UDim2.new(1,-20,0,25)
 local function refreshESP()
  for _,h in pairs(highlights) do h:Destroy() end
  table.clear(highlights)
- for _,b in pairs(labels) do b:Destroy() end
+ for _,entry in pairs(labels) do
+  entry.name:Destroy()
+  entry.distance:Destroy()
+ end
  table.clear(labels)
  if not espOn then return end
  for _,p in ipairs(Players:GetPlayers()) do
@@ -152,24 +155,33 @@ local function refreshESP()
    h.Parent=gui
    highlights[p]=h
    local head=p.Character:FindFirstChild("Head")
-   if head then
-    local billboard=Instance.new("BillboardGui")
-    billboard.Name="OX1DE_Name_Distance"
-    billboard.Adornee=head
-    billboard.Size=UDim2.fromOffset(180,34)
-    billboard.StudsOffsetWorldSpace=Vector3.new(0,2.6,0)
-    billboard.AlwaysOnTop=true
-    billboard.Parent=gui
-    local txt=Instance.new("TextLabel")
-    txt.Name="Text"
-    txt.Size=UDim2.fromScale(1,1)
-    txt.BackgroundTransparency=1
-    txt.TextColor3=Color3.new(1,1,1)
-    txt.TextStrokeTransparency=0
-    txt.Font=Enum.Font.GothamBold
-    txt.TextSize=13
-    txt.Parent=billboard
-    labels[p]=billboard
+   local rootPart=p.Character:FindFirstChild("HumanoidRootPart")
+   if head and rootPart then
+    local function makeBillboard(name,adornee,offset)
+     local b=Instance.new("BillboardGui")
+     b.Name=name
+     b.Adornee=adornee
+     b.Size=UDim2.fromOffset(210,30)
+     b.StudsOffsetWorldSpace=offset
+     b.AlwaysOnTop=true
+     b.MaxDistance=100
+     b.Parent=gui
+     local t=Instance.new("TextLabel")
+     t.Name="Text"
+     t.Size=UDim2.fromScale(1,1)
+     t.BackgroundTransparency=1
+     t.TextColor3=Color3.new(1,1,1)
+     t.TextStrokeColor3=Color3.new(0,0,0)
+     t.TextStrokeTransparency=0
+     t.Font=Enum.Font.GothamBold
+     t.TextSize=14
+     t.Parent=b
+     return b,t
+    end
+    local nameBoard,nameText=makeBillboard("OX1DE_Name",head,Vector3.new(0,2.6,0))
+    nameText.Text=p.DisplayName.." (@"..p.Name..")"
+    local distanceBoard,distanceText=makeBillboard("OX1DE_FeetDistance",rootPart,Vector3.new(0,-3.1,0))
+    labels[p]={name=nameBoard,distance=distanceBoard,distanceText=distanceText}
    end
   end
  end
@@ -195,19 +207,18 @@ for _,p in ipairs(Players:GetPlayers()) do
 end
 connect(Players.PlayerRemoving,function(p)
  if highlights[p] then highlights[p]:Destroy(); highlights[p]=nil end
- if labels[p] then labels[p]:Destroy(); labels[p]=nil end
+ if labels[p] then labels[p].name:Destroy(); labels[p].distance:Destroy(); labels[p]=nil end
 end)
 connect(RunService.RenderStepped,function()
  if espOn and localPlayer.Character then
   local root=localPlayer.Character:FindFirstChild("HumanoidRootPart")
-  for p,b in pairs(labels) do
+  for p,entry in pairs(labels) do
    local target=p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-   local txt=b:FindFirstChild("Text")
-   if txt then
-    local meters=root and target and math.floor((root.Position-target.Position).Magnitude+0.5) or nil
-    b.Enabled=meters~=nil and meters<=100
-    txt.Text=p.DisplayName.." (@"..p.Name..") | "..(meters and (meters.." studs") or "?")
-   end
+   local distance=root and target and math.floor((root.Position-target.Position).Magnitude+0.5) or nil
+   local near=distance~=nil and distance<=100
+   entry.name.Enabled=near
+   entry.distance.Enabled=near
+   entry.distanceText.Text=distance and (distance.." studs") or ""
   end
  end
  if not aimOn or fov==0 then return end
@@ -235,7 +246,7 @@ end)
 _G.OX1DE_HEAD_CLEANUP=function()
  for _,c in ipairs(connections) do pcall(function() c:Disconnect() end) end
  for _,h in pairs(highlights) do pcall(function() h:Destroy() end) end
- for _,b in pairs(labels) do pcall(function() b:Destroy() end) end
+ for _,entry in pairs(labels) do pcall(function() entry.name:Destroy(); entry.distance:Destroy() end) end
  pcall(function() gui:Destroy() end)
  _G.OX1DE_HEAD_CLEANUP=nil
 end
