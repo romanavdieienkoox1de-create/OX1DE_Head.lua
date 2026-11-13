@@ -296,6 +296,32 @@ for i,item in ipairs(navSpec) do
 end
 block(side,13,395,182,1,C.alt,nil,4)
 local leave=button(side,"⏻  "..T("Выход","Exit"),12,404,184,51,function()show("exit")end)
+local statsPanel=block(gui,0,0,218,37,C.bg,10,51)
+statsPanel.AnchorPoint=Vector2.new(1,0)
+statsPanel.Position=UDim2.new(1,-10,0,11)
+statsPanel.BackgroundTransparency=.12
+stroke(statsPanel,C.purple,.45,1)
+local statsText=label(statsPanel,"",10,1,198,35,13,true,C.text,true,53)
+statsPanel.Visible=fpsEnabled or pingEnabled
+local sampledFrames=0
+local elapsedStats=0
+local lastFps=0
+local lastPing=0
+local statsConn=RunService.RenderStepped:Connect(function(dt)
+ if not alive then return end
+ statsPanel.Visible=fpsEnabled or pingEnabled
+ if not statsPanel.Visible then return end
+ sampledFrames+=1;elapsedStats+=dt
+ if elapsedStats<.7 then return end
+ lastFps=math.floor(sampledFrames/elapsedStats+.5)
+ elapsedStats=0;sampledFrames=0
+ local ok,seconds=pcall(function()return p:GetNetworkPing()end)
+ if ok and type(seconds)=="number" then lastPing=math.floor(seconds*1000+.5)end
+ local data={}
+ if fpsEnabled then data[#data+1]="FPS: "..lastFps end
+ if pingEnabled then data[#data+1]="PING: "..lastPing.." мс" end
+ statsText.Text=table.concat(data,"    |    ")
+end)
 local balloon=button(gui,"OX1DE",0,0,52,52,nil,true,45)
 balloon.BackgroundColor3=C.bg
 balloon.Position=UDim2.new(1,-68,.42,0)
@@ -344,6 +370,7 @@ local function shutdown()
  music:Stop();music:Destroy()
  if cameraConn then cameraConn:Disconnect() end
  if cameraChangeConn then cameraChangeConn:Disconnect() end
+ if statsConn then statsConn:Disconnect() end
  gui:Destroy()
 end
 button(confirmCard,T("Отмена","Cancel"),20,177,211,52,function()
@@ -908,17 +935,53 @@ local function renderLanguage()
  label(content,T("Выбор меняет основные надписи меню.","This changes the main menu labels."),
   10,252,720,42,14,false,C.sub)
 end
+local function renderControls()
+ label(content,T("Отображение и управление","Display and controls"),9,67,709,35,19,true)
+ local function option(titleText,desc,key,y)
+  local r=block(content,4,y,734,67,C.panel,11,6)
+  label(r,titleText,15,4,551,30,15,true)
+  label(r,desc,15,35,570,24,12,false,C.sub)
+  local enabled=key=="fps" and fpsEnabled or pingEnabled
+  button(r,enabled and T("ВКЛ","ON") or T("ВЫКЛ","OFF"),
+   609,12,111,43,function()
+    if key=="fps" then fpsEnabled=not fpsEnabled
+    else pingEnabled=not pingEnabled end
+    savePrefs()
+    show("settings")
+   end,enabled)
+ end
+ option(T("Счётчик FPS","FPS counter"),T("Показывать кадры в секунду","Show frames per second"),"fps",109)
+ option(T("Счётчик PING","Ping counter"),T("Показывать задержку сети","Show network latency"),"ping",184)
+ bindRow(T("Открыть / закрыть меню","Open / close menu"),"menu",268)
+ label(content,T("Клавиши для игровых функций","Game function keybinds"),
+  10,334,700,28,16,true)
+ bindRow("Fly", "fly",372)
+ bindRow("NoClip","noclip",437)
+ bindRow("WARFARE Fly","warFly",502)
+ bindRow("WARFARE NoClip","warNoClip",567)
+ bindRow("WARFARE AIM","warAim",632)
+ local hint=label(content,hasFiles and T("Настройки сохраняются на устройстве.",
+   "Settings are saved locally.") or T("Автосохранение недоступно. Параметры сохраняются только до перезапуска.",
+   "File saving unavailable. Settings reset after restart."),
+    10,706,720,49,12,false,C.sub)
+ hint.TextWrapped=true
+ content.CanvasSize=UDim2.fromOffset(0,770)
+end
 local function renderSettings()
- heading(T("Настройки","Settings"),T("Графика, музыка, язык","Graphics, music and language"))
+ heading(T("Настройки","Settings"),
+  T("Графика, музыка, управление и язык","Graphics, music, controls and language"))
  for i,item in ipairs({{"graphics",T("Графика","Graphics")},
-  {"music",T("Музыка","Music")},{"language",T("Язык","Language")}}) do
+  {"music",T("Музыка","Music")},
+  {"controls",T("Управление","Controls")},
+  {"language",T("Язык","Language")}}) do
   local id=item[1]
-  panelTab(item[2],4+(i-1)*247,settingsTab==id,function()
+  panelTab(item[2],4+(i-1)*185,settingsTab==id,function()
    settingsTab=id;show("settings")
   end)
  end
  if settingsTab=="graphics" then renderQuality()
  elseif settingsTab=="music" then renderMusic()
+ elseif settingsTab=="controls" then renderControls()
  else renderLanguage() end
 end
 local function renderTelegram()
@@ -1003,7 +1066,24 @@ show=function(page)
 end
 -- Shift closes/reopens the menu without stopping this demo.
 local keyConn=UIS.InputBegan:Connect(function(input,processed)
- if not processed and input.KeyCode==Enum.KeyCode.RightShift then
+ if not alive then return end
+ if bindingTarget then
+  local target=bindingTarget
+  bindingTarget=nil
+  if input.KeyCode~=Enum.KeyCode.Unknown and input.KeyCode~=Enum.KeyCode.Escape then
+   keyNames[target]=input.KeyCode.Name
+   local b=gameplay()
+   if b and b.keybind then
+    b.keybind[target]=input.KeyCode
+    if b.save then b.save() end
+   end
+   savePrefs()
+  end
+  show(current)
+  return
+ end
+ if UIS:GetFocusedTextBox() then return end
+ if not processed and input.KeyCode.Name==keyNames.menu then
   setVisible(not win.Visible)
   if win.Visible then show(current) end
  end
@@ -1018,6 +1098,7 @@ gui.Destroying:Connect(function()
  clearFX()
  pcall(function()Lighting.GlobalShadows=originalShadows end)
  if keyConn then keyConn:Disconnect() end
+ if statsConn then statsConn:Disconnect() end
  if cameraConn then cameraConn:Disconnect() end
  if cameraChangeConn then cameraChangeConn:Disconnect() end
  if music then pcall(function()music:Stop();music:Destroy()end)end
