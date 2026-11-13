@@ -41,6 +41,28 @@ local stuckClock=0
 local stepClock=0
 local lastThrottle=0
 local lastSteer=0
+local driveMode="seat"
+local keyboardFallbackTried=false
+local keyHeld={W=false,A=false,D=false}
+local virtualInput=nil
+pcall(function()virtualInput=game:GetService("VirtualInputManager")end)
+local function virtualKey(name,pressed)
+ if not virtualInput then return false end
+ if keyHeld[name]==pressed then return true end
+ local ok=pcall(function()
+  virtualInput:SendKeyEvent(pressed,Enum.KeyCode[name],false,game)
+ end)
+ if ok then keyHeld[name]=pressed end
+ return ok
+end
+local function releaseKeys()
+ for name,pressed in pairs(keyHeld) do
+  if pressed then
+   pcall(function()virtualInput:SendKeyEvent(false,Enum.KeyCode[name],false,game)end)
+   keyHeld[name]=false
+  end
+ end
+end
 local status="Сядь на квадроцикл. Затем нажми «Записать»."
 local note="Маршрут вокруг озера: записывай береговую дорогу, не сокращая путь."
 local function listen(signal,callback)
@@ -169,6 +191,7 @@ local function releaseSeat(seat)
 end
 local function stopDrive(reason)
  driving=false
+ releaseKeys()
  lastThrottle=0
  lastSteer=0
  releaseSeat(driveSeat)
@@ -232,10 +255,6 @@ local function startDrive()
  if recording then endRecord() end
  local seat=seatOf()
  if not seat then setStatus("Для автоезды сначала сядь на квадроцикл.");return end
- if not seat:IsA("VehicleSeat") then
-  setStatus("У этой машины сиденье типа "..seat.ClassName..". Нужна адаптация управления.")
-  return
- end
  if #route<15 or routeDistance()<120 then
   setStatus("Сначала запиши маршрут вокруг озера и сохрани его.")
   return
@@ -253,10 +272,23 @@ local function startDrive()
  end
  driveSeat=seat
  driving=true
+ driveMode=seat:IsA("VehicleSeat") and "seat" or "keys"
+ keyboardFallbackTried=false
  currentIndex=2
  lastPosition=pos
  stuckClock=0
- setStatus("Тест автоезды запущен. Кнопка «Стоп» остановит управление.")
+ lastThrottle=0
+ lastSteer=0
+ if driveMode=="keys" then
+  keyboardFallbackTried=true
+  if not virtualKey("W",true) then
+   stopDrive("Trails использует нестандартное сиденье, эмуляция клавиш недоступна.")
+   return
+  end
+  setStatus("Пробую режим клавиш W/A/D для нестандартного транспорта...")
+ else
+  setStatus("Проверяю управление VehicleSeat. Если не поедет, проверю режим клавиш.")
+ end
  refresh()
 end
 local function showRoute()
@@ -304,10 +336,17 @@ runningConnection=listen(RunService.Heartbeat,function(dt)
  -- VehicleSeat steering and throttle may reset to zero every frame.
  -- Refresh the last safe command every heartbeat; navigate less often.
  if driving and driveSeat and driveSeat.Parent then
-  pcall(function()
-   driveSeat.ThrottleFloat=lastThrottle
-   driveSeat.SteerFloat=lastSteer
-  end)
+  if driveMode=="keys" then
+   local ok=virtualKey("W",true)
+   if ok then ok=virtualKey("A",lastSteer<-.22) end
+   if ok then ok=virtualKey("D",lastSteer>.22) end
+   if not ok then stopDrive("Эмуляция клавиш недоступна. Требуется управление Trails.") end
+  else
+   pcall(function()
+    driveSeat.ThrottleFloat=lastThrottle
+    driveSeat.SteerFloat=lastSteer
+   end)
+  end
  end
  stepClock+=dt
  if stepClock<.12 then return end
@@ -370,10 +409,23 @@ runningConnection=listen(RunService.Heartbeat,function(dt)
       local moved=distance2d(pos,lastPosition or pos)
       if moved<1.1 then stuckClock+=delta else stuckClock=0 end
       lastPosition=pos
-      if stuckClock>7 then
-       stopDrive("Нет движения: управление квадроцикла несовместимо или он застрял.")
+      if stuckClock>3 and driveMode=="seat" and not keyboardFallbackTried then
+       keyboardFallbackTried=true
+       if virtualKey("W",true) then
+        driveMode="keys"
+        stuckClock=0
+        setStatus("VehicleSeat не двигает квадроцикл. Пробую управление W/A/D...")
+       else
+        stopDrive("Trails не реагирует на VehicleSeat. В этой среде ввод клавиш недоступен.")
+       end
+      elseif stuckClock>7 then
+       stopDrive(driveMode=="keys" and
+        "Клавиши отправлены, но квадроцикл не поехал. Нужно проверить управление в Trails." or
+        "VehicleSeat не двигает квадроцикл. Нужна адаптация управления Trails.")
       else
-       setStatus(string.format("Автоезда: точка %d/%d • до неё %.0f studs",currentIndex,#route,dist))
+       setStatus(string.format("Автоезда (%s): точка %d/%d • %.0f studs • скорость %.1f",
+        driveMode=="keys" and "клавиши" or "VehicleSeat",
+        currentIndex,#route,dist,seat.AssemblyLinearVelocity.Magnitude))
       end
      end
     end
@@ -387,6 +439,7 @@ local function stopAll()
  alive=false
  recording=false
  driving=false
+ releaseKeys()
  releaseSeat(driveSeat)
  cleanMarkers()
  for _,c in ipairs(connections) do pcall(function()c:Disconnect()end) end
@@ -445,6 +498,8 @@ local api={
    status=status,recording=recording,driving=driving,
    count=#route,length=routeDistance(),gap=gap,
    speed=math.floor(speedOptions[speedIndex]*100+.5),
+   mode=driving and (driveMode=="keys" and "Клавиши" or "VehicleSeat") or "Ожидание",
+   realSpeed=seat and math.floor(seat.AssemblyLinearVelocity.Magnitude*10+.5)/10 or 0,
    seat=seat and (seat.ClassName.." • "..seat.Name) or "Нет квадроцикла",
    waypoint=currentIndex,markers=#markers>0
   }
