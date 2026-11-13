@@ -7,6 +7,8 @@ if not localPlayer then return end
 if _G.OX1DE_HEAD_CLEANUP then pcall(_G.OX1DE_HEAD_CLEANUP) end
 local connections={}
 local highlights={}
+local labels={}
+local distanceConnection=nil
 local aimOn=false
 local espOn=false
 local fov=50
@@ -50,6 +52,8 @@ closeBtn.Size=UDim2.new(1,-20,0,25)
 local function refreshESP()
  for _,h in pairs(highlights) do h:Destroy() end
  table.clear(highlights)
+ for _,b in pairs(labels) do b:Destroy() end
+ table.clear(labels)
  if not espOn then return end
  for _,p in ipairs(Players:GetPlayers()) do
   if p~=localPlayer and p.Character then
@@ -62,6 +66,26 @@ local function refreshESP()
    h.OutlineColor=Color3.fromRGB(255,255,255)
    h.Parent=gui
    highlights[p]=h
+   local head=p.Character:FindFirstChild("Head")
+   if head then
+    local billboard=Instance.new("BillboardGui")
+    billboard.Name="OX1DE_Name_Distance"
+    billboard.Adornee=head
+    billboard.Size=UDim2.fromOffset(180,34)
+    billboard.StudsOffsetWorldSpace=Vector3.new(0,2.6,0)
+    billboard.AlwaysOnTop=true
+    billboard.Parent=gui
+    local txt=Instance.new("TextLabel")
+    txt.Name="Text"
+    txt.Size=UDim2.fromScale(1,1)
+    txt.BackgroundTransparency=1
+    txt.TextColor3=Color3.new(1,1,1)
+    txt.TextStrokeTransparency=0
+    txt.Font=Enum.Font.GothamBold
+    txt.TextSize=13
+    txt.Parent=billboard
+    labels[p]=billboard
+   end
   end
  end
 end
@@ -90,8 +114,20 @@ for _,p in ipairs(Players:GetPlayers()) do
 end
 connect(Players.PlayerRemoving,function(p)
  if highlights[p] then highlights[p]:Destroy(); highlights[p]=nil end
+ if labels[p] then labels[p]:Destroy(); labels[p]=nil end
 end)
 connect(RunService.RenderStepped,function()
+ if espOn and localPlayer.Character then
+  local root=localPlayer.Character:FindFirstChild("HumanoidRootPart")
+  for p,b in pairs(labels) do
+   local target=p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+   local txt=b:FindFirstChild("Text")
+   if txt then
+    local meters=root and target and math.floor((root.Position-target.Position).Magnitude+0.5) or nil
+    txt.Text=p.DisplayName.." (@"..p.Name..") | "..(meters and (meters.." studs") or "?")
+   end
+  end
+ end
  if not aimOn or fov==0 then return end
  local camera=workspace.CurrentCamera
  if not camera then return end
@@ -117,6 +153,7 @@ end)
 _G.OX1DE_HEAD_CLEANUP=function()
  for _,c in ipairs(connections) do pcall(function() c:Disconnect() end) end
  for _,h in pairs(highlights) do pcall(function() h:Destroy() end) end
+ for _,b in pairs(labels) do pcall(function() b:Destroy() end) end
  pcall(function() gui:Destroy() end)
  _G.OX1DE_HEAD_CLEANUP=nil
 end
