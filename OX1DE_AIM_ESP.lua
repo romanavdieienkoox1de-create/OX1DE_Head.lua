@@ -195,6 +195,7 @@ connect(RunService.RenderStepped,function()
    local txt=b:FindFirstChild("Text")
    if txt then
     local meters=root and target and math.floor((root.Position-target.Position).Magnitude+0.5) or nil
+    b.Enabled=meters~=nil and meters<=100
     txt.Text=p.DisplayName.." (@"..p.Name..") | "..(meters and (meters.." studs") or "?")
    end
   end
