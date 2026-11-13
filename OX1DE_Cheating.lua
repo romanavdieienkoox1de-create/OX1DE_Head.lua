@@ -17,6 +17,8 @@ local GameModules={
 }
 local activeTab="violence_district"
 local auxUI={}
+-- The launcher can suspend overlays without modifying saved gameplay toggles.
+auxUI.shellOverlaysVisible=true
 local ActiveGame=GameModules.violence_district
 local GENERATOR_PREVIEW_ASSET_ID = "" -- Roblox image asset ID; supply after uploading the provided screenshot
 
@@ -1397,7 +1399,7 @@ local function addObject(obj,kind)
         end
     end
     local color=palette[kind]
-    local h=make("Highlight",obj,{Name="OX1DE_Object",Adornee=obj,FillColor=color,FillTransparency=kind=="pallets" and .93 or .66,OutlineColor=color,OutlineTransparency=0,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=activeTab=="violence_district" and state[kind]})
+    local h=make("Highlight",obj,{Name="OX1DE_Object",Adornee=obj,FillColor=color,FillTransparency=kind=="pallets" and .93 or .66,OutlineColor=color,OutlineTransparency=0,DepthMode=Enum.HighlightDepthMode.AlwaysOnTop,Enabled=activeTab=="violence_district" and state[kind] and auxUI.shellOverlaysVisible})
     local labels={pumpkins="Тыква",generators="Генератор"}
     local bb,lab=billboard(part,color,kind=="pallets" and "" or (labels[kind] or "Объект"))
     if kind=="pallets" then
@@ -1406,7 +1408,7 @@ local function addObject(obj,kind)
         bb.MaxDistance=350
         lab.TextSize=12
     end
-    bb.Enabled=activeTab=="violence_district" and state[kind]
+    bb.Enabled=activeTab=="violence_district" and state[kind] and auxUI.shellOverlaysVisible
     objectFx[obj]={kind=kind,h=h,bb=bb,lab=lab,part=part}
     -- Safe test: no scene model cloning in the preview
 end
@@ -1983,7 +1985,8 @@ auxUI.aimDebugLabel=aimDebugLabel
 listen(RunService.RenderStepped,function()
  if not alive then return end
  local camera=Workspace.CurrentCamera
- local show=(activeTab=="warfare" and state.warAimPreview and state.warFov and not isOpen) or auxUI.previewFov
+ local show=auxUI.shellOverlaysVisible and
+  ((activeTab=="warfare" and state.warAimPreview and state.warFov and not isOpen) or auxUI.previewFov)
  warFovCircle.Visible=show
  if not camera or not show then return end
  local size=camera.ViewportSize
@@ -1998,11 +2001,12 @@ listen(RunService.RenderStepped,function(delta)
  if warUpdateClock<.07 then return end
  warUpdateClock=0
  local isWar=activeTab=="warfare"
- aimDebugLabel.Visible=auxUI.aimDebug and isWar
+ aimDebugLabel.Visible=auxUI.shellOverlaysVisible and auxUI.aimDebug and isWar
  if aimDebugLabel.Visible and not state.warAimPreview then
   aimDebugLabel.Text="AIM • выключен в основных функциях"
  end
- local showFov=(isWar and state.warAimPreview and state.warFov and not isOpen) or auxUI.previewFov
+ local showFov=auxUI.shellOverlaysVisible and
+   ((isWar and state.warAimPreview and state.warFov and not isOpen) or auxUI.previewFov)
  warFovCircle.Visible=showFov
  warFovCircle.Size=UDim2.fromOffset(warSettings.fov*2,warSettings.fov*2)
  warFovStroke.Color=palette.warFov
@@ -2031,7 +2035,7 @@ listen(RunService.RenderStepped,function(delta)
  if target and position then
   warAimMark.Text=target.DisplayName.."  •  ЦЕЛЬ"
   warAimMark.Position=UDim2.fromOffset(position.X,position.Y-27)
-  warAimMark.Visible=not isOpen
+  warAimMark.Visible=auxUI.shellOverlaysVisible and not isOpen
  end
 end)
 -- Run after Roblox's normal camera update so the AIM actually follows a
@@ -2096,7 +2100,7 @@ listen(RunService.Heartbeat,function(dt)
  warStatusClock+=dt
  if warStatusClock<.24 then return end
  warStatusClock=0
- local selected=activeTab=="warfare"
+ local selected=activeTab=="warfare" and auxUI.shellOverlaysVisible
  local my=root()
  local teamPlayers,otherPlayers,unknownPlayers,droneCount=0,0,0,0
  for _,player in ipairs(Players:GetPlayers()) do
@@ -2244,7 +2248,7 @@ listen(RunService.Heartbeat,function(dt)
         else
             nPlayer+=1
             local r=role(player)
-            local shown=activeTab=="violence_district" and
+            local shown=activeTab=="violence_district" and auxUI.shellOverlaysVisible and
               ((r=="killer" and state.killers) or (r~="killer" and state.players))
             fx.bb.Enabled=shown
             fx.h.Enabled=shown
@@ -2268,8 +2272,8 @@ listen(RunService.Heartbeat,function(dt)
         if inactive(obj,fx.kind) or not fx.part.Parent then
             clearObject(obj)
         else
-            fx.h.Enabled=activeTab=="violence_district" and state[fx.kind]
-            fx.bb.Enabled=activeTab=="violence_district" and state[fx.kind]
+            fx.h.Enabled=activeTab=="violence_district" and state[fx.kind] and auxUI.shellOverlaysVisible
+            fx.bb.Enabled=activeTab=="violence_district" and state[fx.kind] and auxUI.shellOverlaysVisible
             fx.h.FillColor=palette[fx.kind]
             fx.h.OutlineColor=palette[fx.kind]
             fx.lab.TextColor3=palette[fx.kind]
@@ -2433,6 +2437,22 @@ end
 local shellMode=(_G.OX1DE_SHELL_MODE==true or env.OX1DE_SHELL_MODE==true)
 local bridge={
  alive=function()return alive end,
+ setOverlaysVisible=function(visible)
+  auxUI.shellOverlaysVisible=visible~=false
+  if not auxUI.shellOverlaysVisible then
+   for _,fx in pairs(playerFx) do
+    if fx.h then fx.h.Enabled=false end
+    if fx.bb then fx.bb.Enabled=false end
+   end
+   for _,fx in pairs(objectFx) do
+    if fx.h then fx.h.Enabled=false end
+    if fx.bb then fx.bb.Enabled=false end
+   end
+   if hideWarfareFx then pcall(hideWarfareFx) end
+   if auxUI.aimDebugLabel then auxUI.aimDebugLabel.Visible=false end
+   if warFovCircle then warFovCircle.Visible=false end
+  end
+ end,
  setOption=setOption,
  getOption=function(k)return state[k] end,
  warSettings=warSettings,
