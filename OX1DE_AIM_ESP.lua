@@ -1,4 +1,4 @@
--- OX1DE AIM/ESP v0.1
+-- OX1DE AIM/ESP v0.2 visible FOV
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
@@ -15,6 +15,7 @@ local fov=50
 local gui=Instance.new("ScreenGui")
 gui.Name="OX1DE_Head_Menu"
 gui.ResetOnSpawn=false
+gui.IgnoreGuiInset=true
 gui.Parent=localPlayer:WaitForChild("PlayerGui")
 local function connect(signal,fn)
  local c=signal:Connect(fn)
@@ -23,7 +24,7 @@ local function connect(signal,fn)
 end
 local frame=Instance.new("Frame")
 frame.Name="Window"
-frame.Size=UDim2.fromOffset(260,180)
+frame.Size=UDim2.fromOffset(260,214)
 frame.Position=UDim2.new(0,30,0.35,0)
 frame.BackgroundColor3=Color3.fromRGB(18,18,24)
 frame.BorderSizePixel=0
@@ -46,8 +47,82 @@ local function makeButton(text,y)
 end
 local aimBtn=makeButton("AIM [E]: OFF",10)
 local espBtn=makeButton("ESP: OFF",52)
-local fovBtn=makeButton("FOV: 50 / 100  (click to set)",104)
-local closeBtn=makeButton("CLOSE",146)
+
+local fovTitle=Instance.new("TextLabel")
+fovTitle.Name="FOVValue"
+fovTitle.Size=UDim2.new(1,-20,0,23)
+fovTitle.Position=UDim2.fromOffset(10,97)
+fovTitle.TextColor3=Color3.new(1,1,1)
+fovTitle.BackgroundTransparency=1
+fovTitle.Font=Enum.Font.GothamSemibold
+fovTitle.TextSize=14
+fovTitle.Text="FOV: 50 / 100"
+fovTitle.Parent=frame
+local slider=Instance.new("Frame")
+slider.Name="FOVSlider"
+slider.Size=UDim2.new(1,-30,0,10)
+slider.Position=UDim2.fromOffset(15,129)
+slider.BackgroundColor3=Color3.fromRGB(68,68,80)
+slider.BorderSizePixel=0
+slider.Parent=frame
+Instance.new("UICorner",slider).CornerRadius=UDim.new(1,0)
+local fill=Instance.new("Frame")
+fill.Name="Fill"
+fill.Size=UDim2.fromScale(0.5,1)
+fill.BackgroundColor3=Color3.fromRGB(182,125,255)
+fill.BorderSizePixel=0
+fill.Parent=slider
+Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
+local dragHit=Instance.new("TextButton")
+dragHit.Name="FOVDrag"
+dragHit.Size=UDim2.new(1,0,1,24)
+dragHit.Position=UDim2.fromOffset(0,-12)
+dragHit.Text=""
+dragHit.BackgroundTransparency=1
+dragHit.Parent=slider
+local fovCircle=Instance.new("Frame")
+fovCircle.Name="VisibleFOVCircle"
+fovCircle.AnchorPoint=Vector2.new(0.5,0.5)
+fovCircle.Position=UDim2.fromScale(0.5,0.5)
+fovCircle.Size=UDim2.fromOffset(fov*6,fov*6)
+fovCircle.BackgroundTransparency=1
+fovCircle.BorderSizePixel=0
+fovCircle.ZIndex=2
+fovCircle.Parent=gui
+Instance.new("UICorner",fovCircle).CornerRadius=UDim.new(1,0)
+local circleStroke=Instance.new("UIStroke")
+circleStroke.Thickness=2
+circleStroke.Color=Color3.fromRGB(190,135,255)
+circleStroke.Transparency=0.1
+circleStroke.Parent=fovCircle
+local function setFov(value)
+ fov=math.clamp(math.floor(value+0.5),0,100)
+ fovTitle.Text="FOV: "..fov.." / 100"
+ fill.Size=UDim2.fromScale(fov/100,1)
+ fovCircle.Size=UDim2.fromOffset(fov*6,fov*6)
+ fovCircle.Visible=fov>0
+end
+local dragging=false
+local function readSlider(x)
+ if slider.AbsoluteSize.X>0 then
+  setFov((x-slider.AbsolutePosition.X)/slider.AbsoluteSize.X*100)
+ end
+end
+connect(dragHit.InputBegan,function(input)
+ if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+  dragging=true
+  readSlider(input.Position.X)
+ end
+end)
+connect(UIS.InputChanged,function(input)
+ if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
+  readSlider(input.Position.X)
+ end
+end)
+connect(UIS.InputEnded,function(input)
+ if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then dragging=false end
+end)
+local closeBtn=makeButton("CLOSE",170)
 closeBtn.Size=UDim2.new(1,-20,0,25)
 local function refreshESP()
  for _,h in pairs(highlights) do h:Destroy() end
@@ -98,10 +173,6 @@ connect(espBtn.MouseButton1Click,function()
  espOn=not espOn
  espBtn.Text="ESP: "..(espOn and "ON" or "OFF")
  refreshESP()
-end)
-connect(fovBtn.MouseButton1Click,function()
- fov=(fov+10)%110
- fovBtn.Text="FOV: "..fov.." / 100  (click to set)"
 end)
 connect(UIS.InputBegan,function(input,processed)
  if not processed and input.KeyCode==Enum.KeyCode.E and not UIS:GetFocusedTextBox() then toggleAim() end
