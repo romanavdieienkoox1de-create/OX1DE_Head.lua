@@ -206,6 +206,22 @@ local restore=button(head,"−",941,18,24,39,nil,false)
 local hide=button(head,"×",970,18,25,39,nil,false)
 restore.TextSize=20;hide.TextSize=22
 local side=block(win,12,87,208,475,C.head,15,3)
+-- Account block follows the compact OX1DE mockup; real Roblox avatar/name.
+local profile=block(side,9,9,190,82,C.panel,11,5)
+local avatar=mk("ImageLabel",profile,{
+ Position=UDim2.fromOffset(8,9),Size=UDim2.fromOffset(61,61),
+ BackgroundColor3=Color3.fromRGB(16,13,26),BorderSizePixel=0,
+ Image="",ScaleType=Enum.ScaleType.Crop,ZIndex=7})
+rounded(avatar,11);stroke(avatar,C.purple,.34,1)
+label(profile,p.DisplayName,77,13,105,26,13,true)
+label(profile,"@"..p.Name,77,35,106,19,10,false,C.sub)
+label(profile,T("В сети","Online"),77,57,102,15,10,true,C.green)
+task.spawn(function()
+ local ok,img=pcall(function()
+  return Players:GetUserThumbnailAsync(p.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size100x100)
+ end)
+ if ok and avatar.Parent then avatar.Image=img end
+end)
 local content=mk("ScrollingFrame",win,{
  Position=UDim2.fromOffset(235,94),Size=UDim2.fromOffset(754,466),
  BackgroundTransparency=1,ScrollBarThickness=4,ScrollBarImageColor3=C.purple,
@@ -225,10 +241,13 @@ local navSpec={
 local navFunction
 for i,item in ipairs(navSpec) do
  local id=item[1]
- nav[id]=button(side,item[2].."   "..item[3],12,12+(i-1)*62,184,49,function()show(id)end)
+ nav[id]=button(side,item[2].."    "..item[3],12,104+(i-1)*57,184,49,function()show(id)end)
 end
-block(side,13,379,182,1,C.alt,nil,4)
-local leave=button(side,"⏻  "..T("Выход","Exit"),12,397,184,55,function()show("exit")end)
+local primeSidebar=block(side,12,344,184,44,Color3.fromRGB(45,34,22),9,5)
+stroke(primeSidebar,C.yellow,.55,1)
+label(primeSidebar,"♛   PRIME",14,4,155,34,14,true,C.yellow)
+block(side,13,395,182,1,C.alt,nil,4)
+local leave=button(side,"⏻  "..T("Выход","Exit"),12,404,184,51,function()show("exit")end)
 local balloon=button(gui,"OX",0,0,52,52,nil,true,45)
 balloon.BackgroundColor3=C.bg
 balloon.Position=UDim2.new(1,-68,.42,0)
@@ -340,41 +359,62 @@ local function launchGame(id)
  end)
 end
 local function renderScripts()
- heading(T("Скрипты","Scripts"),T("Выбери профиль, чтобы открыть его меню","Select a game profile"))
+ heading(T("Скрипты","Scripts"),T("Список доступных игровых профилей OX1DE","Available OX1DE game profiles"))
  local cards={}
- for i,id in ipairs({"violence_district","warfare"}) do
-  local y=9+(i-1)*173
-  local r=block(content,4,y,729,158,C.panel,14,6)
-  stroke(r,C.purple,.52,1)
+ local defs={{id="violence_district",symbol="R",category="SURVIVAL • HORROR"},
+  {id="warfare",symbol="W",category="TEAM • FPS"}}
+ for i,entry in ipairs(defs) do
+  local id=entry.id
+  local y=10+(i-1)*169
+  local r=block(content,4,y,734,154,C.panel,14,6)
+  r.Name="GameCard_"..id
+  stroke(r,C.purple,.52,1.1)
+  mk("UIGradient",r,{Color=ColorSequence.new({
+   ColorSequenceKeypoint.new(0,Color3.fromRGB(38,28,57)),
+   ColorSequenceKeypoint.new(.52,Color3.fromRGB(26,24,37)),
+   ColorSequenceKeypoint.new(1,Color3.fromRGB(20,19,30))}),Rotation=0})
   cards[id]=r
-  local visual=block(r,13,13,123,131,Color3.fromRGB(13,9,26),12,7)
-  label(visual,id=="warfare" and "W" or "OX1DE",3,33,116,63,
-    id=="warfare" and 54 or 23,true,C.text,true,9)
-  label(r,nameFor(id),153,18,406,39,24,true)
-  label(r,T("Профиль игры OX1DE","OX1DE game profile"),153,58,388,25,13,false,C.sub)
-  local primeTag=button(r,"♛ PRIME",599,13,116,36,nil,false,9)
-  primeTag.TextColor3=C.yellow
-  primeTag.BackgroundColor3=Color3.fromRGB(62,45,25)
-  stroke(primeTag,C.yellow,.45,.8)
-  button(r,T("▶  Открыть","▶  Open"),483,96,231,47,function()launchGame(id)end,true,9)
+  local stripe=block(r,0,14,4,125,C.purple,2,7)
+  local art=block(r,14,15,115,124,Color3.fromRGB(15,12,26),11,7)
+  stroke(art,C.purple,.62,1)
+  label(art,entry.symbol,0,14,115,76,57,true,C.text,true,9)
+  label(art,"OX1DE",0,88,115,22,11,true,C.purple,true,9)
+  label(r,nameFor(id),151,13,399,41,23,true)
+  label(r,entry.category,152,53,415,23,11,true,C.sub)
+  label(r,T("Выберите профиль, чтобы открыть функции","Open this profile to view its features"),
+   151,85,402,23,12,false,C.sub)
+  local primeTag=block(r,614,12,106,33,Color3.fromRGB(45,36,22),8,8)
+  stroke(primeTag,C.yellow,.31,.9)
+  label(primeTag,"♛ PRIME",0,4,106,23,13,true,C.yellow,true,9)
+  button(r,T("▶   ОТКРЫТЬ","▶   OPEN"),518,90,201,47,
+   function()launchGame(id)end,true,9)
  end
  local search=mk("TextBox",content,{
-  Position=UDim2.fromOffset(4,363),Size=UDim2.fromOffset(480,47),
+  Position=UDim2.fromOffset(4,356),Size=UDim2.fromOffset(490,48),
   BackgroundColor3=C.card,BorderSizePixel=0,
-  PlaceholderColor3=C.sub,PlaceholderText=T("Найти игру...","Find a game..."),
+  PlaceholderColor3=C.sub,PlaceholderText=T("  Поиск по названию...","  Search games..."),
   ClearTextOnFocus=false,Text="",TextSize=15,TextColor3=C.text,
-  Font=Enum.Font.Gotham, ZIndex=8})
+  Font=Enum.Font.Gotham,ZIndex=8})
  rounded(search,10)
+ local note=label(content,"",4,412,727,31,12,false,C.sub)
  local function filter(q)
   q=q:lower()
+  local count=0
   for id,r in pairs(cards) do
-   r.Visible=q=="" or nameFor(id):lower():find(q,1,true)~=nil or id:find(q,1,true)~=nil
+   local found=q=="" or nameFor(id):lower():find(q,1,true)~=nil
+      or id:find(q,1,true)~=nil
+   r.Visible=found
+   if found then count+=1 end
   end
+  note.Text=count==0 and T("По этому запросу нет профилей","No matching profiles")
+   or T("Найдено профилей: ","Profiles found: ")..count
  end
  search:GetPropertyChangedSignal("Text"):Connect(function()filter(search.Text)end)
- button(content,T("⟳  Обновить","⟳  Refresh"),498,363,235,47,function()
+ button(content,T("⟳   ОБНОВИТЬ","⟳   REFRESH"),507,356,231,48,function()
   search.Text="";filter("")
+  note.Text=T("Список обновлён • доступны 2 профиля","List refreshed • 2 profiles available")
  end,false)
+ filter("")
 end
 local function renderHistory()
  heading(T("История","History"),T("Недавно открытые игровые профили","Recently opened game profiles"))
