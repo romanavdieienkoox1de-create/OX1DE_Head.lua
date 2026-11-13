@@ -1,4 +1,4 @@
--- OX1DE v0.6.0 BETA • Unified launcher + separate gameplay engine • FULL DESIGN PREVIEW, NO GAMEPLAY MODIFICATIONS
+-- OX1DE v0.6.1 BETA • Unified launcher + separate gameplay engine • FULL DESIGN PREVIEW, NO GAMEPLAY MODIFICATIONS
 -- Isolated launcher for design approval. AIM/ESP/Fly are not activated.
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
@@ -279,7 +279,7 @@ local content=mk("ScrollingFrame",win,{
  BorderSizePixel=0,CanvasSize=UDim2.fromOffset(0,463),
  ScrollingDirection=Enum.ScrollingDirection.Y,ZIndex=4})
 block(win,19,571,960,1,C.alt,nil,4)
-label(win,"OX1DE   •   v0.6.0 BETA",24,578,358,27,12,true,C.sub)
+label(win,"OX1DE   •   v0.6.1 BETA",24,578,358,27,12,true,C.sub)
 local telegramFooter=button(win,"t.me/playox1de",757,576,218,35,nil,false)
 telegramFooter.TextSize=12
 local nav={}
@@ -523,7 +523,7 @@ local function prepareEngine(id)
   env.OX1DE_SHELL_TOGGLE=ignoreNativeToggle
   _G.OX1DE_SHELL_TOGGLE=ignoreNativeToggle
   local ok,err=pcall(function()
-   local url="https://raw.githubusercontent.com/romanavdieienkoox1de-create/OX1DE_Head.lua/main/OX1DE_Cheating.lua"
+   local url="https://raw.githubusercontent.com/romanavdieienkoox1de-create/OX1DE_Head.lua/main/OX1DE_Cheating.lua?v=0.6.1"
    local source=game:HttpGet(url)
    local chunk=loadstring(source)
    assert(type(chunk)=="function","Не удалось собрать игровой модуль")
