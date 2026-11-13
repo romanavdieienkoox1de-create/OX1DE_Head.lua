@@ -2350,6 +2350,9 @@ local function startUnifiedLauncher()
   end
  })
  if type(auxUI.launcherCleanup)~="function" then error("OX1DE UI cleanup handler missing") end
+ -- The old interface already exposed the mouse during startup. Restore the
+ -- original state once before our first open, so closing restores camera input.
+ stopMenuMouse()
  isOpen=false
  window.Visible=false
  resize()
