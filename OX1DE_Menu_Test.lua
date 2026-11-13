@@ -514,6 +514,10 @@ local function prepareEngine(id)
  end
  b=gameplay()
  if not b then bridgeError="Игровой модуль не предоставил управление";return false end
+ if not alive then
+  pcall(b.stop)
+  return false
+ end
  for key,name in pairs(keyNames) do
   local ok,code=pcall(function()return Enum.KeyCode[name]end)
   if ok and code and code~=Enum.KeyCode.Unknown then b.keybind[key]=code end
@@ -839,6 +843,7 @@ local function renderMusic()
  local endConn=UIS.InputEnded:Connect(function(input)
   if input.UserInputType==Enum.UserInputType.MouseButton1 or (dragTouch and input==dragTouch) then
    dragging=false;dragTouch=nil
+   savePrefs()
   end
  end)
  volTrack.Destroying:Connect(function()
@@ -870,6 +875,7 @@ local function renderMusic()
    end
    table.remove(tracks,i)
    songIndex=math.max(1,math.min(songIndex,#tracks))
+   savePrefs()
    show("settings")
   end,false)
  end
@@ -915,6 +921,7 @@ local function renderMusic()
   local songName=title.Text:gsub("^%s+",""):gsub("%s+$","")
   if songName=="" then songName="Audio "..id end
   tracks[#tracks+1]={id=id,name=songName,genre="Мой трек"}
+  savePrefs()
   musicMessage=T("Трек добавлен. Воспроизведение зависит от прав Roblox.","Track added; availability depends on Roblox.")
   show("settings")
  end,true)
@@ -927,10 +934,10 @@ end
 local function renderLanguage()
  label(content,T("Язык интерфейса","Interface language"),10,84,697,42,21,true)
  button(content,"Русский",4,155,353,68,function()
-  language="ru";show("settings")
+  language="ru";savePrefs();show("settings")
  end,language=="ru")
  button(content,"English",383,155,355,68,function()
-  language="en";show("settings")
+  language="en";savePrefs();show("settings")
  end,language=="en")
  label(content,T("Выбор меняет основные надписи меню.","This changes the main menu labels."),
   10,252,720,42,14,false,C.sub)
