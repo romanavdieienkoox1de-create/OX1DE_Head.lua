@@ -593,6 +593,9 @@ end
 -- Rebind keys. Escape cancels; Backspace clears action binds, not menu bind.
 listen(UserInputService.InputBegan,function(input,handled)
  if input.UserInputType~=Enum.UserInputType.Keyboard or not alive then return end
+ -- When the launcher is waiting for a new key, don't trigger existing
+ -- gameplay binds before the launcher can save the replacement.
+ if _G.OX1DE_SHELL_BINDING then return end
  local key=input.KeyCode
  if waitingFor then
   local target=waitingFor
