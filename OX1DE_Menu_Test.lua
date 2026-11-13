@@ -1,4 +1,4 @@
--- OX1DE UI v0.5.0 • FULL DESIGN PREVIEW, NO GAMEPLAY MODIFICATIONS
+-- OX1DE v0.6.0 BETA • Unified launcher + separate gameplay engine • FULL DESIGN PREVIEW, NO GAMEPLAY MODIFICATIONS
 -- Isolated launcher for design approval. AIM/ESP/Fly are not activated.
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
@@ -214,7 +214,7 @@ local function changeGraphics(preset)
  end
 end
 local music=mk("Sound",SoundService,{
- Name="OX1DE_LocalMusicPreview",Volume=.65,Looped=false})
+ Name="OX1DE_LocalMusic",Volume=volume/100,Looped=false})
 local function T(ru,en) return language=="en" and en or ru end
 local function nameFor(id)
  if id=="warfare" then return "WARFARE" end
@@ -279,7 +279,7 @@ local content=mk("ScrollingFrame",win,{
  BorderSizePixel=0,CanvasSize=UDim2.fromOffset(0,463),
  ScrollingDirection=Enum.ScrollingDirection.Y,ZIndex=4})
 block(win,19,571,960,1,C.alt,nil,4)
-label(win,"OX1DE   •   UI TEST v0.5.0",24,578,358,27,12,true,C.sub)
+label(win,"OX1DE   •   v0.6.0 BETA",24,578,358,27,12,true,C.sub)
 local telegramFooter=button(win,"t.me/playox1de",757,576,218,35,nil,false)
 telegramFooter.TextSize=12
 local nav={}
@@ -1134,5 +1134,8 @@ do
   end
  end)
 end
+if cfg.quality=="potato" or cfg.quality=="standard" or cfg.quality=="ultra" then
+ pcall(changeGraphics,cfg.quality)
+end
 show("scripts")
-print("[OX1DE] Unified themed GUI preview 0.5.0 loaded successfully")
+print("[OX1DE] OX1DE v0.6.0 beta launcher initialized")
