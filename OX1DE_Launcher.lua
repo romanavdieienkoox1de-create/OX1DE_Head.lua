@@ -218,6 +218,7 @@ local music=mk("Sound",SoundService,{
 local function T(ru,en) return language=="en" and en or ru end
 local function nameFor(id)
  if id=="warfare" then return "WARFARE" end
+ if id=="trails" then return T("Следы • Trails","Trails • Lake Route") end
  return T("Район насилия","Violence District")
 end
 local win=block(gui,0,0,1000,620,C.bg,22,2)
@@ -515,7 +516,35 @@ local loadTitle=label(loadLayer,"",190,268,621,35,18,true,C.text,true,44)
 local loadBar=block(loadLayer,213,341,574,18,C.card,9,44)
 local loadFill=block(loadBar,0,0,0,18,C.purple,9,45)
 local loadPct=label(loadLayer,"",204,377,594,34,18,true,C.text,true,44)
+local function trailsApi()
+ local t=env.OX1DE_TRAILS_API or _G.OX1DE_TRAILS_API
+ if t and type(t.alive)=="function" and t.alive() then return t end
+ return nil
+end
+local function prepareTrails()
+ local t=trailsApi()
+ if not t then
+  env.OX1DE_TRAILS_EMBEDDED=true
+  _G.OX1DE_TRAILS_EMBEDDED=true
+  local ok,err=pcall(function()
+   local url="https://raw.githubusercontent.com/romanavdieienkoox1de-create/OX1DE_Head.lua/main/OX1DE_Trails_LakeRoute.lua?v=0.2.0"
+   local source=game:HttpGet(url)
+   local chunk=loadstring(source)
+   assert(type(chunk)=="function","Не удалось загрузить скрипт Trails")
+   chunk()
+  end)
+  env.OX1DE_TRAILS_EMBEDDED=nil
+  _G.OX1DE_TRAILS_EMBEDDED=nil
+  if not ok then bridgeError="Trails: "..tostring(err);return false end
+ end
+ t=trailsApi()
+ if not t then bridgeError="Модуль Trails не предоставил управление";return false end
+ if t.hideStandaloneUi then pcall(t.hideStandaloneUi) end
+ bridgeError=""
+ return true
+end
 local function prepareEngine(id)
+ if id=="trails" then return prepareTrails() end
  local b=gameplay()
  if not b then
   env.OX1DE_SHELL_MODE=true;_G.OX1DE_SHELL_MODE=true
@@ -590,11 +619,12 @@ local function renderScripts()
  heading(T("Скрипты","Scripts"),T("Список доступных игровых профилей OX1DE","Available OX1DE game profiles"))
  local cards={}
  local defs={{id="violence_district",symbol="R",category="SURVIVAL • HORROR"},
-  {id="warfare",symbol="W",category="TEAM • FPS"}}
+  {id="warfare",symbol="W",category="TEAM • FPS"},
+  {id="trails",symbol="T",category="OFFROAD • LAKE ROUTE"}}
  for i,entry in ipairs(defs) do
   local id=entry.id
-  local y=5+(i-1)*157
-  local r=block(content,4,y,734,145,C.panel,14,6)
+  local y=5+(i-1)*112
+  local r=block(content,4,y,734,105,C.panel,13,6)
   r.Name="GameCard_"..id
   stroke(r,C.purple,.52,1.1)
   mk("UIGradient",r,{Color=ColorSequence.new({
@@ -602,29 +632,32 @@ local function renderScripts()
    ColorSequenceKeypoint.new(.52,Color3.fromRGB(26,24,37)),
    ColorSequenceKeypoint.new(1,Color3.fromRGB(20,19,30))}),Rotation=0})
   cards[id]=r
-  local stripe=block(r,0,12,4,120,C.purple,2,7)
-  local art=block(r,14,15,115,114,Color3.fromRGB(15,12,26),11,7)
+  block(r,0,9,4,89,C.purple,2,7)
+  local art=block(r,12,9,93,88,Color3.fromRGB(15,12,26),11,7)
   stroke(art,C.purple,.62,1)
-  label(art,entry.symbol,0,14,115,76,57,true,C.text,true,9)
-  label(art,"OX1DE",0,88,115,22,11,true,C.purple,true,9)
-  label(r,nameFor(id),151,13,399,41,23,true)
-  label(r,entry.category,152,53,415,23,11,true,C.sub)
-  label(r,T("Выберите профиль, чтобы открыть функции","Open this profile to view its features"),
-   151,85,402,23,12,false,C.sub)
-  local primeTag=block(r,614,12,106,33,Color3.fromRGB(45,36,22),8,8)
-  stroke(primeTag,C.yellow,.31,.9)
-  label(primeTag,"♛ PRIME",0,4,106,23,13,true,C.yellow,true,9)
-  button(r,T("▶   ОТКРЫТЬ","▶   OPEN"),518,84,201,46,
+  label(art,entry.symbol,0,5,93,53,42,true,C.text,true,9)
+  label(art,"OX1DE",0,60,93,21,10,true,C.purple,true,9)
+  label(r,nameFor(id),119,8,392,34,21,true)
+  label(r,entry.category,120,41,402,21,11,true,C.sub)
+  label(r,id=="trails" and T("Маршрут вокруг озера • запись и автоезда","Lake route • record and drive")
+   or T("Открой игровой профиль","Open game profile"),
+   120,65,390,26,12,false,C.sub)
+  local tag=block(r,617,8,100,28,id=="trails" and Color3.fromRGB(33,47,53)
+    or Color3.fromRGB(45,36,22),8,8)
+  stroke(tag,id=="trails" and C.accent or C.yellow,.42,.9)
+  label(tag,id=="trails" and "BETA" or "♛ PRIME",0,1,100,25,12,true,
+   id=="trails" and C.bright or C.yellow,true,9)
+  button(r,T("▶ ОТКРЫТЬ","▶ OPEN"),520,53,198,42,
    function()launchGame(id)end,true,9)
  end
  local search=mk("TextBox",content,{
-  Position=UDim2.fromOffset(4,322),Size=UDim2.fromOffset(490,45),
+  Position=UDim2.fromOffset(4,348),Size=UDim2.fromOffset(490,43),
   BackgroundColor3=C.card,BorderSizePixel=0,
   PlaceholderColor3=C.sub,PlaceholderText=T("  Поиск по названию...","  Search games..."),
   ClearTextOnFocus=false,Text="",TextSize=15,TextColor3=C.text,
   Font=Enum.Font.Gotham,ZIndex=8})
  rounded(search,10)
- local note=label(content,"",4,370,727,27,12,false,C.sub)
+ local note=label(content,"",4,393,727,25,12,false,C.sub)
  local function filter(q)
   q=q:lower()
   local count=0
@@ -638,11 +671,12 @@ local function renderScripts()
    or T("Найдено профилей: ","Profiles found: ")..count
  end
  search:GetPropertyChangedSignal("Text"):Connect(function()filter(search.Text)end)
- button(content,T("⟳   ОБНОВИТЬ","⟳   REFRESH"),507,322,231,45,function()
+ button(content,T("⟳   ОБНОВИТЬ","⟳   REFRESH"),507,348,231,43,function()
   search.Text="";filter("")
-  note.Text=T("Список обновлён • доступны 2 профиля","List refreshed • 2 profiles available")
+  note.Text=T("Список обновлён • доступны 3 профиля","List refreshed • 3 profiles available")
  end,false)
  filter("")
+ content.CanvasSize=UDim2.fromOffset(0,436)
 end
 local function renderHistory()
  heading(T("История","History"),T("Недавно открытые игровые профили","Recently opened game profiles"))
