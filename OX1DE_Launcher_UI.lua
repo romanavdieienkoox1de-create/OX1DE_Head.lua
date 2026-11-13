@@ -16,6 +16,15 @@ return function(api)
  local z=340
  local lang=api.uiData.language=="en" and "en" or "ru"
  local tracks=api.uiData.musicTracks or {}
+ -- IDs are from Roblox Creator Hub's official background-music tutorial.
+ if not api.uiData.musicSeeded then
+  tracks={{id="1837849285",name="Upbeat Electronica"},
+   {id="1848183670",name="Grandiose Fantasy"},
+   {id="1843463175",name="Creepy Organ / Dungeon"}}
+  api.uiData.musicSeeded=true
+  api.uiData.musicTracks=tracks
+ end
+ local musicError=""
  local musicVolume=math.clamp(tonumber(api.uiData.musicVolume) or 70,0,100)
  local history=api.uiData.history or {}
  local view="scripts"
@@ -96,11 +105,14 @@ return function(api)
  lbl(header,"SCRIPT MENU",98,50,280,18,10,true,C.muted)
  local userName=lbl(header,player.DisplayName,704,18,160,31,14,true)
  lbl(header,"@"..player.Name,704,47,165,18,10,false,C.muted)
- local prime=btn(header,"♛  PRIME",867,22,104,41,nil,true,z+6)
+ local prime=btn(header,"♛ PRIME",847,22,93,41,nil,true,z+6)
  prime.BackgroundColor3=Color3.fromRGB(91,61,25)
  prime.TextColor3=C.yellow
  border(prime,C.yellow,.30,1)
- local hide=btn(header,"×",989,22,43,41,nil,false,z+7)
+ local minimize=btn(header,"−",946,22,40,41,nil,false,z+7)
+ api.listen(minimize.MouseButton1Click,function()api.setVisible(false)end)
+ minimize.TextSize=23
+ local hide=btn(header,"×",991,22,41,41,nil,false,z+7)
  api.listen(hide.MouseButton1Click,function()api.setVisible(false)end)
  hide.TextSize=24
  local side=pane(shell,12,90,219,515,Color3.fromRGB(18,17,28),15,z+3)
@@ -417,7 +429,17 @@ return function(api)
   sound:Stop()
   sound.SoundId="rbxassetid://"..tostring(tracks[i].id)
   sound.Volume=musicVolume/100
-  sound:Play()
+  musicError=""
+  local ok,err=pcall(function()sound:Play()end)
+  if not ok then musicEnabled=false;musicError="Ошибка аудио: "..tostring(err) end
+  local expectedId=sound.SoundId
+  task.delay(6,function()
+   if api.isAlive() and musicEnabled and sound.SoundId==expectedId and not sound.IsLoaded then
+    musicEnabled=false;sound:Stop()
+    musicError=T("Roblox не разрешил аудио в этой игре.","Audio unavailable in this Roblox experience.")
+    if view=="settings" and settingSection=="music" then show("settings") end
+   end
+  end)
  end
  local function renderMusic()
   -- Called within Settings; preserve the single shared settings header/tabs.
@@ -441,7 +463,7 @@ return function(api)
    Text="",TextSize=15,Font=Enum.Font.Gotham,
    ClearTextOnFocus=false,BorderSizePixel=0,ZIndex=z+7})
   corner(audioID,10)
-  local notice=lbl(scroll,"",6,368,730,31,12,false,C.muted)
+  local notice=lbl(scroll,musicError,6,368,730,31,12,false,C.red)
   btn(scroll,T("+  Добавить","+  Add"),518,310,224,49,function()
    local id=audioID.Text:gsub("%D","")
    if #id<6 or #id>15 then
