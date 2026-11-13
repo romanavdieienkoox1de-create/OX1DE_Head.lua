@@ -396,25 +396,68 @@ local loadTitle=label(loadLayer,"",190,268,621,35,18,true,C.text,true,44)
 local loadBar=block(loadLayer,213,341,574,18,C.card,9,44)
 local loadFill=block(loadBar,0,0,0,18,C.purple,9,45)
 local loadPct=label(loadLayer,"",204,377,594,34,18,true,C.text,true,44)
+local function prepareEngine(id)
+ local b=gameplay()
+ if not b then
+  env.OX1DE_SHELL_MODE=true;_G.OX1DE_SHELL_MODE=true
+  local function ignoreNativeToggle()end
+  env.OX1DE_SHELL_TOGGLE=ignoreNativeToggle
+  _G.OX1DE_SHELL_TOGGLE=ignoreNativeToggle
+  local ok,err=pcall(function()
+   local url="https://raw.githubusercontent.com/romanavdieienkoox1de-create/OX1DE_Head.lua/main/OX1DE_Cheating.lua"
+   local source=game:HttpGet(url)
+   local chunk=loadstring(source)
+   assert(type(chunk)=="function","Не удалось собрать игровой модуль")
+   chunk()
+  end)
+  if not ok then
+   bridgeError="Ошибка игрового модуля: "..tostring(err)
+   env.OX1DE_SHELL_MODE=nil;_G.OX1DE_SHELL_MODE=nil
+   env.OX1DE_SHELL_TOGGLE=nil;_G.OX1DE_SHELL_TOGGLE=nil
+   return false
+  end
+ end
+ b=gameplay()
+ if not b then bridgeError="Игровой модуль не предоставил управление";return false end
+ for key,name in pairs(keyNames) do
+  local ok,code=pcall(function()return Enum.KeyCode[name]end)
+  if ok and code and code~=Enum.KeyCode.Unknown then b.keybind[key]=code end
+ end
+ pcall(b.setTab,id)
+ if b.hideNative then pcall(b.hideNative) end
+ pcall(b.save)
+ bridgeError=""
+ return true
+end
 local function launchGame(id)
+ if engineStarting then return end
+ engineStarting=true
  selectedGame=id;previousGame=id;tab="main"
- loadTitle.Text=T("Проверка интерфейса...","Checking interface...")
- loadFill.Size=UDim2.fromOffset(0,18);loadPct.Text="0%"
+ loadTitle.Text=T("Подготовка профиля","Preparing game profile")
+ loadFill.Size=UDim2.fromOffset(0,18)
+ loadPct.Text="0%"
  loadLayer.Visible=true
  task.spawn(function()
-  for i,pct in ipairs({20,45,75,100}) do
-   if not alive then return end
-   loadTitle.Text=i==1 and T("Подготовка окна","Preparing window")
-      or i==2 and T("Проверка профиля","Checking profile")
-      or i==3 and T("Открытие разделов","Opening sections")
-      or T("Интерфейс готов","Interface ready")
-   loadFill.Size=UDim2.fromOffset(math.floor(574*pct/100),18)
-   loadPct.Text=tostring(pct).."%"
-   RunService.Heartbeat:Wait()
+  if not alive then engineStarting=false;return end
+  loadPct.Text="20%"
+  loadTitle.Text=T("Подключение игрового модуля...","Connecting game module...")
+  loadFill.Size=UDim2.fromOffset(115,18)
+  local ok,result=pcall(prepareEngine,id)
+  loadPct.Text=ok and result and "85%" or "Ошибка"
+  loadTitle.Text=ok and result and T("Открытие интерфейса","Opening menu")
+   or T("Игровой модуль не подключён","Gameplay module unavailable")
+  loadFill.Size=UDim2.fromOffset(ok and result and 490 or 0,18)
+  RunService.Heartbeat:Wait()
+  if not ok then bridgeError=tostring(result) end
+  if not alive then engineStarting=false;return end
+  if ok and result then
+   loadPct.Text="100%"
+   loadFill.Size=UDim2.fromOffset(574,18)
+   table.insert(history,1,{name=nameFor(id),time=os.date("%d.%m.%Y %H:%M")})
+   if #history>12 then table.remove(history,13) end
+   savePrefs()
   end
-  if not alive then return end
-  table.insert(history,1,{name=nameFor(id),time=os.date("%d.%m.%Y %H:%M")})
-  if #history>12 then table.remove(history,13) end
+  engineStarting=false
   loadLayer.Visible=false
   show("game")
  end)
