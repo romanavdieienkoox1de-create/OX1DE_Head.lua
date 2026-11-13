@@ -1,149 +1,139 @@
--- OX1DE MENU TEST v0.4.2 -- GUI ONLY. No gameplay modifications.
--- Run this ALONE to test whether the new UI can open in your Roblox client.
+-- OX1DE small menu smoke test 0.4.3 -- GUI ONLY
 local Players=game:GetService("Players")
-local UIS=game:GetService("UserInputService")
-local TweenService=game:GetService("TweenService")
 local player=Players.LocalPlayer
-local parent=player:WaitForChild("PlayerGui",10)
-if not parent then return warn("[OX1DE TEST] PlayerGui unavailable") end
-local old=parent:FindFirstChild("OX1DE_Menu_Test")
-if old then old:Destroy() end
+if not player then error("OX1DE: Players.LocalPlayer is nil") end
+local holder
+if type(gethui)=="function" then
+ local ok,h=pcall(gethui)
+ if ok and h then holder=h end
+end
+if not holder then holder=player:WaitForChild("PlayerGui",8) end
+if not holder then error("OX1DE: no GUI container") end
+local previous=holder:FindFirstChild("OX1DE_Menu_Test")
+if previous then previous:Destroy() end
 local gui=Instance.new("ScreenGui")
 gui.Name="OX1DE_Menu_Test"
-gui.ResetOnSpawn=false
 gui.IgnoreGuiInset=true
-gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
-gui.DisplayOrder=700
-gui.Parent=parent
-local color={
- bg=Color3.fromRGB(12,10,19),panel=Color3.fromRGB(23,21,33),
- card=Color3.fromRGB(33,30,46),purple=Color3.fromRGB(158,66,229),
- white=Color3.fromRGB(244,240,255),muted=Color3.fromRGB(161,156,177),
- yellow=Color3.fromRGB(255,220,54),red=Color3.fromRGB(244,76,95)
-}
-local function add(kind,parent,props)
- local obj=Instance.new(kind)
- for key,val in pairs(props or {}) do obj[key]=val end
- obj.Parent=parent
- return obj
+gui.DisplayOrder=999
+gui.ResetOnSpawn=false
+gui.Enabled=true
+gui.Parent=holder
+local function obj(class,parent,values)
+ local o=Instance.new(class)
+ for k,v in pairs(values) do o[k]=v end
+ o.Parent=parent
+ return o
 end
-local function round(p,r) add("UICorner",p,{CornerRadius=UDim.new(0,r or 12)}) end
-local function outline(p,c)
- add("UIStroke",p,{Color=c or color.purple,Transparency=.25,Thickness=1.5})
+local function round(o,n)
+ obj("UICorner",o,{CornerRadius=UDim.new(0,n)})
 end
-local function label(p,str,x,y,w,h,size,bold,col)
- return add("TextLabel",p,{
-  BackgroundTransparency=1,Position=UDim2.fromOffset(x,y),
-  Size=UDim2.fromOffset(w,h),Text=str,TextColor3=col or color.white,
-  Font=bold and Enum.Font.GothamBold or Enum.Font.Gotham,
-  TextSize=size or 16,TextXAlignment=Enum.TextXAlignment.Left,
-  TextTruncate=Enum.TextTruncate.AtEnd
+local bg=Color3.fromRGB(14,11,23)
+local panel=Color3.fromRGB(28,24,39)
+local purp=Color3.fromRGB(140,74,219)
+local white=Color3.fromRGB(245,244,255)
+local muted=Color3.fromRGB(174,171,188)
+local window=obj("Frame",gui,{
+ AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),
+ Size=UDim2.fromOffset(810,510),BackgroundColor3=bg,BorderSizePixel=0,
+ Visible=true
+})
+round(window,18)
+obj("UIStroke",window,{Color=purp,Thickness=1.5,Transparency=.1})
+local sc=obj("UIScale",window,{Scale=1})
+local function fit()
+ local cam=workspace.CurrentCamera
+ if cam then
+  local vp=cam.ViewportSize
+  sc.Scale=math.max(.3,math.min(1,(vp.X-20)/810,(vp.Y-20)/510))
+ end
+end
+fit()
+local header=obj("Frame",window,{
+ Size=UDim2.fromOffset(810,68),BackgroundColor3=panel,BorderSizePixel=0
+})
+round(header,18)
+local function text(parent,value,x,y,w,h,size,color)
+ return obj("TextLabel",parent,{
+  Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),
+  Text=tostring(value),TextColor3=color or white,TextSize=size or 15,
+  Font=Enum.Font.GothamBold,BackgroundTransparency=1,
+  TextXAlignment=Enum.TextXAlignment.Left
  })
 end
-local function button(p,str,x,y,w,h,action,selected)
- local b=add("TextButton",p,{
-  Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),Text=str,
-  BackgroundColor3=selected and color.purple or color.card,
-  TextColor3=color.white,Font=Enum.Font.GothamBold,TextSize=16,
+local function button(parent,name,x,y,w,h,callback,active)
+ local b=obj("TextButton",parent,{
+  Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),
+  Text=name,TextColor3=white,Font=Enum.Font.GothamBold,
+  TextSize=15,BackgroundColor3=active and purp or panel,
   BorderSizePixel=0,AutoButtonColor=true
  })
  round(b,11)
- if action then b.MouseButton1Click:Connect(action) end
+ if callback then b.MouseButton1Click:Connect(callback) end
  return b
 end
-local root=add("Frame",gui,{
- AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),
- Size=UDim2.fromOffset(930,570),BackgroundColor3=color.bg,BorderSizePixel=0
-})
-round(root,19);outline(root)
-local scale=add("UIScale",root,{Scale=1})
-local function fit()
- local cam=workspace.CurrentCamera
- if not cam then return end
- local view=cam.ViewportSize
- scale.Scale=math.clamp(math.min((view.X-20)/930,(view.Y-20)/570),.26,1)
-end
-fit()
-local vpc
-local function cameraChanged()
- if vpc then vpc:Disconnect() end
- if workspace.CurrentCamera then vpc=workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fit) end
- fit()
-end
-local cameraConnection=workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(cameraChanged)
-cameraChanged()
-local header=add("Frame",root,{
- Position=UDim2.fromOffset(0,0),Size=UDim2.fromOffset(930,85),
- BackgroundColor3=color.panel,BorderSizePixel=0
-})
-round(header,19)
-local logo=add("Frame",header,{
- Position=UDim2.fromOffset(18,13),Size=UDim2.fromOffset(57,57),
+local box=obj("Frame",header,{
+ Position=UDim2.fromOffset(12,9),Size=UDim2.fromOffset(51,51),
  BackgroundColor3=Color3.fromRGB(0,0,0),BorderSizePixel=0
 })
-round(logo,10);outline(logo,Color3.fromRGB(255,255,255))
-label(logo,"OX",5,5,52,26,22,true,color.white)
-label(logo,"1DE",9,32,45,15,14,true,color.white)
-label(header,"OX1DE",88,9,270,42,29,true)
-label(header,"ТЕСТ НОВОГО МЕНЮ • БЕЗ ИГРОВЫХ ФУНКЦИЙ",89,49,430,20,11,false,color.muted)
-label(header,player.DisplayName,627,18,161,26,17,true)
-label(header,"@"..player.Name,627,46,165,18,11,false,color.muted)
-local close=button(header,"×",865,20,45,44,function()gui:Destroy()end)
-close.TextSize=25
-local side=add("Frame",root,{
- Position=UDim2.fromOffset(13,98),Size=UDim2.fromOffset(206,411),
- BackgroundColor3=color.panel,BorderSizePixel=0
+round(box,9)
+text(box,"OX",8,6,44,25,18)
+text(box,"1DE",10,27,40,20,12)
+text(header,"OX1DE",75,11,290,37,24)
+text(header,"ТЕСТ МЕНЮ • без игровых функций",75,43,480,15,11,muted)
+text(header,player.DisplayName,547,16,175,24,14)
+button(header,"×",756,12,39,42,function()gui:Destroy()end)
+local side=obj("Frame",window,{
+ Position=UDim2.fromOffset(12,81),Size=UDim2.fromOffset(183,377),
+ BackgroundColor3=panel,BorderSizePixel=0
 })
-round(side,15)
-local body=add("Frame",root,{
- Position=UDim2.fromOffset(233,102),Size=UDim2.fromOffset(684,406),
- BackgroundColor3=color.bg,BorderSizePixel=0
+round(side,12)
+local content=obj("Frame",window,{
+ Position=UDim2.fromOffset(207,81),Size=UDim2.fromOffset(590,377),
+ BackgroundTransparency=1
 })
-local nav={}
-local refresh
-local function show(selected)
- for key,b in pairs(nav) do b.BackgroundColor3=key==selected and color.purple or color.card end
- for _,o in ipairs(body:GetChildren()) do o:Destroy() end
- if selected=="scripts" then
-  label(body,"Скрипты",12,7,630,40,26,true)
-  label(body,"Выбери игру для просмотра",12,47,629,25,14,false,color.muted)
+local current="scripts"
+local menuButtons={}
+local render
+render=function(view)
+ current=view
+ for key,b in pairs(menuButtons) do
+  b.BackgroundColor3=key==view and purp or bg
+ end
+ for _,child in ipairs(content:GetChildren()) do child:Destroy() end
+ if view=="scripts" then
+  text(content,"Скрипты",7,0,570,40,25)
+  text(content,"Выбери игровой профиль OX1DE",7,37,570,29,13,muted)
   for i,name in ipairs({"Район насилия","WARFARE"}) do
-   local y=91+(i-1)*139
-   local r=add("Frame",body,{
-    Position=UDim2.fromOffset(9,y),Size=UDim2.fromOffset(656,127),
-    BackgroundColor3=color.panel,BorderSizePixel=0
+   local y=73+(i-1)*107
+   local card=obj("Frame",content,{
+    Position=UDim2.fromOffset(7,y),Size=UDim2.fromOffset(574,96),
+    BackgroundColor3=panel,BorderSizePixel=0
    })
-   round(r,12);outline(r)
-   label(r,name,18,17,430,40,23,true)
-   label(r,"ТЕСТ МЕНЮ: игровые функции пока не подключены",18,54,505,30,12,false,color.muted)
-   local tag=label(r,"♛ PRIME",533,9,120,29,14,true,color.yellow)
-   button(r,"▶  Открыть",467,77,177,42,function()
-    for _,o in ipairs(body:GetChildren()) do o:Destroy() end
-    label(body,name,15,11,610,44,25,true)
-    label(body,"Это облегчённый тест интерфейса. AIM, ESP и Fly не запускаются.",
-     15,73,625,78,16,false,color.muted).TextWrapped=true
-    button(body,"← Назад",15,193,212,51,function()show("scripts")end)
+   round(card,12)
+   text(card,name,18,11,340,31,20)
+   text(card,"♛ PRIME",453,6,107,27,13,Color3.fromRGB(255,213,70))
+   button(card,"ОТКРЫТЬ",380,50,177,35,function()
+    render(i==1 and "district" or "warfare")
    end,true)
   end
-  button(body,"⟳  Обновить",10,375,215,31,function()show("scripts")end)
- elseif selected=="settings" then
-  label(body,"Настройки",11,7,610,44,27,true)
-  label(body,"Графика",13,70,610,32,19,true)
-  label(body,"Potato    |    Стандартная    |    Ультра",13,116,630,37,17,false)
-  label(body,"Музыка",13,181,630,32,19,true)
-  label(body,"Плеер будет подключён после проверки запуска меню.",13,230,640,45,15,false,color.muted)
-  label(body,"Растяжение 4:3, 16:9 зависит от настроек Windows/Roblox.",13,309,650,46,14,false,color.red)
- elseif selected=="history" then
-  label(body,"История",11,7,610,44,27,true)
-  label(body,"Список игр появится после подключения основных функций.",13,89,648,59,15,false,color.muted)
- elseif selected=="telegram" then
-  label(body,"Телеграм",11,7,610,44,27,true)
-  label(body,"https://t.me/playox1de",13,90,600,50,19,true)
+ elseif view=="settings" then
+  text(content,"Настройки",7,0,560,45,24)
+  text(content,"Графика  |  Музыка  |  Язык",7,73,570,42,19)
+  text(content,"Без изменения игры: проверяем запуск окна.",7,122,574,40,14,muted)
+ elseif view=="history" then
+  text(content,"История",7,0,570,43,24)
+  text(content,"История будет подключена в полной версии.",7,75,570,36,14,muted)
+ elseif view=="telegram" then
+  text(content,"Telegram",7,0,570,43,24)
+  text(content,"https://t.me/playox1de",7,75,570,36,18)
+ elseif view=="exit" then
+  text(content,"Закрыть тест OX1DE?",7,0,570,48,24)
+  button(content,"ОТМЕНА",7,93,260,51,function()render("scripts")end)
+  button(content,"ЗАКРЫТЬ",300,93,262,51,function()gui:Destroy()end,true)
  else
-  label(body,"Выход",11,7,610,44,27,true)
-  label(body,"Вы точно хотите закрыть тестовое меню?",13,94,630,55,19,true)
-  button(body,"Отмена",13,179,219,51,function()show("scripts")end)
-  button(body,"Подтвердить",254,179,219,51,function()gui:Destroy()end,true)
+  text(content,view=="warfare" and "WARFARE" or "Район насилия",7,0,570,45,24)
+  text(content,"Тестовое меню. AIM / ESP / Fly не подключены.",7,78,574,50,14,muted)
+  button(content,"← Назад",7,145,225,46,function()render("scripts")end)
  end
 end
 for i,item in ipairs({
@@ -151,10 +141,10 @@ for i,item in ipairs({
  {"settings","⚙  Настройки"},{"telegram","➤  Телеграм"},
  {"exit","⏻  Выход"}
 }) do
- local key=item[1]
- nav[key]=button(side,item[2],11,13+(i-1)*73,184,59,function()show(key)end,key=="scripts")
+ local id=item[1]
+ menuButtons[id]=button(side,item[2],10,10+(i-1)*71,163,59,function()render(id)end,id=="scripts")
 end
-label(root,"OX1DE  •  SAFE UI TEST v0.4.2",23,528,410,25,12,true,color.muted)
-label(root,"t.me/playox1de",737,528,172,25,12,true,color.muted)
-show("scripts")
-print("[OX1DE TEST] New lightweight menu launched successfully")
+text(window,"OX1DE • тест запуска 0.4.3",20,467,390,27,12,muted)
+text(window,"t.me/playox1de",622,467,172,27,12,muted)
+render("scripts")
+print("[OX1DE] Lightweight menu v0.4.3 successfully shown in "..holder:GetFullName())
