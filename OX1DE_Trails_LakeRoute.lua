@@ -424,6 +424,9 @@ end
 refresh()
 local api={
  alive=function()return alive end,
+ hideStandaloneUi=function()
+  if gui and gui.Parent then gui.Enabled=false end
+ end,
  record=recordToggle,
  save=persist,
  autoDrive=startDrive,
