@@ -13,6 +13,7 @@ if type(getgenv)=="function" then
  local ok,result=pcall(getgenv)
  if ok and type(result)=="table" then env=result end
 end
+local embedded=env.OX1DE_TRAILS_EMBEDDED==true or _G.OX1DE_TRAILS_EMBEDDED==true
 local previous=env.OX1DE_TRAILS_STOP or _G.OX1DE_TRAILS_STOP
 if type(previous)=="function" then pcall(previous) end
 local container
@@ -79,6 +80,9 @@ gui.ResetOnSpawn=false
 gui.IgnoreGuiInset=true
 gui.DisplayOrder=850
 gui.Parent=container
+-- The main OX1DE launcher renders the Trails controls itself.
+-- Keep this backend's original standalone GUI available only for direct runs.
+gui.Enabled=not embedded
 local function make(class,parent,props)
  local o=Instance.new(class)
  for k,v in pairs(props or {}) do o[k]=v end
@@ -389,6 +393,8 @@ local function stopAll()
  if gui then gui:Destroy() end
  if env.OX1DE_TRAILS_STOP==stopAll then env.OX1DE_TRAILS_STOP=nil end
  if _G.OX1DE_TRAILS_STOP==stopAll then _G.OX1DE_TRAILS_STOP=nil end
+ if env.OX1DE_TRAILS_API and env.OX1DE_TRAILS_API.stop==stopAll then env.OX1DE_TRAILS_API=nil end
+ if _G.OX1DE_TRAILS_API and _G.OX1DE_TRAILS_API.stop==stopAll then _G.OX1DE_TRAILS_API=nil end
 end
 env.OX1DE_TRAILS_STOP=stopAll
 _G.OX1DE_TRAILS_STOP=stopAll
@@ -416,4 +422,32 @@ if type(readfile)=="function" and type(isfile)=="function" then
  end
 end
 refresh()
-print("[OX1DE Trails] Route recorder ready. Auto Drive requires a compatible VehicleSeat.")
+local api={
+ alive=function()return alive end,
+ record=recordToggle,
+ save=persist,
+ autoDrive=startDrive,
+ stopDriving=function()
+  if recording then endRecord() end
+  if driving then stopDrive("Автоезда остановлена.") end
+ end,
+ toggleMarkers=showRoute,
+ hideMarkers=function()cleanMarkers()end,
+ nextSpeed=function()speedIndex=speedIndex%#speedOptions+1;refresh()end,
+ getState=function()
+  local seat=seatOf()
+  local gap=0
+  if #route>1 then gap=distance2d(asVector(route[1]),asVector(route[#route]))end
+  return {
+   status=status,recording=recording,driving=driving,
+   count=#route,length=routeDistance(),gap=gap,
+   speed=math.floor(speedOptions[speedIndex]*100+.5),
+   seat=seat and (seat.ClassName.." • "..seat.Name) or "Нет квадроцикла",
+   waypoint=currentIndex,markers=#markers>0
+  }
+ end,
+ stop=stopAll
+}
+env.OX1DE_TRAILS_API=api
+_G.OX1DE_TRAILS_API=api
+print("[OX1DE Trails] Route recorder ready; embedded mode: "..tostring(embedded))
