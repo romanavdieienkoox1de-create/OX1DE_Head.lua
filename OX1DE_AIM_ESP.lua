@@ -1,4 +1,4 @@
--- OX1DE AIM/ESP v0.5 red FOV, separate name and feet distance
+-- OX1DE AIM/ESP v0.6, 220 meter labels
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
@@ -8,16 +8,21 @@ if _G.OX1DE_HEAD_CLEANUP then pcall(_G.OX1DE_HEAD_CLEANUP) end
 local connections={}
 local highlights={}
 local labels={}
-local distanceConnection=nil
+local STUDS_PER_METER=1/0.28
+local MAX_LABEL_METERS=220
+local MAX_LABEL_STUDS=MAX_LABEL_METERS*STUDS_PER_METER
 local aimOn=false
-local espOn=false
+local espOn=true
 local fov=50
 local gui=Instance.new("ScreenGui")
 gui.Name="OX1DE_Head_Menu"
 gui.ResetOnSpawn=false
 gui.IgnoreGuiInset=true
 gui.DisplayOrder=950
-gui.Parent=localPlayer:WaitForChild("PlayerGui")
+local playerGui=localPlayer:WaitForChild("PlayerGui")
+local oldGui=playerGui:FindFirstChild("OX1DE_Head_Menu")
+if oldGui then oldGui:Destroy() end
+gui.Parent=playerGui
 local function connect(signal,fn)
  local c=signal:Connect(fn)
  table.insert(connections,c)
@@ -47,7 +52,7 @@ local function makeButton(text,y)
  return b
 end
 local aimBtn=makeButton("AIM [E]: OFF",10)
-local espBtn=makeButton("ESP: OFF",52)
+local espBtn=makeButton("ESP: ON",52)
 
 local fovTitle=Instance.new("TextLabel")
 fovTitle.Name="FOVValue"
@@ -164,7 +169,7 @@ local function refreshESP()
      b.Size=UDim2.fromOffset(210,30)
      b.StudsOffsetWorldSpace=offset
      b.AlwaysOnTop=true
-     b.MaxDistance=100
+     b.MaxDistance=MAX_LABEL_STUDS
      b.Parent=gui
      local t=Instance.new("TextLabel")
      t.Name="Text"
@@ -186,6 +191,7 @@ local function refreshESP()
   end
  end
 end
+refreshESP()
 local function toggleAim()
  aimOn=not aimOn
  aimBtn.Text="AIM [E]: "..(aimOn and "ON" or "OFF")
@@ -215,10 +221,11 @@ connect(RunService.RenderStepped,function()
   for p,entry in pairs(labels) do
    local target=p.Character and p.Character:FindFirstChild("HumanoidRootPart")
    local distance=root and target and math.floor((root.Position-target.Position).Magnitude+0.5) or nil
-   local near=distance~=nil and distance<=100
+   local meters=distance and math.floor(distance*0.28+0.5) or nil
+   local near=meters~=nil and meters<=MAX_LABEL_METERS
    entry.name.Enabled=near
    entry.distance.Enabled=near
-   entry.distanceText.Text=distance and (distance.." studs") or ""
+   entry.distanceText.Text=meters and (meters.." м") or ""
   end
  end
  if not aimOn or fov==0 then return end
