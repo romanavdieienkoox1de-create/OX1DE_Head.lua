@@ -280,6 +280,11 @@ exitNotice.TextWrapped=true
 local function shutdown()
  if not alive then return end
  alive=false
+ clearFX()
+ pcall(function()Lighting.GlobalShadows=originalShadows end)
+ if originalQuality then pcall(function()
+  UserSettings():GetService("UserGameSettings").SavedQualityLevel=originalQuality
+ end) end
  music:Stop();music:Destroy()
  if cameraConn then cameraConn:Disconnect() end
  if cameraChangeConn then cameraChangeConn:Disconnect() end
@@ -473,30 +478,39 @@ local function renderGame()
  content.CanvasSize=UDim2.fromOffset(0,math.max(464,y+137))
 end
 local function renderQuality()
- label(content,T("Качество графики","Graphics quality"),10,75,630,33,19,true)
- for i,entry in ipairs({{"potato","POTATO"},{"standard",T("Стандартная","Standard")},{"ultra",T("Ультра","Ultra")}}) do
-  local id,name=entry[1],entry[2]
-  local b=button(content,name,4+(i-1)*247,118,238,73,function()
-   chosenQuality=id;show("settings")
-  end,chosenQuality==id)
-  if chosenQuality~=id then b.BackgroundColor3=C.panel end
+ label(content,T("Качество изображения","Image quality"),10,73,650,33,20,true)
+ for i,cfg in ipairs({
+  {"potato","POTATO",T("Минимум теней","Less shadows")},
+  {"standard",T("Стандарт","Standard"),T("Без доп. эффектов","No extra effects")},
+  {"ultra",T("Ультра","Ultra"),T("Свечение и цвета","Bloom + color")}
+ }) do
+  local id=cfg[1]
+  local x=4+(i-1)*247
+  local selected=chosenQuality==id
+  local card=block(content,x,113,239,89,selected and Color3.fromRGB(63,38,88) or C.panel,12,6)
+  if selected then stroke(card,C.purple,.10,1.5) else stroke(card,C.alt,.6,1) end
+  button(card,cfg[2],8,8,222,39,function()
+   changeGraphics(id)
+   show("settings")
+  end,selected,8)
+  label(card,cfg[3],10,52,217,26,11,false,C.sub,true)
  end
- label(content,T("Формат экрана • предварительный выбор","Display format • preview"),
-  10,211,716,33,17,true)
+ local result=block(content,4,214,734,58,C.panel,10,6)
+ local status=label(result,graphicsMessage,13,6,705,45,13,false,C.sub)
+ status.TextWrapped=true
+ label(content,T("Соотношение сторон • справка","Aspect ratio • reference"),11,284,704,31,17,true)
  for i,opt in ipairs({"4:3","16:9","16:10","5:4","5:3","3:2","3:4"}) do
-  local b=button(content,opt,4+(i-1)*104,259,96,43,function()
+  local b=button(content,opt,4+(i-1)*104,325,97,41,function()
    aspect=opt;show("settings")
   end,aspect==opt)
   if aspect~=opt then b.BackgroundColor3=C.panel end
  end
- local warn=block(content,4,327,734,104,Color3.fromRGB(54,24,37),12,6)
- local top=label(warn,T("ВНИМАНИЕ • Из Roblox Lua нельзя растянуть всю игру.",
-  "WARNING • Roblox Lua cannot stretch the entire game."),13,7,700,42,15,true,C.red)
- top.TextWrapped=true
- local bottom=label(warn,T("На ПК меняй формат в Windows или драйвере. На телефоне смена разрешения недоступна.",
-  "Change aspect ratio through Windows or graphics drivers; not available on mobile."),
-  13,52,702,45,13,false,C.text)
- bottom.TextWrapped=true
+ local warn=block(content,4,383,734,68,Color3.fromRGB(56,27,41),10,6)
+ local msg=label(warn,T("Растянуть весь Roblox через Lua нельзя. ПК: Windows / драйвер. Телефон: недоступно.",
+  "Lua cannot change full Roblox stretching. PC: Windows / GPU driver. Mobile: unavailable."),
+  12,6,705,56,13,false,C.text)
+ msg.TextWrapped=true
+ content.CanvasSize=UDim2.fromOffset(0,468)
 end
 local function startTrack(i)
  local row=tracks[i]
@@ -652,6 +666,8 @@ local keyConn=UIS.InputBegan:Connect(function(input,processed)
 end)
 gui.Destroying:Connect(function()
  alive=false
+ clearFX()
+ pcall(function()Lighting.GlobalShadows=originalShadows end)
  if keyConn then keyConn:Disconnect() end
  if cameraConn then cameraConn:Disconnect() end
  if cameraChangeConn then cameraChangeConn:Disconnect() end
