@@ -1,0 +1,274 @@
+-- OX1DE v0.7 NEW FILE (visible version marker)
+local Players=game:GetService("Players")
+local UIS=game:GetService("UserInputService")
+local RunService=game:GetService("RunService")
+local localPlayer=Players.LocalPlayer
+if not localPlayer then return end
+if _G.OX1DE_HEAD_CLEANUP then pcall(_G.OX1DE_HEAD_CLEANUP) end
+local connections={}
+local highlights={}
+local labels={}
+local STUDS_PER_METER=1/0.28
+local MAX_LABEL_METERS=220
+local MAX_LABEL_STUDS=MAX_LABEL_METERS*STUDS_PER_METER
+local aimOn=false
+local espOn=true
+local fov=50
+local gui=Instance.new("ScreenGui")
+gui.Name="OX1DE_Head_Menu_v07"
+gui.ResetOnSpawn=false
+gui.IgnoreGuiInset=true
+gui.DisplayOrder=950
+local playerGui=localPlayer:WaitForChild("PlayerGui")
+for _,oldName in ipairs({"OX1DE_Head_Menu","OX1DE_Head_Menu_v07"}) do
+ local old=playerGui:FindFirstChild(oldName)
+ if old then old:Destroy() end
+end
+gui.Parent=playerGui
+local function connect(signal,fn)
+ local c=signal:Connect(fn)
+ table.insert(connections,c)
+ return c
+end
+local versionTag=Instance.new("TextLabel")
+versionTag.Name="OX1DE_Version_Verification"
+versionTag.Size=UDim2.fromOffset(260,34)
+versionTag.Position=UDim2.new(0.5,-130,0,45)
+versionTag.BackgroundColor3=Color3.fromRGB(110,0,0)
+versionTag.TextColor3=Color3.new(1,1,1)
+versionTag.Text="OX1DE v0.7 | NICKS 220m"
+versionTag.TextSize=16
+versionTag.Font=Enum.Font.GothamBold
+versionTag.ZIndex=200
+versionTag.Parent=gui
+Instance.new("UICorner",versionTag).CornerRadius=UDim.new(0,8)
+local frame=Instance.new("Frame")
+frame.Name="Window"
+frame.Size=UDim2.fromOffset(260,214)
+frame.Position=UDim2.new(0,30,0.35,0)
+frame.BackgroundColor3=Color3.fromRGB(18,18,24)
+frame.BorderSizePixel=0
+frame.Active=true
+frame.Draggable=true
+frame.Parent=gui
+Instance.new("UICorner",frame).CornerRadius=UDim.new(0,10)
+local function makeButton(text,y)
+ local b=Instance.new("TextButton")
+ b.Text=text
+ b.Font=Enum.Font.GothamSemibold
+ b.TextSize=13
+ b.TextColor3=Color3.fromRGB(255,255,255)
+ b.Size=UDim2.new(1,-20,0,35)
+ b.Position=UDim2.fromOffset(10,y)
+ b.BackgroundColor3=Color3.fromRGB(50,50,60)
+ b.Parent=frame
+ Instance.new("UICorner",b).CornerRadius=UDim.new(0,7)
+ return b
+end
+local aimBtn=makeButton("AIM [E]: OFF",10)
+local espBtn=makeButton("ESP: ON",52)
+
+local fovTitle=Instance.new("TextLabel")
+fovTitle.Name="FOVValue"
+fovTitle.Size=UDim2.new(1,-20,0,23)
+fovTitle.Position=UDim2.fromOffset(10,97)
+fovTitle.TextColor3=Color3.new(1,1,1)
+fovTitle.BackgroundTransparency=1
+fovTitle.Font=Enum.Font.GothamSemibold
+fovTitle.TextSize=14
+fovTitle.Text="FOV: 50 / 100"
+fovTitle.Parent=frame
+local slider=Instance.new("Frame")
+slider.Name="FOVSlider"
+slider.Size=UDim2.new(1,-30,0,10)
+slider.Position=UDim2.fromOffset(15,129)
+slider.BackgroundColor3=Color3.fromRGB(68,68,80)
+slider.BorderSizePixel=0
+slider.Parent=frame
+Instance.new("UICorner",slider).CornerRadius=UDim.new(1,0)
+local fill=Instance.new("Frame")
+fill.Name="Fill"
+fill.Size=UDim2.fromScale(0.5,1)
+fill.BackgroundColor3=Color3.fromRGB(255,35,35)
+fill.BorderSizePixel=0
+fill.Parent=slider
+Instance.new("UICorner",fill).CornerRadius=UDim.new(1,0)
+local dragHit=Instance.new("TextButton")
+dragHit.Name="FOVDrag"
+dragHit.Size=UDim2.new(1,0,1,24)
+dragHit.Position=UDim2.fromOffset(0,-12)
+dragHit.Text=""
+dragHit.BackgroundTransparency=1
+dragHit.Parent=slider
+-- Visible FOV ring drawn as 72 explicit UI line segments
+local circleSegments={}
+for i=1,72 do
+ local segment=Instance.new("Frame")
+ segment.Name="FOV_Segment_"..i
+ segment.AnchorPoint=Vector2.new(0.5,0.5)
+ segment.BackgroundColor3=Color3.fromRGB(255,35,35)
+ segment.BackgroundTransparency=0
+ segment.BorderSizePixel=0
+ segment.ZIndex=100
+ segment.Parent=gui
+ circleSegments[i]=segment
+end
+local function updateCircle()
+ local radius=fov*3
+ local segmentLength=math.max(2,2*math.pi*radius/72+1)
+ for i,segment in ipairs(circleSegments) do
+  local angle=(i-0.5)*2*math.pi/72
+  segment.Visible=radius>0
+  segment.Size=UDim2.fromOffset(segmentLength,3)
+  segment.Position=UDim2.new(0.5,math.cos(angle)*radius,0.5,math.sin(angle)*radius)
+  segment.Rotation=math.deg(angle)+90
+ end
+end
+local function setFov(value)
+ fov=math.clamp(math.floor(value+0.5),0,100)
+ fovTitle.Text="FOV: "..fov.." / 100"
+ fill.Size=UDim2.fromScale(fov/100,1)
+ updateCircle()
+end
+updateCircle()
+local dragging=false
+local function readSlider(x)
+ if slider.AbsoluteSize.X>0 then
+  setFov((x-slider.AbsolutePosition.X)/slider.AbsoluteSize.X*100)
+ end
+end
+connect(dragHit.InputBegan,function(input)
+ if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
+  dragging=true
+  readSlider(input.Position.X)
+ end
+end)
+connect(UIS.InputChanged,function(input)
+ if dragging and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
+  readSlider(input.Position.X)
+ end
+end)
+connect(UIS.InputEnded,function(input)
+ if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then dragging=false end
+end)
+local closeBtn=makeButton("CLOSE",170)
+closeBtn.Size=UDim2.new(1,-20,0,25)
+local function refreshESP()
+ for _,h in pairs(highlights) do h:Destroy() end
+ table.clear(highlights)
+ for _,entry in pairs(labels) do
+  entry.name:Destroy()
+  entry.distance:Destroy()
+ end
+ table.clear(labels)
+ if not espOn then return end
+ for _,p in ipairs(Players:GetPlayers()) do
+  if p~=localPlayer and p.Character then
+   local h=Instance.new("Highlight")
+   h.Name="OX1DE_ESP"
+   h.Adornee=p.Character
+   h.DepthMode=Enum.HighlightDepthMode.AlwaysOnTop
+   h.FillColor=Color3.fromRGB(155,155,155)
+   h.FillTransparency=0.45
+   h.OutlineColor=Color3.fromRGB(255,255,255)
+   h.Parent=gui
+   highlights[p]=h
+   local head=p.Character:FindFirstChild("Head")
+   local rootPart=p.Character:FindFirstChild("HumanoidRootPart")
+   if head and rootPart then
+    local function makeBillboard(name,adornee,offset)
+     local b=Instance.new("BillboardGui")
+     b.Name=name
+     b.Adornee=adornee
+     b.Size=UDim2.fromOffset(210,30)
+     b.StudsOffsetWorldSpace=offset
+     b.AlwaysOnTop=true
+     b.MaxDistance=MAX_LABEL_STUDS
+     b.Parent=gui
+     local t=Instance.new("TextLabel")
+     t.Name="Text"
+     t.Size=UDim2.fromScale(1,1)
+     t.BackgroundTransparency=1
+     t.TextColor3=Color3.new(1,1,1)
+     t.TextStrokeColor3=Color3.new(0,0,0)
+     t.TextStrokeTransparency=0
+     t.Font=Enum.Font.GothamBold
+     t.TextSize=14
+     t.Parent=b
+     return b,t
+    end
+    local nameBoard,nameText=makeBillboard("OX1DE_Name",head,Vector3.new(0,2.6,0))
+    nameText.Text=p.DisplayName.." (@"..p.Name..")"
+    local distanceBoard,distanceText=makeBillboard("OX1DE_FeetDistance",rootPart,Vector3.new(0,-3.1,0))
+    labels[p]={name=nameBoard,distance=distanceBoard,distanceText=distanceText}
+   end
+  end
+ end
+end
+refreshESP()
+local function toggleAim()
+ aimOn=not aimOn
+ aimBtn.Text="AIM [E]: "..(aimOn and "ON" or "OFF")
+end
+connect(aimBtn.MouseButton1Click,toggleAim)
+connect(espBtn.MouseButton1Click,function()
+ espOn=not espOn
+ espBtn.Text="ESP: "..(espOn and "ON" or "OFF")
+ refreshESP()
+end)
+connect(UIS.InputBegan,function(input,processed)
+ if not processed and input.KeyCode==Enum.KeyCode.E and not UIS:GetFocusedTextBox() then toggleAim() end
+end)
+connect(Players.PlayerAdded,function(p)
+ connect(p.CharacterAdded,function() task.defer(refreshESP) end)
+end)
+for _,p in ipairs(Players:GetPlayers()) do
+ if p~=localPlayer then connect(p.CharacterAdded,function() task.defer(refreshESP) end) end
+end
+connect(Players.PlayerRemoving,function(p)
+ if highlights[p] then highlights[p]:Destroy(); highlights[p]=nil end
+ if labels[p] then labels[p].name:Destroy(); labels[p].distance:Destroy(); labels[p]=nil end
+end)
+connect(RunService.RenderStepped,function()
+ if espOn and localPlayer.Character then
+  local root=localPlayer.Character:FindFirstChild("HumanoidRootPart")
+  for p,entry in pairs(labels) do
+   local target=p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+   local distance=root and target and math.floor((root.Position-target.Position).Magnitude+0.5) or nil
+   local meters=distance and math.floor(distance*0.28+0.5) or nil
+   local near=meters~=nil and meters<=MAX_LABEL_METERS
+   entry.name.Enabled=near
+   entry.distance.Enabled=near
+   entry.distanceText.Text=meters and (meters.." м") or ""
+  end
+ end
+ if not aimOn or fov==0 then return end
+ local camera=workspace.CurrentCamera
+ if not camera then return end
+ local middle=Vector2.new(camera.ViewportSize.X/2,camera.ViewportSize.Y/2)
+ local closest,dist=nil,fov*3
+ for _,p in ipairs(Players:GetPlayers()) do
+  if p~=localPlayer and p.Character then
+   local humanoid=p.Character:FindFirstChildOfClass("Humanoid")
+   local head=p.Character:FindFirstChild("Head")
+   if head and humanoid and humanoid.Health>0 then
+    local pos,visible=camera:WorldToViewportPoint(head.Position)
+    if visible and pos.Z>0 then
+     local d=(Vector2.new(pos.X,pos.Y)-middle).Magnitude
+     if d<dist then closest=head;dist=d end
+    end
+   end
+  end
+ end
+ if closest then
+  camera.CFrame=CFrame.lookAt(camera.CFrame.Position,closest.Position)
+ end
+end)
+_G.OX1DE_HEAD_CLEANUP=function()
+ for _,c in ipairs(connections) do pcall(function() c:Disconnect() end) end
+ for _,h in pairs(highlights) do pcall(function() h:Destroy() end) end
+ for _,entry in pairs(labels) do pcall(function() entry.name:Destroy(); entry.distance:Destroy() end) end
+ pcall(function() gui:Destroy() end)
+ _G.OX1DE_HEAD_CLEANUP=nil
+end
+connect(closeBtn.MouseButton1Click,function() _G.OX1DE_HEAD_CLEANUP() end)
