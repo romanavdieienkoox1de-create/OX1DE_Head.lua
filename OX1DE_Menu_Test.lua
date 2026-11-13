@@ -370,14 +370,24 @@ local function onlyPreview(y)
  return rowNotice(T("Демонстрация оформления. Игровые функции пока отключены — проверяем стабильность нового меню.",
  "Visual preview. Game functions are disabled until the UI is stable."),4,y,734,59)
 end
-local function demoToggle(k,txt,desc,y,value)
+local function demoToggle(k,txt,desc,y)
+ local b=gameplay()
+ local enabled=b and b.getOption(k)==true or false
  local row=block(content,4,y,734,64,C.panel,12,6)
  label(row,txt,15,7,570,28,16,true)
- label(row,desc,15,35,580,20,11,false,C.sub)
- local toggle=button(row,value and T("ВКЛ","ON") or "OFF",620,12,100,39,nil,value,8)
- toggle.TextColor3=C.sub
- toggle.BackgroundColor3=C.alt
- toggle.AutoButtonColor=false
+ label(row,desc or "",15,35,580,20,11,false,C.sub)
+ local toggle=button(row,not b and "—" or (enabled and T("ВКЛ","ON") or T("ВЫКЛ","OFF")),
+  620,12,100,39,nil,enabled,8)
+ if not b then toggle.BackgroundColor3=C.alt;toggle.AutoButtonColor=false;return row end
+ toggle.MouseButton1Click:Connect(function()
+  local now=gameplay()
+  if now then
+   now.setOption(k,not now.getOption(k))
+   local selected=now.getOption(k)
+   toggle.Text=selected and T("ВКЛ","ON") or T("ВЫКЛ","OFF")
+   toggle.BackgroundColor3=selected and C.purple or C.card
+  end
+ end)
  return row
 end
 local function valueRow(titleText,value,y)
@@ -385,6 +395,64 @@ local function valueRow(titleText,value,y)
  label(row,titleText,15,5,440,45,15,true)
  label(row,tostring(value),490,5,225,45,15,true,C.purple)
  return row
+end
+local function bindRow(titleText,key,y)
+ local r=block(content,4,y,734,57,C.panel,11,6)
+ label(r,titleText,16,6,450,42,15,true)
+ local currentName=keyNames[key] or "?"
+ button(r,bindingTarget==key and T("Нажми клавишу","Press a key") or currentName,
+  509,7,209,43,function()
+   bindingTarget=key
+   show(current=="settings" and "settings" or "game")
+  end,true)
+end
+local function engineSlider(key,titleText,minimum,maximum,step,unit,y)
+ local b=gameplay()
+ if not b or not b.warSettings then return end
+ local r=block(content,4,y,734,74,C.panel,11,6)
+ label(r,titleText,14,4,450,29,14,true)
+ local value=label(r,"",579,4,134,29,13,true,C.bright)
+ local track=block(r,22,50,683,9,C.alt,5,8)
+ track.Active=true
+ local fill=block(track,0,0,1,9,C.purple,5,9)
+ local dot=block(track,0,-5,19,19,C.text,10,10)
+ local function sync()
+  local v=tonumber(b.warSettings[key]) or minimum
+  local t=math.clamp((v-minimum)/(maximum-minimum),0,1)
+  fill.Size=UDim2.new(t,0,1,0)
+  dot.Position=UDim2.new(t,-9,0,-5)
+  value.Text=tostring(v)..(unit or "")
+ end
+ local function move(x)
+  local t=math.clamp((x-track.AbsolutePosition.X)/math.max(1,track.AbsoluteSize.X),0,1)
+  local v=math.clamp(math.floor(((minimum+(maximum-minimum)*t)/step)+.5)*step,minimum,maximum)
+  b.warSettings[key]=v
+  sync()
+ end
+ local dragged=false
+ local dragTouch=nil
+ track.InputBegan:Connect(function(i)
+  if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+   dragged=true;dragTouch=i.UserInputType==Enum.UserInputType.Touch and i or nil
+   move(i.Position.X)
+  end
+ end)
+ local moving=UIS.InputChanged:Connect(function(i)
+  if not dragged then return end
+  if dragTouch then if i~=dragTouch then return end
+  elseif i.UserInputType~=Enum.UserInputType.MouseMovement then return end
+  move(i.Position.X)
+ end)
+ local ending=UIS.InputEnded:Connect(function(i)
+  if i.UserInputType==Enum.UserInputType.MouseButton1 or (dragTouch and i==dragTouch) then
+   if dragged then
+    dragged=false;dragTouch=nil
+    if b.save then b.save() end
+   end
+  end
+ end)
+ track.Destroying:Connect(function()moving:Disconnect();ending:Disconnect()end)
+ sync()
 end
 local function panelTab(txt,x,active,callback)
  return button(content,txt,x,4,178,46,callback,active,8)
@@ -532,49 +600,95 @@ local function renderHistory()
  content.CanvasSize=UDim2.fromOffset(0,math.max(463,75+#history*67))
 end
 local function renderGame()
- heading("OX1DE  •  "..nameFor(selectedGame),T("Меню функций игры","Game features menu"))
- for i,item in ipairs({
-  {"main",T("Главное","Main")},{"aim","AIM"},{"esp","ESP"},{"other",T("Прочее","Other")}
- }) do
-  panelTab(item[2],4+(i-1)*184,tab==item[1],function()tab=item[1];show("game")end)
+ if not selectedGame then selectedGame="violence_district" end
+ heading("OX1DE  •  "..nameFor(selectedGame),T("Управление функциями игры","Game controls"))
+ local isWar=selectedGame=="warfare"
+ local tabs=isWar and {{"main",T("Главное","Main")},{"aim","AIM"},{"esp","ESP"}}
+   or {{"main",T("Главное","Main")},{"esp","ESP"}}
+ if not isWar and tab=="aim" then tab="main" end
+ for i,item in ipairs(tabs) do
+  local w=math.floor(734/#tabs)-7
+  local x=4+(i-1)*(w+10)
+  button(content,item[2],x,4,w,46,function()tab=item[1];show("game")end,tab==item[1],8)
  end
- local y=67
- if selectedGame=="warfare" then
+ local y=63
+ local b=gameplay()
+ if not b then
+  local notice=rowNotice(bridgeError~="" and bridgeError or
+   T("Игровой модуль ещё не подключён. Вернись к списку и нажми «Открыть».",
+     "Game module is not connected. Return to the list and launch it."),
+    4,y,734,82)
+  local retry=button(content,T("↻  Повторить запуск","↻  Retry launch"),4,y+96,325,48,function()
+   launchGame(selectedGame)
+  end,true)
+  content.CanvasSize=UDim2.fromOffset(0,430)
+  return
+ end
+ if isWar then
   if tab=="main" then
-   demoToggle("warFly","Fly","WASD / Space / Ctrl",y,false);y+=71
-   demoToggle("warNoClip","NoClip",T("Проход через объекты","Pass through objects"),y,false);y+=71
-   demoToggle("warAimPreview","AIM",T("Наведение камеры","Camera aiming"),y,false);y+=71
+   demoToggle("warFly","Fly",T("Полёт относительно камеры","Camera flight"),y);y+=72
+   demoToggle("warNoClip","NoClip",T("Без столкновений","No collisions"),y);y+=72
+   demoToggle("warTeamHud",T("Счётчик команд","Team counter"),T("Союзники и противники","Allies and enemies"),y);y+=72
+   bindRow("Fly", "warFly",y);y+=65
+   bindRow("NoClip","warNoClip",y);y+=65
   elseif tab=="aim" then
-   for _,row in ipairs({{"AIM",false},{"FOV",true},{"Wall Check",true},{"Team Check",true},{"Удержание AIM",true}}) do
-    demoToggle("aim",row[1],T("Параметр наведения","Aiming option"),y,row[2]);y+=71
+   demoToggle("warAimPreview","AIM",T("Настройка из оригинального игрового модуля","Original game module settings"),y);y+=72
+   demoToggle("warFov","FOV",T("Отображать FOV","Show FOV"),y);y+=72
+   demoToggle("warTeamCheck","Team Check",T("Проверять команду","Check teams"),y);y+=72
+   demoToggle("warWallCheck","Wall Check",T("Проверять препятствия","Check obstacles"),y);y+=72
+   demoToggle("warHoldAim",T("Удержание AIM","Hold AIM"),"RMB / LMB",y);y+=72
+   local mode=b.warSettings.mode
+   label(content,T("Режим наведения","Aim mode"),11,y,300,35,16,true)
+   button(content,"HARD",340,y,182,39,function()
+    b.warSettings.mode="hard";b.save();show("game")
+   end,mode=="hard")
+   button(content,"LEGIT",538,y,191,39,function()
+    b.warSettings.mode="legit";b.save();show("game")
+   end,mode=="legit")
+   y+=52
+   local specs={
+    {"fov","FOV",20,400,5," px"},
+    {"distance",T("Дальность","Range"),10,300,5," м"},
+    {"prediction",T("Упреждение","Prediction"),0,100,5," %"},
+    {"smooth",T("Плавность","Smoothness"),5,100,5," %"},
+    {"height",T("Высота","Height"),-100,100,5," %"},
+    {"drop",T("Коррекция падения","Drop correction"),0,100,5," %"}
+   }
+   for _,item in ipairs(specs) do
+    engineSlider(item[1],item[2],item[3],item[4],item[5],item[6],y)
+    y+=82
    end
-   valueRow("FOV","160 px",y);y+=63
-   valueRow(T("Дальность","Range"),"50 м",y);y+=63
-  elseif tab=="esp" then
-   for _,r in ipairs({"Союзники","Противники","Никнеймы","Оружие","FPV-дроны","HP игроков"}) do
-    demoToggle("esp",r,T("Подсветка в игре","In-game highlight"),y,false);y+=71
-   end
+   bindRow(T("Клавиша AIM","AIM key"),"warAim",y);y+=65
   else
-   demoToggle("warFly","Fly","WASD",y,false);y+=71
-   demoToggle("warNoClip","NoClip","WASD",y,false);y+=71
+   for _,entry in ipairs({
+    {"warAllies",T("Союзники","Allies")},{"warEnemies",T("Противники","Enemies")},
+    {"warNames",T("Никнеймы и метры","Names and distance")},
+    {"warWeapons",T("Оружие","Weapon info")},{"warFPV","FPV"},
+    {"warShowHP","HP"},{"warTeamHud",T("Счётчик команд","Team counter")}
+   }) do
+    demoToggle(entry[1],entry[2],T("Информация на экране","On-screen display"),y);y+=72
+   end
   end
  else
   if tab=="esp" then
-   for _,r in ipairs({"Игроки","Убийца","Генераторы","Тыквы","Паллеты"}) do
-    demoToggle("esp",r,T("Подсветка объектов","Object ESP"),y,false);y+=71
+   for _,entry in ipairs({{"players",T("Игроки","Players")},
+    {"killers",T("Убийца","Killer")},{"generators",T("Генераторы","Generators")},
+    {"pumpkins",T("Тыквы","Pumpkins")},{"pallets",T("Паллеты","Pallets")}}) do
+    demoToggle(entry[1],entry[2],T("Подсветка объектов","Object highlight"),y);y+=72
    end
-  elseif tab=="aim" then
-   rowNotice(T("Для «Района насилия» в текущем скрипте нет AIM.",
-       "The Violence District script currently has no AIM."),4,y,734,82);y+=91
   else
-   for _,r in ipairs({"Fly","NoClip",T("Автопроверка навыка","Auto Skill Check")}) do
-    demoToggle("main",r,T("Игровая функция","Game feature"),y,false);y+=71
-   end
+   demoToggle("fly","Fly",T("Полёт","Flight"),y);y+=72
+   demoToggle("noclip","NoClip",T("Без столкновений","No collisions"),y);y+=72
+   demoToggle("autoSkill",T("Автопроверка навыка","Auto Skill Check"),
+    T("Ранее добавленная функция","Existing game function"),y);y+=72
+   bindRow("Fly","fly",y);y+=65
+   bindRow("NoClip","noclip",y);y+=65
   end
  end
- onlyPreview(y+9)
- button(content,T("←  Вернуться к играм","←  Back to games"),4,y+77,335,47,function()show("scripts")end,false)
- content.CanvasSize=UDim2.fromOffset(0,math.max(464,y+137))
+ button(content,T("←  Все скрипты","←  Scripts"),4,y+12,287,46,function()
+  show("scripts")
+ end)
+ content.CanvasSize=UDim2.fromOffset(0,math.max(424,y+83))
 end
 local function renderQuality()
  label(content,T("Качество изображения","Image quality"),10,73,650,33,20,true)
