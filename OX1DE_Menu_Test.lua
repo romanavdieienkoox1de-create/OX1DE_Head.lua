@@ -707,17 +707,61 @@ local function renderSettings()
 end
 local function renderTelegram()
  heading("Telegram","https://t.me/playox1de")
- label(content,T("Канал OX1DE","OX1DE channel"),11,30,700,51,27,true)
- label(content,"https://t.me/playox1de",11,95,705,43,19,true)
- local status=label(content,"",11,252,720,51,14,false,C.sub)
- button(content,T("➤  Открыть Telegram","➤  Open Telegram"),11,170,500,57,function()
-  local url="https://t.me/playox1de"
-  local ok=pcall(function()game:GetService("GuiService"):OpenBrowserWindow(url)end)
+ local card=block(content,4,18,734,331,C.panel,15,6)
+ stroke(card,C.alt,.4,1)
+ local badge=block(card,21,24,72,70,Color3.fromRGB(32,84,135),14,7)
+ label(badge,"➤",0,10,72,48,33,true,C.text,true,8)
+ label(card,T("Канал OX1DE","OX1DE channel"),113,25,589,43,24,true)
+ label(card,T("Новости, обновления и связь с командой",
+  "Updates, news and team contact"),114,70,580,29,14,false,C.sub)
+ local url="https://t.me/playox1de"
+ local link=mk("TextBox",card,{
+  Position=UDim2.fromOffset(20,132),Size=UDim2.fromOffset(692,47),
+  Text=url,TextEditable=false,ClearTextOnFocus=false,
+  TextColor3=C.text,TextSize=16,Font=Enum.Font.Gotham,
+  BackgroundColor3=C.card,BorderSizePixel=0,ZIndex=9})
+ rounded(link,10)
+ local status=label(card,T("Кнопка копирования доступна, если исполнитель разрешает буфер обмена.",
+   "Copy works when the script environment supports clipboard access."),
+   21,266,684,47,12,false,C.sub)
+ status.TextWrapped=true
+ local function copyLink()
+  local copied=false
+  if type(setclipboard)=="function" then copied=pcall(setclipboard,url)
+  elseif type(toclipboard)=="function" then copied=pcall(toclipboard,url)
+  end
+  if copied then
+   status.Text=T("Ссылка скопирована! Вставь её в браузер или Telegram.",
+    "Link copied! Paste it into your browser or Telegram.")
+  else
+   pcall(function()
+    link:CaptureFocus()
+    link.CursorPosition=#url+1
+    link.SelectionStart=1
+   end)
+   status.Text=T("Ссылка выделена. Нажми Ctrl+C или скопируй её вручную.",
+    "Link selected. Press Ctrl+C or copy it manually.")
+  end
+  return copied
+ end
+ button(card,T("➤   ОТКРЫТЬ TELEGRAM","➤   OPEN TELEGRAM"),19,196,332,57,function()
+  local ok=pcall(function()
+   local gs=game:GetService("GuiService")
+   gs:OpenBrowserWindow(url)
+  end)
   if not ok then
-   if type(setclipboard)=="function" then pcall(setclipboard,url) end
-   status.Text=T("Если ссылка не открылась, используй: ","Open the link manually: ")..url
+   copyLink()
+   status.Text=T("Roblox заблокировал браузер. Ссылка доступна выше для копирования.",
+    "Roblox blocked the browser. You can copy the link above.")
+  else
+   status.Text=T("Запрос на открытие Telegram отправлен.","Requested to open Telegram.")
   end
  end,true)
+ button(card,T("▣   КОПИРОВАТЬ ССЫЛКУ","▣   COPY LINK"),365,196,347,57,copyLink,false)
+ rowNotice(T("Нельзя обещать автоматическое открытие внешней ссылки из любой игры Roblox.",
+  "Automatic external-link opening cannot be guaranteed in every Roblox experience."),
+  4,369,734,60)
+ content.CanvasSize=UDim2.fromOffset(0,463)
 end
 show=function(page)
  if not alive then return end
