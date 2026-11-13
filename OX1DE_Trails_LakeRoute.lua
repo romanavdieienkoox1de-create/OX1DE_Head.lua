@@ -38,6 +38,8 @@ local driveSeat=nil
 local lastPosition=nil
 local stuckClock=0
 local stepClock=0
+local lastThrottle=0
+local lastSteer=0
 local status="Сядь на квадроцикл. Затем нажми «Записать»."
 local note="Маршрут вокруг озера: записывай береговую дорогу, не сокращая путь."
 local function listen(signal,callback)
@@ -163,6 +165,8 @@ local function releaseSeat(seat)
 end
 local function stopDrive(reason)
  driving=false
+ lastThrottle=0
+ lastSteer=0
  releaseSeat(driveSeat)
  driveSeat=nil
  stuckClock=0
@@ -293,6 +297,14 @@ end)
 local runningConnection
 runningConnection=listen(RunService.Heartbeat,function(dt)
  if not alive then return end
+ -- VehicleSeat steering and throttle may reset to zero every frame.
+ -- Refresh the last safe command every heartbeat; navigate less often.
+ if driving and driveSeat and driveSeat.Parent then
+  pcall(function()
+   driveSeat.ThrottleFloat=lastThrottle
+   driveSeat.SteerFloat=lastSteer
+  end)
+ end
  stepClock+=dt
  if stepClock<.12 then return end
  local delta=stepClock
@@ -342,9 +354,11 @@ runningConnection=listen(RunService.Heartbeat,function(dt)
      local steer=math.clamp(angle*1.55,-1,1)
      local throttle=speedOptions[speedIndex]
      if math.abs(angle)>1.0 then throttle=throttle*.45 end
+     lastThrottle=throttle
+     lastSteer=steer
      local ok=pcall(function()
-      seat.ThrottleFloat=throttle
-      seat.SteerFloat=steer
+      seat.ThrottleFloat=lastThrottle
+      seat.SteerFloat=lastSteer
      end)
      if not ok then
       stopDrive("Trails не разрешил управление VehicleSeat из этого скрипта.")
