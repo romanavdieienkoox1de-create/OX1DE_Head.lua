@@ -513,89 +513,173 @@ local function renderQuality()
  content.CanvasSize=UDim2.fromOffset(0,468)
 end
 local function startTrack(i)
- local row=tracks[i]
- if not row then return end
- songIndex=i
- musicEnabled=true
- music:Stop();music.SoundId="rbxassetid://"..row.id
+ local track=tracks[i]
+ if not track then musicMessage=T("Список треков пуст.","Playlist is empty.");return end
+ songIndex=i;musicEnabled=true;musicMessage=""
+ music:Stop()
+ music.SoundId="rbxassetid://"..tostring(track.id)
  music.Volume=volume/100
- pcall(function()music:Play()end)
+ local ok,err=pcall(function()music:Play()end)
+ if not ok then
+  musicEnabled=false
+  musicMessage="Ошибка: "..tostring(err)
+ end
+ local expected=music.SoundId
+ task.delay(8,function()
+  if not alive or not music.Parent or not musicEnabled or music.SoundId~=expected then return end
+  if not music.IsLoaded then
+   musicEnabled=false;music:Stop()
+   musicMessage=T("Roblox не разрешил этот Audio ID или трек недоступен.",
+      "Roblox denied this audio asset or it is unavailable.")
+   if current=="settings" and settingsTab=="music" then show("settings") end
+  end
+ end)
 end
 music.Ended:Connect(function()
  if musicEnabled and alive and #tracks>0 then
   startTrack(songIndex%#tracks+1)
+  if current=="settings" and settingsTab=="music" then show("settings") end
  end
 end)
 local function renderMusic()
- label(content,T("Музыкальный плеер","Music player"),9,70,485,35,20,true)
- local active=button(content,musicEnabled and T("■  Стоп","■  Stop") or T("▶  Включить","▶  Play"),
-  537,70,195,45,function()
-   if musicEnabled then musicEnabled=false;music:Stop()
-   else startTrack(songIndex) end
-   show("settings")
-  end,musicEnabled)
- label(content,T("Громкость музыки","Music volume"),9,130,580,35,17,true)
- local volText=label(content,tostring(volume).."%",602,129,127,35,16,true,C.yellow)
- local volTrack=block(content,12,184,716,10,C.alt,5,7)
- local volFill=block(volTrack,0,0,volume*7.16,10,C.purple,5,8)
- local knob=block(volTrack,volume*7.16-9,-5,19,19,C.text,10,9)
- local moving=false
+ label(content,T("Музыкальный плеер","Music player"),9,64,494,36,20,true)
+ local now=tracks[songIndex]
+ local playerBox=block(content,4,108,734,113,C.panel,13,6)
+ stroke(playerBox,C.alt,.42,1)
+ local art=block(playerBox,12,10,88,91,Color3.fromRGB(43,23,75),12,7)
+ label(art,"♫",0,21,88,47,33,true,C.bright,true,8)
+ label(playerBox,now and now.name or T("Нет трека","No track"),115,13,361,35,18,true)
+ label(playerBox,now and (now.genre or "Roblox Audio") or "",
+  115,49,356,22,12,false,C.sub)
+ label(playerBox,T("Локальный звук • слышен только тебе","Local music • only you hear it"),
+  115,75,370,21,11,false,C.sub)
+ button(playerBox,"◀◀",508,28,61,54,function()
+  if #tracks>0 then startTrack((songIndex-2)%#tracks+1);show("settings")end
+ end,false)
+ button(playerBox,musicEnabled and "■" or "▶",577,28,61,54,function()
+  if musicEnabled then musicEnabled=false;music:Stop()
+  else startTrack(songIndex)end
+  show("settings")
+ end,true)
+ button(playerBox,"▶▶",646,28,61,54,function()
+  if #tracks>0 then startTrack(songIndex%#tracks+1);show("settings")end
+ end,false)
+ local status=label(content,musicMessage,11,224,727,28,12,false,C.red)
+ label(content,T("Громкость музыки","Music volume"),10,258,580,28,16,true)
+ local volText=label(content,tostring(volume).."%",626,258,106,27,14,true,C.yellow)
+ local volTrack=block(content,12,308,713,11,C.alt,6,7)
+ local volFill=block(volTrack,0,0,volume*7.13,11,C.purple,6,8)
+ local knob=block(volTrack,volume*7.13-9,-5,20,20,C.text,10,9)
+ local dragging=false
+ local dragTouch=nil
  local function updateVolume(x)
   local t=math.clamp((x-volTrack.AbsolutePosition.X)/math.max(1,volTrack.AbsoluteSize.X),0,1)
   volume=math.floor(t*100+.5)
-  volText.Text=volume.."%"
+  volText.Text=tostring(volume).."%"
   volFill.Size=UDim2.new(volume/100,0,1,0)
   knob.Position=UDim2.new(volume/100,-9,0,-5)
   music.Volume=volume/100
  end
  volTrack.InputBegan:Connect(function(input)
   if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then
-   moving=true;updateVolume(input.Position.X)
-  end
- end)
- volTrack.InputEnded:Connect(function()moving=false end)
- local c1=UIS.InputChanged:Connect(function(input)
-  if moving and (input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch) then
+   dragging=true
+   dragTouch=input.UserInputType==Enum.UserInputType.Touch and input or nil
    updateVolume(input.Position.X)
   end
  end)
- -- Disconnect global handlers when this page is destroyed.
- volTrack.Destroying:Connect(function()c1:Disconnect()end)
- label(content,T("Добавить трек Roblox Audio ID","Add Roblox Audio ID"),10,215,720,31,15,true)
- local field=mk("TextBox",content,{
-  Position=UDim2.fromOffset(4,255),Size=UDim2.fromOffset(490,46),
-  Text="",PlaceholderText=T("Числовой Audio ID","Numeric Audio ID"),
-  TextColor3=C.text,PlaceholderColor3=C.sub,TextSize=14,Font=Enum.Font.Gotham,
-  ClearTextOnFocus=false,BackgroundColor3=C.panel,BorderSizePixel=0,ZIndex=8})
- rounded(field,10)
- local status=label(content,"",10,305,718,30,12,false,C.red)
- button(content,T("+ Добавить","+ Add"),506,255,226,46,function()
-  local id=field.Text:gsub("%D","")
-  if #id<6 then
-   status.Text=T("Укажи числовой Roblox Audio ID.","Enter a numeric Roblox Audio ID.")
-   return
+ local dragConn=UIS.InputChanged:Connect(function(input)
+  if not dragging then return end
+  if dragTouch then if input~=dragTouch then return end
+  elseif input.UserInputType~=Enum.UserInputType.MouseMovement then return end
+  updateVolume(input.Position.X)
+ end)
+ local endConn=UIS.InputEnded:Connect(function(input)
+  if input.UserInputType==Enum.UserInputType.MouseButton1 or (dragTouch and input==dragTouch) then
+   dragging=false;dragTouch=nil
   end
-  tracks[#tracks+1]={id=id,name="Audio "..id}
-  show("settings")
- end,true)
- label(content,T("Плейлист","Playlist"),9,351,570,28,17,true)
+ end)
+ volTrack.Destroying:Connect(function()
+  dragConn:Disconnect();endConn:Disconnect()
+ end)
+ label(content,T("Плейлист Roblox","Roblox playlist"),9,339,450,31,18,true)
+ local find=mk("TextBox",content,{
+  Position=UDim2.fromOffset(443,340),Size=UDim2.fromOffset(290,35),
+  Text="",PlaceholderText=T("Поиск по названию...","Search by title..."),
+  TextColor3=C.text,PlaceholderColor3=C.sub,Font=Enum.Font.Gotham,
+  TextSize=12,ClearTextOnFocus=false,BackgroundColor3=C.card,
+  BorderSizePixel=0,ZIndex=9})
+ rounded(find,8)
+ local rowFrames={}
  for i,track in ipairs(tracks) do
-  local y=388+(i-1)*61
-  local row=block(content,4,y,732,54,C.panel,10,6)
-  label(row,track.name,12,4,470,45,14,true)
-  button(row,"▶",504,7,93,39,function()startTrack(i);show("settings")end,i==songIndex and musicEnabled)
-  button(row,"×",608,7,113,39,function()
-   if i==songIndex then music:Stop();musicEnabled=false end
+  local y=387+(i-1)*60
+  local row=block(content,4,y,734,54,i==songIndex and Color3.fromRGB(56,38,76) or C.panel,9,6)
+  rowFrames[i]=row
+  label(row,string.format("%02d",i),10,3,33,47,12,true,C.sub)
+  label(row,track.name,47,3,449,26,14,true)
+  label(row,track.genre or "Roblox Audio",47,29,438,19,10,false,C.sub)
+  button(row,"▶",554,7,70,39,function()
+   startTrack(i);show("settings")
+  end,i==songIndex and musicEnabled)
+  button(row,"×",636,7,86,39,function()
+   local currentTrack=tracks[i]
+   if currentTrack and music.SoundId=="rbxassetid://"..currentTrack.id then
+    musicEnabled=false;music:Stop()
+   end
    table.remove(tracks,i)
    songIndex=math.max(1,math.min(songIndex,#tracks))
    show("settings")
   end,false)
  end
- local info=label(content,T("Музыка звучит только у тебя. Права на аудио проверяет Roblox; поиск любых песен Google недоступен.",
- "Audio is local. Roblox controls audio permissions; Google-wide song search is unavailable."),
-  10,397+#tracks*61,718,75,12,false,C.sub)
- info.TextWrapped=true
- content.CanvasSize=UDim2.fromOffset(0,math.max(465,489+#tracks*61))
+ local function filter(query)
+  local search=query:lower()
+  local visibleCount=0
+  for i,track in ipairs(tracks) do
+   local good=search=="" or track.name:lower():find(search,1,true)~=nil
+      or tostring(track.id):find(search,1,true)~=nil
+   if rowFrames[i] then
+    rowFrames[i].Visible=good
+    if good then
+     rowFrames[i].Position=UDim2.fromOffset(4,387+visibleCount*60)
+     visibleCount+=1
+    end
+   end
+  end
+ end
+ find:GetPropertyChangedSignal("Text"):Connect(function()filter(find.Text)end)
+ local bottom=391+#tracks*60
+ label(content,T("Добавить свой Roblox Audio ID","Add Roblox Audio ID"),
+  9,bottom+10,700,31,16,true)
+ local title=mk("TextBox",content,{
+  Position=UDim2.fromOffset(4,bottom+49),Size=UDim2.fromOffset(365,44),
+  Text="",PlaceholderText=T("Название трека","Track title"),
+  TextColor3=C.text,PlaceholderColor3=C.sub,Font=Enum.Font.Gotham,
+  TextSize=13,ClearTextOnFocus=false,BackgroundColor3=C.card,
+  BorderSizePixel=0,ZIndex=8})
+ rounded(title,9)
+ local idInput=mk("TextBox",content,{
+  Position=UDim2.fromOffset(377,bottom+49),Size=UDim2.fromOffset(227,44),
+  Text="",PlaceholderText="Audio ID",
+  TextColor3=C.text,PlaceholderColor3=C.sub,Font=Enum.Font.Gotham,
+  TextSize=13,ClearTextOnFocus=false,BackgroundColor3=C.card,
+  BorderSizePixel=0,ZIndex=8})
+ rounded(idInput,9)
+ button(content,"+",615,bottom+49,121,44,function()
+  local id=idInput.Text:gsub("%D","")
+  if #id<6 or #id>15 then
+   musicMessage=T("Нужен корректный числовой Audio ID.","Enter a numeric Audio ID.")
+   show("settings");return
+  end
+  local songName=title.Text:gsub("^%s+",""):gsub("%s+$","")
+  if songName=="" then songName="Audio "..id end
+  tracks[#tracks+1]={id=id,name=songName,genre="Мой трек"}
+  musicMessage=T("Трек добавлен. Воспроизведение зависит от прав Roblox.","Track added; availability depends on Roblox.")
+  show("settings")
+ end,true)
+ local foot=label(content,T("Любые песни из Google напрямую не воспроизводятся. Используй доступные аудио Roblox.",
+  "Streaming any Google song is unavailable. Use permitted Roblox audio assets."),
+  9,bottom+112,718,47,12,false,C.sub)
+ foot.TextWrapped=true
+ content.CanvasSize=UDim2.fromOffset(0,bottom+173)
 end
 local function renderLanguage()
  label(content,T("Язык интерфейса","Interface language"),10,84,697,42,21,true)
