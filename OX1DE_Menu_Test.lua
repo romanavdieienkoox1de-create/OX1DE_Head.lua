@@ -1,4 +1,4 @@
--- OX1DE UI v0.4.4 • FULL DESIGN PREVIEW, NO GAMEPLAY MODIFICATIONS
+-- OX1DE UI v0.5.0 • FULL DESIGN PREVIEW, NO GAMEPLAY MODIFICATIONS
 -- Isolated launcher for design approval. AIM/ESP/Fly are not activated.
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
@@ -76,14 +76,18 @@ local previousGame=nil
 local history={}
 -- Licensed Roblox library samples. Actual playback depends on audio permissions.
 local tracks={
- {id="1837849285",name="Upbeat Electronica",genre="Electronic"},
- {id="1848183670",name="Grandiose Fantasy",genre="Cinematic"},
- {id="1843463175",name="Creepy Organ / Dungeon",genre="Atmosphere"},
  {id="1837848642",name="Crystal Clear",genre="Electronic"},
  {id="1836842889",name="Solar Flares",genre="Electronic"},
  {id="1847853099",name="Robotic Dance C",genre="Dance"},
+ {id="1842627030",name="Funky Beats",genre="Dance"},
+ {id="1842801942",name="Full Force",genre="Electronic"},
+ {id="1837560230",name="Classic Chase",genre="Cinematic"},
+ {id="1840044242",name="Shooting Star",genre="Electronic"},
  {id="1841647093",name="Life in an Elevator",genre="Lounge"},
- {id="1848354536",name="Relaxed Scene",genre="Ambient"}
+ {id="1848354536",name="Relaxed Scene",genre="Ambient"},
+ {id="1837849285",name="Upbeat Electronica",genre="Electronic"},
+ {id="1848183670",name="Grandiose Fantasy",genre="Cinematic"},
+ {id="1843463175",name="Creepy Organ / Dungeon",genre="Atmosphere"}
 }
 local songIndex=1
 local musicEnabled=false
@@ -228,7 +232,7 @@ local content=mk("ScrollingFrame",win,{
  BorderSizePixel=0,CanvasSize=UDim2.fromOffset(0,463),
  ScrollingDirection=Enum.ScrollingDirection.Y,ZIndex=4})
 block(win,19,571,960,1,C.alt,nil,4)
-label(win,"OX1DE   •   UI TEST v0.4.4",24,578,358,27,12,true,C.sub)
+label(win,"OX1DE   •   UI TEST v0.5.0",24,578,358,27,12,true,C.sub)
 local telegramFooter=button(win,"➤  t.me/playox1de",757,576,218,35,nil,false)
 telegramFooter.TextSize=12
 local nav={}
@@ -833,4 +837,4 @@ do
  end)
 end
 show("scripts")
-print("[OX1DE] Unified themed GUI preview 0.4.4 loaded successfully")
+print("[OX1DE] Unified themed GUI preview 0.5.0 loaded successfully")
