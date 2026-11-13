@@ -346,6 +346,8 @@ local function setVisible(open)
    pcall(b.setTab,"violence_district")
    if b.setOverlaysVisible then pcall(b.setOverlaysVisible,false) end
   end
+  local trails=env.OX1DE_TRAILS_API or _G.OX1DE_TRAILS_API
+  if trails and trails.hideMarkers then pcall(trails.hideMarkers) end
  elseif b and b.setOverlaysVisible then
   pcall(b.setOverlaysVisible,true)
  end
@@ -371,6 +373,8 @@ local exitNotice=label(confirmCard,T("Меню полностью отключи
 exitNotice.TextWrapped=true
 local function shutdown()
  if not alive then return end
+ local trails=env.OX1DE_TRAILS_API or _G.OX1DE_TRAILS_API
+ if trails and trails.stop then pcall(trails.stop) end
  local b=gameplay()
  if b then pcall(b.stop) end
  savePrefs()
@@ -689,8 +693,79 @@ local function renderHistory()
  end
  content.CanvasSize=UDim2.fromOffset(0,math.max(463,75+#history*67))
 end
+local function renderTrails()
+ heading("OX1DE  •  "..nameFor("trails"),
+  T("Автоматическая езда вокруг озера","Route recorder for the lake"))
+ local api=trailsApi()
+ if not api then
+  local message=bridgeError~="" and bridgeError or
+   T("Модуль Trails ещё не запущен.","Trails module is not running.")
+  rowNotice(message,4,14,734,84)
+  button(content,T("↻  Подключить Trails","↻  Connect Trails"),4,118,344,52,function()
+   launchGame("trails")
+  end,true)
+  content.CanvasSize=UDim2.fromOffset(0,415)
+  return
+ end
+ local state=api.getState()
+ local headingBox=block(content,4,10,734,108,C.panel,13,6)
+ stroke(headingBox,C.alt,.35,1)
+ label(headingBox,T("МАРШРУТ ВОКРУГ ОЗЕРА","LAKE LOOP ROUTE"),15,7,708,25,17,true,C.text)
+ local liveText=label(headingBox,state.status or "",15,35,701,63,13,false,C.sub)
+ liveText.TextWrapped=true
+ local buttonWidth=355
+ local function callApi(fn)
+  local ok,err=pcall(fn)
+  if not ok then bridgeError="Trails: "..tostring(err) end
+  show("game")
+ end
+ button(content,state.recording and T("■  Закончить запись","■  Stop recording")
+  or T("●  Записать маршрут","●  Record route"),4,132,buttonWidth,52,function()
+   callApi(api.record)
+ end,state.recording,8)
+ button(content,T("↓  Сохранить маршрут","↓  Save route"),379,132,355,52,function()
+   callApi(api.save)
+ end,false,8)
+ button(content,state.driving and T("▶  Автоезда активна","▶  Auto drive active")
+  or T("▶  АВТОЕЗДА","▶  AUTO DRIVE"),4,195,355,52,function()
+   if not state.driving then callApi(api.autoDrive) end
+ end,state.driving,8)
+ button(content,T("■  СТОП","■  STOP"),379,195,355,52,function()
+   callApi(api.stopDriving)
+ end,false,8)
+ button(content,state.markers and T("◎  Скрыть точки","◎  Hide waypoints")
+  or T("◎  Показать точки","◎  Show waypoints"),4,258,355,48,function()
+   callApi(api.toggleMarkers)
+ end,false,8)
+ button(content,T("Скорость • ","Speed • ")..tostring(state.speed).."%",379,258,355,48,function()
+   callApi(api.nextSpeed)
+ end,false,8)
+ local counters=block(content,4,319,734,109,C.panel,12,6)
+ local pointsText=label(counters,"",13,4,708,30,14,true)
+ local seatText=label(counters,"",13,38,708,29,12,false,C.sub)
+ local modeText=label(counters,"",13,71,708,28,12,false,C.sub)
+ local function updateStatus()
+  if not api.alive() or not alive then return end
+  local st=api.getState()
+  liveText.Text=st.status or ""
+  pointsText.Text=string.format(T("Точки: %d • Длина: %.0f studs • Разрыв: %.0f",
+   "Points: %d • Length: %.0f studs • Gap: %.0f"),st.count,st.length,st.gap)
+  seatText.Text=T("Транспорт: ","Vehicle: ")..(st.seat or "—")
+  modeText.Text=T("Управление: ","Control: ")..(st.mode or "—")..
+    T("  •  Скорость: ","  •  Speed: ")..tostring(st.realSpeed or 0).." studs/s"
+ end
+ updateStatus()
+ local tick=0
+ local connection=RunService.Heartbeat:Connect(function(dt)
+  tick+=dt
+  if tick>.45 then tick=0;updateStatus()end
+ end)
+ liveText.Destroying:Connect(function()connection:Disconnect()end)
+ content.CanvasSize=UDim2.fromOffset(0,448)
+end
 local function renderGame()
  if not selectedGame then selectedGame="violence_district" end
+ if selectedGame=="trails" then renderTrails();return end
  heading("OX1DE  •  "..nameFor(selectedGame),T("Управление функциями игры","Game controls"))
  local isWar=selectedGame=="warfare"
  local tabs=isWar and {{"main",T("Главное","Main")},{"aim","AIM"},{"esp","ESP"}}
@@ -1153,6 +1228,8 @@ local keyConn=UIS.InputBegan:Connect(function(input,processed)
 end)
 gui.Destroying:Connect(function()
  alive=false
+ local trails=env.OX1DE_TRAILS_API or _G.OX1DE_TRAILS_API
+ if trails and trails.stop then pcall(trails.stop) end
  env.OX1DE_SHELL_MODE=nil
  _G.OX1DE_SHELL_MODE=nil
  env.OX1DE_SHELL_TOGGLE=nil
