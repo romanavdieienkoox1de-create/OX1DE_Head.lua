@@ -296,12 +296,11 @@ for i,item in ipairs(navSpec) do
 end
 block(side,13,395,182,1,C.alt,nil,4)
 local leave=button(side,"⏻  "..T("Выход","Exit"),12,404,184,51,function()show("exit")end)
-local statsPanel=block(gui,0,0,218,37,C.bg,10,51)
-statsPanel.AnchorPoint=Vector2.new(1,0)
-statsPanel.Position=UDim2.new(1,-10,0,11)
-statsPanel.BackgroundTransparency=.12
-stroke(statsPanel,C.purple,.45,1)
-local statsText=label(statsPanel,"",10,1,198,35,13,true,C.text,true,53)
+-- HUD is embedded beside the minimize/close buttons, rather than floating
+-- above Roblox or covering the top-right of the launcher.
+local statsPanel=block(head,463,18,190,39,C.panel,10,9)
+stroke(statsPanel,C.purple,.5,1)
+local statsText=label(statsPanel,"",7,1,176,37,12,true,C.text,true,11)
 statsPanel.Visible=fpsEnabled or pingEnabled
 local sampledFrames=0
 local elapsedStats=0
@@ -309,8 +308,12 @@ local lastFps=0
 local lastPing=0
 local statsConn=RunService.RenderStepped:Connect(function(dt)
  if not alive then return end
- statsPanel.Visible=fpsEnabled or pingEnabled
- if not statsPanel.Visible then return end
+ statsPanel.Visible=win.Visible and (fpsEnabled or pingEnabled)
+ if not (fpsEnabled or pingEnabled) then
+  elapsedStats=0;sampledFrames=0
+  statsText.Text=""
+  return
+ end
  sampledFrames+=1;elapsedStats+=dt
  if elapsedStats<.7 then return end
  lastFps=math.floor(sampledFrames/elapsedStats+.5)
@@ -323,6 +326,7 @@ local statsConn=RunService.RenderStepped:Connect(function(dt)
  statsText.Text=table.concat(data,"    |    ")
 end)
 local balloon=button(gui,"OX1DE",0,0,52,52,nil,true,45)
+local mobileBubbleOnly=UIS.TouchEnabled and not UIS.KeyboardEnabled
 balloon.BackgroundColor3=C.bg
 balloon.Position=UDim2.new(1,-68,.42,0)
 stroke(balloon,C.purple,.05,1.4);rounded(balloon,26)
@@ -337,7 +341,8 @@ local function setVisible(open)
   local b=gameplay()
   if b then pcall(b.setTab,"violence_district") end
  end
- win.Visible=open;balloon.Visible=not open
+ win.Visible=open
+ balloon.Visible=mobileBubbleOnly and not open
 end
 restore.MouseButton1Click:Connect(function()setVisible(false)end)
 hide.MouseButton1Click:Connect(function()setVisible(false)end)
@@ -397,12 +402,20 @@ local function onlyPreview(y)
  return rowNotice(T("Демонстрация оформления. Игровые функции пока отключены — проверяем стабильность нового меню.",
  "Visual preview. Game functions are disabled until the UI is stable."),4,y,734,59)
 end
-local function demoToggle(k,txt,desc,y)
+local function demoToggle(k,txt,desc,y,bindKey)
  local b=gameplay()
  local enabled=b and b.getOption(k)==true or false
  local row=block(content,4,y,734,64,C.panel,12,6)
- label(row,txt,15,7,570,28,16,true)
- label(row,desc or "",15,35,580,20,11,false,C.sub)
+ label(row,txt,15,7,bindKey and 375 or 570,28,16,true)
+ label(row,desc or "",15,35,bindKey and 377 or 580,20,11,false,C.sub)
+ if bindKey then
+  local keyCaption=bindingTarget==bindKey and T("ЖДУ КЛАВИШУ","PRESS KEY")
+    or (T("БИНД: ","KEY: ")..(keyNames[bindKey] or "?"))
+  button(row,keyCaption,409,12,201,39,function()
+   bindingTarget=bindKey
+   show("game")
+  end,false,8)
+ end
  local toggle=button(row,not b and "—" or (enabled and T("ВКЛ","ON") or T("ВЫКЛ","OFF")),
   620,12,100,39,nil,enabled,8)
  if not b then toggle.BackgroundColor3=C.alt;toggle.AutoButtonColor=false;return row end
@@ -657,13 +670,11 @@ local function renderGame()
  end
  if isWar then
   if tab=="main" then
-   demoToggle("warFly","Fly",T("Полёт относительно камеры","Camera flight"),y);y+=72
-   demoToggle("warNoClip","NoClip",T("Без столкновений","No collisions"),y);y+=72
+   demoToggle("warFly","Fly",T("Полёт относительно камеры","Camera flight"),y,"warFly");y+=72
+   demoToggle("warNoClip","NoClip",T("Без столкновений","No collisions"),y,"warNoClip");y+=72
    demoToggle("warTeamHud",T("Счётчик команд","Team counter"),T("Союзники и противники","Allies and enemies"),y);y+=72
-   bindRow("Fly", "warFly",y);y+=65
-   bindRow("NoClip","warNoClip",y);y+=65
   elseif tab=="aim" then
-   demoToggle("warAimPreview","AIM",T("Настройка из оригинального игрового модуля","Original game module settings"),y);y+=72
+   demoToggle("warAimPreview","AIM",T("Настройка из оригинального игрового модуля","Original game module settings"),y,"warAim");y+=72
    demoToggle("warFov","FOV",T("Отображать FOV","Show FOV"),y);y+=72
    demoToggle("warTeamCheck","Team Check",T("Проверять команду","Check teams"),y);y+=72
    demoToggle("warWallCheck","Wall Check",T("Проверять препятствия","Check obstacles"),y);y+=72
@@ -689,7 +700,6 @@ local function renderGame()
     engineSlider(item[1],item[2],item[3],item[4],item[5],item[6],y)
     y+=82
    end
-   bindRow(T("Клавиша AIM","AIM key"),"warAim",y);y+=65
   else
    for _,entry in ipairs({
     {"warAllies",T("Союзники","Allies")},{"warEnemies",T("Противники","Enemies")},
@@ -708,12 +718,10 @@ local function renderGame()
     demoToggle(entry[1],entry[2],T("Подсветка объектов","Object highlight"),y);y+=72
    end
   else
-   demoToggle("fly","Fly",T("Полёт","Flight"),y);y+=72
-   demoToggle("noclip","NoClip",T("Без столкновений","No collisions"),y);y+=72
+   demoToggle("fly","Fly",T("Полёт","Flight"),y,"fly");y+=72
+   demoToggle("noclip","NoClip",T("Без столкновений","No collisions"),y,"noclip");y+=72
    demoToggle("autoSkill",T("Автопроверка навыка","Auto Skill Check"),
     T("Ранее добавленная функция","Existing game function"),y);y+=72
-   bindRow("Fly","fly",y);y+=65
-   bindRow("NoClip","noclip",y);y+=65
   end
  end
  button(content,T("←  Все скрипты","←  Scripts"),4,y+12,287,46,function()
@@ -948,7 +956,8 @@ local function renderControls()
   local r=block(content,4,y,734,67,C.panel,11,6)
   label(r,titleText,15,4,551,30,15,true)
   label(r,desc,15,35,570,24,12,false,C.sub)
-  local enabled=key=="fps" and fpsEnabled or pingEnabled
+  local enabled
+  if key=="fps" then enabled=fpsEnabled else enabled=pingEnabled end
   button(r,enabled and T("ВКЛ","ON") or T("ВЫКЛ","OFF"),
    609,12,111,43,function()
     if key=="fps" then fpsEnabled=not fpsEnabled
@@ -960,19 +969,12 @@ local function renderControls()
  option(T("Счётчик FPS","FPS counter"),T("Показывать кадры в секунду","Show frames per second"),"fps",109)
  option(T("Счётчик PING","Ping counter"),T("Показывать задержку сети","Show network latency"),"ping",184)
  bindRow(T("Открыть / закрыть меню","Open / close menu"),"menu",268)
- label(content,T("Клавиши для игровых функций","Game function keybinds"),
-  10,334,700,28,16,true)
- bindRow("Fly", "fly",372)
- bindRow("NoClip","noclip",437)
- bindRow("WARFARE Fly","warFly",502)
- bindRow("WARFARE NoClip","warNoClip",567)
- bindRow("WARFARE AIM","warAim",632)
- local hint=label(content,hasFiles and T("Настройки сохраняются на устройстве.",
-   "Settings are saved locally.") or T("Автосохранение недоступно. Параметры сохраняются только до перезапуска.",
-   "File saving unavailable. Settings reset after restart."),
-    10,706,720,49,12,false,C.sub)
+ local hint=label(content,hasFiles and T("Клавиша меню сохраняется на устройстве.",
+   "Menu shortcut is saved locally.") or T("Автосохранение недоступно; после перезапуска клавиша сбросится.",
+   "File saving unavailable; shortcut resets after restart."),
+    10,345,720,65,12,false,C.sub)
  hint.TextWrapped=true
- content.CanvasSize=UDim2.fromOffset(0,770)
+ content.CanvasSize=UDim2.fromOffset(0,433)
 end
 local function renderSettings()
  heading(T("Настройки","Settings"),
