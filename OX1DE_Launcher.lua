@@ -333,13 +333,20 @@ stroke(balloon,C.purple,.05,1.4);rounded(balloon,26)
 balloon.Visible=false
 local function setVisible(open)
  if not alive then return end
+ local b=gameplay()
  if not open then
+  -- Hiding the menu suspends visual ESP and generator highlights immediately;
+  -- save the user's switches unchanged for the next open.
   selectedGame="violence_district"
   previousGame="violence_district"
   tab="main"
   current="game"
-  local b=gameplay()
-  if b then pcall(b.setTab,"violence_district") end
+  if b then
+   pcall(b.setTab,"violence_district")
+   if b.setOverlaysVisible then pcall(b.setOverlaysVisible,false) end
+  end
+ elseif b and b.setOverlaysVisible then
+  pcall(b.setOverlaysVisible,true)
  end
  win.Visible=open
  balloon.Visible=mobileBubbleOnly and not open
@@ -413,6 +420,8 @@ local function demoToggle(k,txt,desc,y,bindKey)
     or (T("БИНД: ","KEY: ")..(keyNames[bindKey] or "?"))
   button(row,keyCaption,409,12,201,39,function()
    bindingTarget=bindKey
+   _G.OX1DE_SHELL_BINDING=true
+   env.OX1DE_SHELL_BINDING=true
    show("game")
   end,false,8)
  end
@@ -443,6 +452,8 @@ local function bindRow(titleText,key,y)
  button(r,bindingTarget==key and T("Нажми клавишу","Press a key") or currentName,
   509,7,209,43,function()
    bindingTarget=key
+   _G.OX1DE_SHELL_BINDING=true
+   env.OX1DE_SHELL_BINDING=true
    show(current=="settings" and "settings" or "game")
   end,true)
 end
@@ -537,6 +548,7 @@ local function prepareEngine(id)
  end
  pcall(b.setTab,id)
  if b.hideNative then pcall(b.hideNative) end
+ if b.setOverlaysVisible then pcall(b.setOverlaysVisible,win.Visible) end
  pcall(b.save)
  bridgeError=""
  return true
@@ -1079,6 +1091,8 @@ local keyConn=UIS.InputBegan:Connect(function(input,processed)
  if bindingTarget then
   local target=bindingTarget
   bindingTarget=nil
+  _G.OX1DE_SHELL_BINDING=nil
+  env.OX1DE_SHELL_BINDING=nil
   if input.KeyCode~=Enum.KeyCode.Unknown and input.KeyCode~=Enum.KeyCode.Escape then
    keyNames[target]=input.KeyCode.Name
    local b=gameplay()
@@ -1092,6 +1106,10 @@ local keyConn=UIS.InputBegan:Connect(function(input,processed)
   return
  end
  if UIS:GetFocusedTextBox() then return end
+ if input.KeyCode==Enum.KeyCode.Escape and win.Visible then
+  setVisible(false)
+  return
+ end
  if not processed and input.KeyCode.Name==keyNames.menu then
   setVisible(not win.Visible)
   if win.Visible then show(current) end
@@ -1103,6 +1121,8 @@ gui.Destroying:Connect(function()
  _G.OX1DE_SHELL_MODE=nil
  env.OX1DE_SHELL_TOGGLE=nil
  _G.OX1DE_SHELL_TOGGLE=nil
+ env.OX1DE_SHELL_BINDING=nil
+ _G.OX1DE_SHELL_BINDING=nil
  savePrefs()
  clearFX()
  pcall(function()Lighting.GlobalShadows=originalShadows end)
