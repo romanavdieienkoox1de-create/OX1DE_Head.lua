@@ -1,4 +1,4 @@
--- OX1DE Trails Lake Route v0.1 | standalone client-side test
+-- OX1DE Trails Lake Route v0.2.0 | standalone client-side test
 -- Record an actual trip around the lake, save points, then TEST seat steering.
 -- This does not teleport a vehicle. Actual movement depends on the game's
 -- VehicleSeat/chassis controls and server permissions.
@@ -508,4 +508,4 @@ local api={
 }
 env.OX1DE_TRAILS_API=api
 _G.OX1DE_TRAILS_API=api
-print("[OX1DE Trails] Route recorder ready; embedded mode: "..tostring(embedded))
+print("[OX1DE Trails v0.2.0] Route recorder ready; embedded mode: "..tostring(embedded))
