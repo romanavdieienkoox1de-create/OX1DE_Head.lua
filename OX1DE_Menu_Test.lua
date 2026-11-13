@@ -74,6 +74,36 @@ local aspect="16:9"
 local language="ru"
 local previousGame=nil
 local history={}
+local HttpService=game:GetService("HttpService")
+local prefsFile="OX1DE_Menu_"..tostring(p.UserId)..".json"
+local hasFiles=type(readfile)=="function" and type(writefile)=="function"
+local cfg={}
+if hasFiles then
+ local ok,data=pcall(function()return HttpService:JSONDecode(readfile(prefsFile))end)
+ if ok and type(data)=="table" then cfg=data end
+end
+local fpsEnabled=cfg.showFPS==true
+local pingEnabled=cfg.showPing==true
+local bindingTarget=nil
+local keyNames={menu="RightShift",fly="F6",noclip="F7",warFly="F9",warNoClip="F8",warAim="F10"}
+if type(cfg.binds)=="table" then
+ for k,v in pairs(cfg.binds) do
+  local ok=type(v)=="string" and #v<35 and pcall(function()return Enum.KeyCode[v]end)
+  if keyNames[k] and ok then keyNames[k]=v end
+ end
+end
+local env=_G
+if type(getgenv)=="function" then
+ local ok,e=pcall(getgenv)
+ if ok and type(e)=="table" then env=e end
+end
+local bridgeError=""
+local engineStarting=false
+local function gameplay()
+ local b=env.OX1DE_BRIDGE or _G.OX1DE_BRIDGE
+ if b and type(b.alive)=="function" and b.alive() then return b end
+ return nil
+end
 -- Licensed Roblox library samples. Actual playback depends on audio permissions.
 local tracks={
  {id="1837848642",name="Crystal Clear",genre="Electronic"},
@@ -92,6 +122,26 @@ local tracks={
 local songIndex=1
 local musicEnabled=false
 local volume=65
+if cfg.language=="ru" or cfg.language=="en" then language=cfg.language end
+if cfg.quality=="potato" or cfg.quality=="standard" or cfg.quality=="ultra" then chosenQuality=cfg.quality end
+if type(cfg.aspect)=="string" then aspect=cfg.aspect end
+if type(cfg.volume)=="number" then volume=math.clamp(cfg.volume,0,100) end
+if type(cfg.tracks)=="table" and #cfg.tracks>0 then
+ tracks={}
+ for i,item in ipairs(cfg.tracks) do
+  if i>120 then break end
+  if type(item)=="table" and type(item.id)=="string" and item.id:match("^%d+$") and type(item.name)=="string" then
+   tracks[#tracks+1]={id=item.id,name=item.name:sub(1,75),genre=type(item.genre)=="string" and item.genre or "Roblox Audio"}
+  end
+ end
+end
+local function savePrefs()
+ if not hasFiles then return end
+ cfg.showFPS=fpsEnabled;cfg.showPing=pingEnabled;cfg.binds=keyNames
+ cfg.language=language;cfg.quality=chosenQuality;cfg.aspect=aspect
+ cfg.volume=volume;cfg.tracks=tracks
+ pcall(function()writefile(prefsFile,HttpService:JSONEncode(cfg))end)
+end
 local musicMessage=""
 local activeFX={}
 local graphicsMessage="Выбери профиль графики"
@@ -195,16 +245,11 @@ block(head,0,60,1000,14,C.head,nil,3)
 block(head,16,73,968,1,C.alt,nil,5)
 local logo=block(head,14,10,54,53,Color3.fromRGB(0,0,0),10,6)
 stroke(logo,C.text,.35,1)
-label(logo,"OX",2,4,50,27,22,true,C.text,true,8)
-label(logo,"1DE",3,30,49,17,13,true,C.text,true,8)
+label(logo,"OX1DE",3,3,49,47,13,true,C.text,true,8)
 label(head,"OX1DE",81,8,320,35,27,true)
 label(head,"SCRIPT MENU",83,43,290,17,10,true,C.sub)
 local account=label(head,p.DisplayName,678,10,190,27,14,true)
 local username=label(head,"@"..p.Name,678,38,194,20,11,false,C.sub)
-local crown=label(head,"♛",643,16,29,30,19,true,C.yellow)
-local prime=button(head,"PRIME",868,18,68,39,nil,false)
-prime.BackgroundColor3=Color3.fromRGB(66,48,27);prime.TextColor3=C.yellow
-stroke(prime,C.yellow,.35,.8)
 local show
 local restore=button(head,"−",941,18,24,39,nil,false)
 local hide=button(head,"×",970,18,25,39,nil,false)
@@ -233,34 +278,36 @@ local content=mk("ScrollingFrame",win,{
  ScrollingDirection=Enum.ScrollingDirection.Y,ZIndex=4})
 block(win,19,571,960,1,C.alt,nil,4)
 label(win,"OX1DE   •   UI TEST v0.5.0",24,578,358,27,12,true,C.sub)
-local telegramFooter=button(win,"➤  t.me/playox1de",757,576,218,35,nil,false)
+local telegramFooter=button(win,"t.me/playox1de",757,576,218,35,nil,false)
 telegramFooter.TextSize=12
 local nav={}
 local navSpec={
  {"scripts","≡",T("Скрипты","Scripts")},
  {"history","◷",T("История","History")},
  {"settings","⚙",T("Настройки","Settings")},
- {"telegram","➤","Telegram"}
+ {"telegram","","Telegram"}
 }
 local navFunction
 for i,item in ipairs(navSpec) do
  local id=item[1]
  nav[id]=button(side,item[2].."    "..item[3],12,104+(i-1)*57,184,49,function()show(id)end)
 end
-local primeSidebar=block(side,12,344,184,44,Color3.fromRGB(45,34,22),9,5)
-stroke(primeSidebar,C.yellow,.55,1)
-label(primeSidebar,"♛   PRIME",14,4,155,34,14,true,C.yellow)
 block(side,13,395,182,1,C.alt,nil,4)
 local leave=button(side,"⏻  "..T("Выход","Exit"),12,404,184,51,function()show("exit")end)
-local balloon=button(gui,"OX",0,0,52,52,nil,true,45)
+local balloon=button(gui,"OX1DE",0,0,52,52,nil,true,45)
 balloon.BackgroundColor3=C.bg
 balloon.Position=UDim2.new(1,-68,.42,0)
 stroke(balloon,C.purple,.05,1.4);rounded(balloon,26)
 balloon.Visible=false
 local function setVisible(open)
  if not alive then return end
- if not open and current=="settings" and previousGame then
+ if not open then
+  selectedGame="violence_district"
+  previousGame="violence_district"
+  tab="main"
   current="game"
+  local b=gameplay()
+  if b then pcall(b.setTab,"violence_district") end
  end
  win.Visible=open;balloon.Visible=not open
 end
@@ -283,6 +330,9 @@ local exitNotice=label(confirmCard,T("Меню полностью отключи
 exitNotice.TextWrapped=true
 local function shutdown()
  if not alive then return end
+ local b=gameplay()
+ if b then pcall(b.stop) end
+ savePrefs()
  alive=false
  clearFX()
  pcall(function()Lighting.GlobalShadows=originalShadows end)
@@ -798,6 +848,11 @@ local keyConn=UIS.InputBegan:Connect(function(input,processed)
 end)
 gui.Destroying:Connect(function()
  alive=false
+ env.OX1DE_SHELL_MODE=nil
+ _G.OX1DE_SHELL_MODE=nil
+ env.OX1DE_SHELL_TOGGLE=nil
+ _G.OX1DE_SHELL_TOGGLE=nil
+ savePrefs()
  clearFX()
  pcall(function()Lighting.GlobalShadows=originalShadows end)
  if keyConn then keyConn:Disconnect() end
