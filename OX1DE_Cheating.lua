@@ -75,7 +75,7 @@ if savedSettings and (savedSettings.selectedTab=="warfare" or savedSettings.sele
 end
 local scheduleLegacyRefresh
 local hideWarfareFx
-local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20,height=0,mode="legit"}
+local warSettings={fov=160,distance=50,prediction=35,smooth=65,drop=20,height=0,mode="hard"}
 auxUI.defaults.warfare=table.clone(warSettings)
 if savedSettings and type(savedSettings.warfare)=="table" then
  for name,limits in pairs({fov={20,400},distance={10,300},prediction={0,100},smooth={5,100},drop={0,100},height={-100,100}}) do
@@ -611,7 +611,7 @@ listen(UserInputService.InputBegan,function(input,handled)
  if UserInputService:GetFocusedTextBox() then return end
  if key==keybind.menu then
   if _G.OX1DE_SHELL_TOGGLE then
-   _G.OX1DE_SHELL_TOGGLE()
+   -- The dedicated launcher handles this same key. Avoid double-toggle.
    return
   end
   -- A touch profile is opened by its floating launcher, never by a second
