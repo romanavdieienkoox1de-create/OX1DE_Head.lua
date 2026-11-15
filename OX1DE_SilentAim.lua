@@ -23,6 +23,7 @@ local settings = {
     hookMouse = true,
 }
 local diagnostics = { raycast = 0, mouse = 0 }
+local checkingVisibility = false
 local holdingFire = false
 local lastFire = 0
 local connections = {}
@@ -76,7 +77,9 @@ local function playerCounts()
             params.FilterType = Enum.RaycastFilterType.Exclude
             local char = localPlayer.Character
             if char then params.FilterDescendantsInstances = {char} end
+            checkingVisibility = true
             local hit = workspace:Raycast(origin, direction, params)
+            checkingVisibility = false
             if not hit or hit.Instance:IsDescendantOf(part.Parent) then
                 visible += 1
             end
@@ -174,7 +177,7 @@ if type(hookmetamethod) == "function" and type(getnamecallmethod) == "function" 
     local ok = pcall(function()
         oldNamecall = hookmetamethod(game, "__namecall", safeClosure(function(self, ...)
             local method = getnamecallmethod()
-            if alive and settings.enabled and isFiring() and self == workspace and method == "Raycast"
+            if alive and settings.enabled and not checkingVisibility and isFiring() and self == workspace and method == "Raycast"
                 and not (type(checkcaller) == "function" and checkcaller()) then
                 local args = table.pack(...)
                 local origin, direction = args[1], args[2]
@@ -222,7 +225,7 @@ end
 status.Text = string.format("Hooks: Raycast %s | Mouse %s",
     raycastAvailable and "YES" or "NO",
     mouseAvailable and "YES" or "NO")
-status.TextColor3 = raycastAvailable or mouseAvailable
+status.TextColor3 = (raycastAvailable or mouseAvailable)
     and Color3.fromRGB(140, 240, 165)
     or Color3.fromRGB(255, 120, 110)
 local lastUpdate = 0
