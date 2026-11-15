@@ -8,7 +8,7 @@ local me=P.LocalPlayer
 local cam=W.CurrentCamera
 if type(_G.OX1DE_BS_STOP)=="function" then pcall(_G.OX1DE_BS_STOP) end
 local on=true
-local state={aim=false,esp=true,wall=false,team=true,los=true,fov=175,smooth=.2}
+local state={aim=false,esp=true,wall=false,team=false,los=true,fov=175,smooth=.2}
 local connections={}
 local visuals={}
 local gui=Instance.new("ScreenGui")
@@ -51,7 +51,7 @@ local function valid(plr)
  if state.team and me.Team and plr.Team==me.Team then return end
  local char=plr.Character; if not char then return end
  local hum=char:FindFirstChildOfClass("Humanoid")
- local head=char:FindFirstChild("Head")
+ local head=char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
  if not hum or hum.Health<=0 or not head then return end
  return char,hum,head
 end
@@ -68,6 +68,7 @@ local function clearVisual(plr)
  local v=visuals[plr];if not v then return end
  if v.highlight then v.highlight:Destroy() end
  if v.billboard then v.billboard:Destroy() end
+ if v.screenLabel then v.screenLabel:Destroy() end
  visuals[plr]=nil
 end
 local function ensureVisual(plr,char,head)
@@ -77,7 +78,15 @@ local function ensureVisual(plr,char,head)
   local h=mk("Highlight",char,{Name="OX1DE_ESP_HIGHLIGHT",FillColor=Color3.fromRGB(245,65,65),OutlineColor=Color3.new(1,1,1),FillTransparency=.75,OutlineTransparency=.05,DepthMode=Enum.HighlightDepthMode.Occluded})
   local board=mk("BillboardGui",head,{Name="OX1DE_HP_TAG",Size=UDim2.fromOffset(150,46),StudsOffsetWorldSpace=Vector3.new(0,2.4,0),AlwaysOnTop=false,Adornee=head})
   local txt=mk("TextLabel",board,{Size=UDim2.fromScale(1,1),BackgroundTransparency=1,TextColor3=Color3.new(1,1,1),TextStrokeTransparency=.25,TextSize=12,Font=Enum.Font.GothamBold,Text=""})
-  v={character=char,highlight=h,billboard=board,text=txt};visuals[plr]=v
+  local tag=mk("TextLabel",gui,{
+   Name="OX1DE_PLAYER_"..plr.UserId,AnchorPoint=Vector2.new(.5,1),
+   Size=UDim2.fromOffset(210,43),BackgroundColor3=Color3.fromRGB(15,15,22),
+   BackgroundTransparency=.4,BorderSizePixel=0,TextColor3=Color3.fromRGB(255,255,255),
+   TextStrokeTransparency=.5,TextSize=12,Font=Enum.Font.GothamBold,
+   Text="",Visible=false,ZIndex=5
+  })
+  mk("UICorner",tag,{CornerRadius=UDim.new(0,5)})
+  v={character=char,highlight=h,billboard=board,text=txt,screenLabel=tag};visuals[plr]=v
  end
  return v
 end
@@ -111,7 +120,16 @@ listen(R.RenderStepped,function(dt)
     v.highlight.DepthMode=state.wall and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
     v.billboard.AlwaysOnTop=state.wall
     v.billboard.Enabled=true
-    v.text.Text=string.format("%s | HP %d/%d",plr.DisplayName,math.ceil(hum.Health),math.ceil(hum.MaxHealth))
+    local root=me.Character and (me.Character:FindFirstChild("HumanoidRootPart") or me.Character:FindFirstChild("Head"))
+    local distance=root and math.floor((head.Position-root.Position).Magnitude+.5) or -1
+    local displayDistance=distance>=0 and (tostring(distance).." studs") or "? studs"
+    v.text.Text=string.format("%s | HP %d/%d | %s",plr.DisplayName,math.ceil(hum.Health),math.ceil(hum.MaxHealth),displayDistance)
+    local point,inView=cam:WorldToViewportPoint(head.Position)
+    v.screenLabel.Visible=inView and point.Z>0
+    if v.screenLabel.Visible then
+     v.screenLabel.Position=UDim2.fromOffset(point.X,point.Y-33)
+     v.screenLabel.Text=string.format("%s (@%s)\nHP %d/%d  |  %s",plr.DisplayName,plr.Name,math.ceil(hum.Health),math.ceil(hum.MaxHealth),displayDistance)
+    end
    else clearVisual(plr) end
    if not state.los or canSee then
     local point,onScreen=cam:WorldToViewportPoint(head.Position)
