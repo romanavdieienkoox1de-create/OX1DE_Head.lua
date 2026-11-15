@@ -72,7 +72,7 @@ local bindHint=make("TextLabel",{
  Text="Bind: click the small key button, then press a key",
  Font=Enum.Font.Gotham,TextSize=10,TextColor3=Color3.fromRGB(190,190,205),
  BackgroundTransparency=1,Size=UDim2.fromOffset(250,18),
- Position=UDim2.fromOffset(10,414),ZIndex=11
+ Position=UDim2.fromOffset(10,348),ZIndex=11
 },window)
 local state={aim=false,esp=true,fly=false,noclip=false,hitbox=false,push=false,fov=50}
 local bindings={aim=Enum.KeyCode.E,fly=Enum.KeyCode.F,noclip=Enum.KeyCode.N,hitbox=Enum.KeyCode.H,push=Enum.KeyCode.P}
