@@ -1,4 +1,4 @@
--- OX1DE v0.8 | Fly Noclip Hitbox and FOV
+-- OX1DE v0.8.1 | Fix unexpected bracket in Heartbeat handler
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
@@ -323,7 +323,7 @@ connect(RunService.Heartbeat,function()
    flyGyro.CFrame=camera.CFrame
   end
  end
-end))
+end)
 
 connect(RunService.RenderStepped,function()
  if espOn and localPlayer.Character then
