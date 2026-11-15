@@ -18,10 +18,11 @@ local settings = {
     teamCheck = true,
     maxDistance = 1200,
     bulletSpeed = 500, -- studs/second; adjust for the game's projectile speed
-    prediction = true,
+    prediction = false, -- hitscan-style test; no travel-time prediction
     hookRaycast = true,
     hookMouse = true,
 }
+local diagnostics = { raycast = 0, mouse = 0 }
 local holdingFire = false
 local lastFire = 0
 local connections = {}
@@ -63,6 +64,26 @@ local function targetPart()
     end
     return nearest
 end
+local function playerCounts()
+    local total, visible = 0, 0
+    local origin = camera.CFrame.Position
+    for _, p in ipairs(Players:GetPlayers()) do
+        local part = validTarget(p)
+        if part then
+            total += 1
+            local direction = part.Position - origin
+            local params = RaycastParams.new()
+            params.FilterType = Enum.RaycastFilterType.Exclude
+            local char = localPlayer.Character
+            if char then params.FilterDescendantsInstances = {char} end
+            local hit = workspace:Raycast(origin, direction, params)
+            if not hit or hit.Instance:IsDescendantOf(part.Parent) then
+                visible += 1
+            end
+        end
+    end
+    return total, visible
+end
 local function predictedPosition(part, origin)
     local position = part.Position
     if settings.prediction and settings.bulletSpeed > 1 then
@@ -79,7 +100,7 @@ gui.DisplayOrder = 10000
 gui.Parent = localPlayer:WaitForChild("PlayerGui")
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
-panel.Size = UDim2.fromOffset(258, 142)
+panel.Size = UDim2.fromOffset(258, 198)
 panel.Position = UDim2.fromOffset(24, 155)
 panel.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
 panel.BorderSizePixel = 0
@@ -105,9 +126,11 @@ end
 label(7, 16, "OX1DE | SILENT AIM TEST")
 local status = label(38, 13, "Loading hooks...")
 local targetStatus = label(67, 12, "Target: none", Color3.fromRGB(170, 170, 185))
+local countsStatus = label(94, 12, "Players: 0 | Visible: 0")
+local hooksStatus = label(120, 11, "Shot hooks: 0 / 0")
 local toggle = Instance.new("TextButton")
 toggle.Size = UDim2.fromOffset(236, 32)
-toggle.Position = UDim2.fromOffset(11, 102)
+toggle.Position = UDim2.fromOffset(11, 158)
 toggle.Font = Enum.Font.GothamBold
 toggle.TextSize = 13
 toggle.TextColor3 = Color3.new(1, 1, 1)
@@ -160,6 +183,7 @@ if type(hookmetamethod) == "function" and type(getnamecallmethod) == "function" 
                     if root and (origin - root.Position).Magnitude < 35 then
                         local part = targetPart()
                         if part then
+                            diagnostics.raycast += 1
                             args[2] = (predictedPosition(part, origin) - origin).Unit * direction.Magnitude
                             return oldNamecall(self, table.unpack(args, 1, args.n))
                         end
@@ -181,6 +205,7 @@ if type(hookmetamethod) == "function" and settings.hookMouse then
                 if key == "Hit" or key == "Target" then
                     local part = targetPart()
                     if part then
+                        diagnostics.mouse += 1
                         if key == "Target" then return part end
                         local root = myRoot()
                         local origin = root and root.Position or camera.CFrame.Position
@@ -200,10 +225,16 @@ status.Text = string.format("Hooks: Raycast %s | Mouse %s",
 status.TextColor3 = raycastAvailable or mouseAvailable
     and Color3.fromRGB(140, 240, 165)
     or Color3.fromRGB(255, 120, 110)
+local lastUpdate = 0
 connect(RunService.Heartbeat, function()
+    if os.clock() - lastUpdate < 0.3 then return end
+    lastUpdate = os.clock()
     if not alive then return end
     local part = settings.enabled and targetPart() or nil
     targetStatus.Text = part and ("Target: " .. part.Parent.Name) or "Target: none"
+    local total, visible = playerCounts()
+    countsStatus.Text = string.format("Players: %d | Visible: %d", total, visible)
+    hooksStatus.Text = string.format("Redirect attempts: Ray %d / Mouse %d", diagnostics.raycast, diagnostics.mouse)
 end)
 _G.OX1DE_SILENT_STOP = function()
     alive = false
