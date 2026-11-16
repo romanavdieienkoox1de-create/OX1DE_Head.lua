@@ -7,28 +7,11 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local fly, noclip = false, false
-local boostEnabled, animationsDisabled = false, false
+local boostEnabled = false
 local baseWalkSpeed = 16
 local lastHumanoid = nil
-local animationScriptWasDisabled = nil
 local speed = 55
-local BOOST = 1.8
-local function applyAnimations()
-    local c = player.Character
-    if not c then return end
-    local animate = c:FindFirstChild("Animate")
-    if animate then
-        if animationScriptWasDisabled == nil then animationScriptWasDisabled = animate.Disabled end
-        animate.Disabled = animationsDisabled or animationScriptWasDisabled
-    end
-    if animationsDisabled then
-        local h = c:FindFirstChildOfClass("Humanoid")
-        local animator = h and h:FindFirstChildOfClass("Animator")
-        if animator then
-            for _, track in ipairs(animator:GetPlayingAnimationTracks()) do track:Stop(0) end
-        end
-    end
-end
+local BOOST_SPEED = 1250
 local function applySpeed()
     local c = player.Character
     local h = c and c:FindFirstChildOfClass("Humanoid")
@@ -37,7 +20,7 @@ local function applySpeed()
         lastHumanoid = h
         baseWalkSpeed = h.WalkSpeed
     end
-    h.WalkSpeed = baseWalkSpeed * (boostEnabled and BOOST or 1)
+    h.WalkSpeed = boostEnabled and BOOST_SPEED or baseWalkSpeed
 end
 local velocity, gyro
 local labels = {}
@@ -48,7 +31,6 @@ local function clearFlight()
     local c=character()
     local h=c and c:FindFirstChildOfClass("Humanoid")
     if h then h.PlatformStand=false; h.AutoRotate=true end
-    applyAnimations()
 end
 local function beginFlight()
     clearFlight()
@@ -129,9 +111,6 @@ UIS.InputBegan:Connect(function(input,processed)
     elseif input.KeyCode==Enum.KeyCode.C then
         boostEnabled=not boostEnabled
         applySpeed()
-    elseif input.KeyCode==Enum.KeyCode.S then
-        animationsDisabled=not animationsDisabled
-        applyAnimations()
     end
 end)
 RunService.RenderStepped:Connect(function()
@@ -151,7 +130,7 @@ RunService.RenderStepped:Connect(function()
         if UIS:IsKeyDown(Enum.KeyCode.A) then direction-=cf.RightVector end
         if UIS:IsKeyDown(Enum.KeyCode.Space) then direction+=Vector3.yAxis end
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then direction-=Vector3.yAxis end
-        velocity.Velocity=direction.Magnitude>0 and direction.Unit*speed*(boostEnabled and BOOST or 1) or Vector3.zero
+        velocity.Velocity=direction.Magnitude>0 and direction.Unit*(boostEnabled and BOOST_SPEED or speed) or Vector3.zero
         gyro.CFrame=cf
         local h=c:FindFirstChildOfClass("Humanoid")
         if h and not h.PlatformStand then
@@ -164,10 +143,9 @@ player.CharacterAdded:Connect(function()
     fly=false
     noclip=false
     lastHumanoid=nil
-    animationScriptWasDisabled=nil
     clearFlight()
-    task.defer(function() task.wait(0.4); applySpeed(); applyAnimations() end)
+    task.defer(function() task.wait(0.4); applySpeed() end)
 end)
 
--- X: Fly, Z: NoClip, C: speed x1.8, S: animations toggle.
--- In Studio, the server may override character movement; this script cannot defeat server correction.\n
+-- X: Fly, Z: NoClip, C: toggle speed 1250. S is normal backwards movement.
+-- In Studio, the server may override character movement; this script cannot defeat server correction.
