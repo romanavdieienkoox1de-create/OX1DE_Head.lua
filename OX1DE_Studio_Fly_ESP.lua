@@ -168,4 +168,6 @@ player.CharacterAdded:Connect(function()
     clearFlight()
     task.defer(function() task.wait(0.4); applySpeed(); applyAnimations() end)
 end)
-\n-- X: Fly, Z: NoClip, C: speed x1.8, S: animations toggle.\n-- In Studio, the server may override character movement; this script cannot defeat server correction.\n
+
+-- X: Fly, Z: NoClip, C: speed x1.8, S: animations toggle.
+-- In Studio, the server may override character movement; this script cannot defeat server correction.\n
