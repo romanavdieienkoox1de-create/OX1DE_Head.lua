@@ -19,9 +19,9 @@ local function applyAnimations()
     local animate = c:FindFirstChild("Animate")
     if animate then
         if animationScriptWasDisabled == nil then animationScriptWasDisabled = animate.Disabled end
-        animate.Disabled = animationsDisabled or fly or animationScriptWasDisabled
+        animate.Disabled = animationsDisabled or animationScriptWasDisabled
     end
-    if animationsDisabled or fly then
+    if animationsDisabled then
         local h = c:FindFirstChildOfClass("Humanoid")
         local animator = h and h:FindFirstChildOfClass("Animator")
         if animator then
@@ -59,7 +59,6 @@ local function beginFlight()
     h.PlatformStand=true
     h.AutoRotate=false
     h:ChangeState(Enum.HumanoidStateType.Physics)
-    applyAnimations()
     velocity=Instance.new("BodyVelocity")
     velocity.MaxForce=Vector3.new(1e9,1e9,1e9)
     velocity.Velocity=Vector3.zero
