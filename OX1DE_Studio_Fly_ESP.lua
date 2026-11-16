@@ -10,13 +10,14 @@ local fly, noclip = false, false
 local speed = 55
 local velocity, gyro
 local labels = {}
+local savedCollisions = {}
 local function character() return player.Character end
 local function clearFlight()
     if velocity then velocity:Destroy(); velocity=nil end
     if gyro then gyro:Destroy(); gyro=nil end
     local c=character()
     local h=c and c:FindFirstChildOfClass("Humanoid")
-    if h then h.PlatformStand=false end
+    if h then h.AutoRotate=true end
 end
 local function beginFlight()
     clearFlight()
@@ -24,7 +25,7 @@ local function beginFlight()
     local root=c and c:FindFirstChild("HumanoidRootPart")
     local h=c and c:FindFirstChildOfClass("Humanoid")
     if not root or not h then fly=false; return end
-    h.PlatformStand=true
+    h.AutoRotate=false
     velocity=Instance.new("BodyVelocity")
     velocity.MaxForce=Vector3.new(1e9,1e9,1e9)
     velocity.Velocity=Vector3.zero
@@ -92,6 +93,17 @@ UIS.InputBegan:Connect(function(input,processed)
         if fly then beginFlight() else clearFlight() end
     elseif input.KeyCode==Enum.KeyCode.Z then
         noclip=not noclip
+        if not noclip then
+            local c=character()
+            if c then
+                for part,canCollide in pairs(savedCollisions) do
+                    if part and part.Parent then
+                        part.CanCollide=canCollide
+                    end
+                end
+            end
+            table.clear(savedCollisions)
+        end
     end
 end)
 RunService.RenderStepped:Connect(function()
@@ -99,7 +111,12 @@ RunService.RenderStepped:Connect(function()
     if not c then return end
     if noclip then
         for _,part in ipairs(c:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide=false end
+            if part:IsA("BasePart") then
+                if savedCollisions[part] == nil then
+                    savedCollisions[part] = part.CanCollide
+                end
+                part.CanCollide=false
+            end
         end
     end
     if fly and velocity and gyro then
@@ -118,5 +135,6 @@ end)
 player.CharacterAdded:Connect(function()
     fly=false
     noclip=false
+    table.clear(savedCollisions)
     clearFlight()
 end)
