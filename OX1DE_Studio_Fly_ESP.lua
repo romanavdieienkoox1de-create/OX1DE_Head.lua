@@ -11,15 +11,34 @@ local speed = 55
 local velocity, gyro
 local labels = {}
 local function character() return player.Character end
-local function clearFlight()
+local function destroyFlightForces()
     if velocity then velocity:Destroy(); velocity=nil end
     if gyro then gyro:Destroy(); gyro=nil end
+end
+
+local function clearFlight()
+    destroyFlightForces()
     local c=character()
     local h=c and c:FindFirstChildOfClass("Humanoid")
-    if h then h.PlatformStand=false; h.AutoRotate=true end
+    local root=c and c:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.AssemblyLinearVelocity=Vector3.zero
+        root.AssemblyAngularVelocity=Vector3.zero
+    end
+    if h then
+        h.PlatformStand=false
+        h.AutoRotate=true
+        h.Sit=false
+        h:ChangeState(Enum.HumanoidStateType.GettingUp)
+        task.defer(function()
+            if h.Parent and not fly then
+                h:ChangeState(Enum.HumanoidStateType.Running)
+            end
+        end)
+    end
 end
 local function beginFlight()
-    clearFlight()
+    destroyFlightForces()
     local c=character()
     local root=c and c:FindFirstChild("HumanoidRootPart")
     local h=c and c:FindFirstChildOfClass("Humanoid")
