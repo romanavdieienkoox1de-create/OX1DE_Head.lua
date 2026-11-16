@@ -7,21 +7,7 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 local fly, noclip = false, false
-local boostEnabled = false
-local baseWalkSpeed = 16
-local lastHumanoid = nil
 local speed = 55
-local BOOST_SPEED = 1250
-local function applySpeed()
-    local c = player.Character
-    local h = c and c:FindFirstChildOfClass("Humanoid")
-    if not h then return end
-    if h ~= lastHumanoid then
-        lastHumanoid = h
-        baseWalkSpeed = h.WalkSpeed
-    end
-    h.WalkSpeed = boostEnabled and BOOST_SPEED or baseWalkSpeed
-end
 local velocity, gyro
 local labels = {}
 local function character() return player.Character end
@@ -108,9 +94,6 @@ UIS.InputBegan:Connect(function(input,processed)
         if fly then beginFlight() else clearFlight() end
     elseif input.KeyCode==Enum.KeyCode.Z then
         noclip=not noclip
-    elseif input.KeyCode==Enum.KeyCode.C then
-        boostEnabled=not boostEnabled
-        applySpeed()
     end
 end)
 RunService.RenderStepped:Connect(function()
@@ -130,7 +113,7 @@ RunService.RenderStepped:Connect(function()
         if UIS:IsKeyDown(Enum.KeyCode.A) then direction-=cf.RightVector end
         if UIS:IsKeyDown(Enum.KeyCode.Space) then direction+=Vector3.yAxis end
         if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then direction-=Vector3.yAxis end
-        velocity.Velocity=direction.Magnitude>0 and direction.Unit*(boostEnabled and BOOST_SPEED or speed) or Vector3.zero
+        velocity.Velocity=direction.Magnitude>0 and direction.Unit*speed or Vector3.zero
         gyro.CFrame=cf
         local h=c:FindFirstChildOfClass("Humanoid")
         if h and not h.PlatformStand then
@@ -142,10 +125,8 @@ end)
 player.CharacterAdded:Connect(function()
     fly=false
     noclip=false
-    lastHumanoid=nil
     clearFlight()
-    task.defer(function() task.wait(0.4); applySpeed() end)
 end)
 
--- X: Fly, Z: NoClip, C: toggle speed 1250. S is normal backwards movement.
+-- X: Fly, Z: NoClip. S is normal backwards movement.
 -- In Studio, the server may override character movement; this script cannot defeat server correction.
