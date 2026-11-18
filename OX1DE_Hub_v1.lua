@@ -1,4 +1,4 @@
--- OX1DE Hub v1.0 | Roblox LocalScript (your own experience)
+-- OX1DE Hub v1.1 | Roblox LocalScript (your own experience)
 -- G = toggle menu/cursor | X = Fly | Z = NoClip
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -9,6 +9,8 @@ local state = {esp = true, pumpkins = false, fly = false, noclip = false, menu =
 local conns, playerTags, pumpkinTags, originalCollisions = {}, {}, {}, {}
 local flyVelocity, flyGyro, previousAutoRotate = nil, nil, nil
 local active = true
+local originalMouseBehavior = UIS.MouseBehavior
+local originalMouseIcon = UIS.MouseIconEnabled
 local env = (type(getgenv) == "function" and getgenv()) or shared
 if env.OX1DE_HUB_CLEANUP then pcall(env.OX1DE_HUB_CLEANUP) end
 local function on(signal, callback)
@@ -77,7 +79,7 @@ local header = Instance.new("TextLabel")
 header.Size = UDim2.new(1,-16,0,40)
 header.Position = UDim2.fromOffset(8,0)
 header.BackgroundTransparency = 1
-header.Text = "OX1DE  |  HUB"
+header.Text = "OX1DE  |  МЕНЮ"
 header.TextColor3 = Color3.fromRGB(240,243,248)
 header.TextSize = 17
 header.Font = Enum.Font.GothamBold
@@ -88,7 +90,7 @@ local hint = Instance.new("TextLabel")
 hint.Size = UDim2.new(1,-20,0,24)
 hint.Position = UDim2.fromOffset(10,245)
 hint.BackgroundTransparency = 1
-hint.Text = "G  Menu    X  Fly    Z  NoClip"
+hint.Text = "G  Меню    X  Полёт    Z  Стены"
 hint.Font = Enum.Font.Gotham
 hint.TextSize = 11
 hint.TextColor3 = Color3.fromRGB(162,169,184)
@@ -107,14 +109,14 @@ local function addButton(key, label, y)
     buttons[key] = {button=btn,label=label}
     return btn
 end
-addButton("esp","Player ESP + Names",46)
-addButton("pumpkins","Pumpkin ESP",94)
-addButton("fly","Fly",142)
-addButton("noclip","NoClip",190)
+addButton("esp","Игроки · ники и метры",46)
+addButton("pumpkins","Тыквы · подсветка",94)
+addButton("fly","Полёт",142)
+addButton("noclip","Сквозь стены",190)
 local function updateButtons()
     for key, entry in pairs(buttons) do
         local enabled = state[key]
-        entry.button.Text = entry.label .. (enabled and "     ON" or "     OFF")
+        entry.button.Text = entry.label .. (enabled and "   ВКЛ" or "   ВЫКЛ")
         entry.button.BackgroundColor3 = enabled and Color3.fromRGB(28,72,58) or Color3.fromRGB(35,37,47)
         entry.button.TextColor3 = enabled and Color3.fromRGB(137,255,199) or Color3.fromRGB(214,217,225)
     end
@@ -201,7 +203,7 @@ local function updatePumpkinESP()
             local adorn = obj:IsA("BasePart") and obj or (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart",true))
             if adorn then
                 local t = newTag(obj,adorn,Color3.fromRGB(255,171,60))
-                t.label.Text = "🎃 Pumpkin"
+                t.label.Text = "🎃 Тыква"
                 pumpkinTags[obj] = t
             end
         end
@@ -228,12 +230,21 @@ on(UIS.InputChanged,function(input)
     end
 end)
 on(UIS.InputBegan,function(input, processed)
-    if processed or UIS:GetFocusedTextBox() then return end
+    if UIS:GetFocusedTextBox() then return end
     if input.KeyCode == Enum.KeyCode.G then
         state.menu = not state.menu
         frame.Visible = state.menu
-        if state.menu then UIS.MouseBehavior = Enum.MouseBehavior.Default; UIS.MouseIconEnabled = true end
-    elseif input.KeyCode == Enum.KeyCode.X then
+        if state.menu then
+            UIS.MouseBehavior = Enum.MouseBehavior.Default
+            UIS.MouseIconEnabled = true
+        else
+            UIS.MouseBehavior = originalMouseBehavior
+            UIS.MouseIconEnabled = false
+        end
+        return
+    end
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.X then
         setFly(not state.fly)
     elseif input.KeyCode == Enum.KeyCode.Z then
         setNoclip(not state.noclip)
@@ -255,6 +266,8 @@ on(RunService.RenderStepped,function()
     if state.menu then
         UIS.MouseBehavior = Enum.MouseBehavior.Default
         UIS.MouseIconEnabled = true
+    else
+        UIS.MouseIconEnabled = false
     end
     if state.fly and flyVelocity and flyGyro then
         local cam = workspace.CurrentCamera
@@ -300,6 +313,8 @@ env.OX1DE_HUB_CLEANUP = function()
     for _,t in pairs(playerTags) do destroyTag(t) end
     for _,t in pairs(pumpkinTags) do destroyTag(t) end
     if gui then gui:Destroy() end
+    UIS.MouseBehavior = originalMouseBehavior
+    UIS.MouseIconEnabled = originalMouseIcon
 end
 updateButtons()
 updatePlayerESP()
