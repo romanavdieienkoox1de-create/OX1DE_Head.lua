@@ -1,4 +1,4 @@
--- OX1DE Hub v2.3
+-- OX1DE Hub v2.4
 -- UI matches OX1DE Hub screenshot series: Player / Visual / Combat / Setting.
 -- RightShift: menu; E: Aim; X: Fly; Z: Noclip (rebindable in the UI).
 -- Client-side local features; experience-specific server checks may limit effects.
@@ -35,11 +35,12 @@ local state={Speed=16,Jump=50,Fly=false,Noclip=false,NameESP=false,DistanceESP=f
 local binds={Aim=Enum.KeyCode.E,Fly=Enum.KeyCode.X,Noclip=Enum.KeyCode.Z}
 local bindLabels={}
 local teamColors=function(p)
-    if state.TeamVisual then
-        if LocalPlayer.Team~=nil and p.Team==LocalPlayer.Team then return palette.green end
-        return palette.enemy
+    -- Team Check OFF always means neutral white; never infer a team color.
+    if state.TeamVisual ~= true then return palette.white end
+    if LocalPlayer.Team~=nil and p.Team~=nil and p.Team==LocalPlayer.Team then
+        return palette.green
     end
-    return palette.white
+    return palette.enemy
 end
 local function track(conn) connections[#connections+1]=conn return conn end
 local function new(class,props,parent)
@@ -61,6 +62,18 @@ end
 -- Screenshot-matched interface: 1082 x 744 design canvas, centered and scaled.
 local gui=new('ScreenGui',{Name='OX1DE_V3_UI',ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=100,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},PG)
 local fovGui=new('ScreenGui',{Name='OX1DE_V3_FOV',ResetOnSpawn=false,IgnoreGuiInset=true,DisplayOrder=90,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},PG)
+-- Remove leftover OX1DE visual overlays from previous script versions.
+-- Old instances could remain even after the old menu was closed.
+for _,item in ipairs(PG:GetDescendants()) do
+    if item:IsA('BillboardGui') and item.Name=='OX1DE_Name_ESP' then
+        item:Destroy()
+    end
+end
+for _,item in ipairs(workspace:GetDescendants()) do
+    if item.Name=='OX1DE_V3_ESP_Highlights' or item.Name=='OX1DE_Outline' then
+        if item:IsA('Folder') or item:IsA('Highlight') then item:Destroy() end
+    end
+end
 local highlightFolder=new('Folder',{Name='OX1DE_V3_ESP_Highlights'},workspace)
 local circle=new('Frame',{Name='FOV_Red_Circle',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(state.FOVRadius*2,state.FOVRadius*2),BackgroundTransparency=1,BorderSizePixel=0,Visible=false},fovGui)
 new('UICorner',{CornerRadius=UDim.new(1,0)},circle)
@@ -178,7 +191,7 @@ new('UIStroke',{Color=palette.white,Thickness=3},logoInner)
 label(header,'OX1DE Hub',84,19,250,46,25,palette.white,true)
 local version=round(new('Frame',{Position=UDim2.fromOffset(241,31),Size=UDim2.fromOffset(49,22),BackgroundColor3=palette.top,BorderSizePixel=0},header),13)
 border(version)
-local vLabel=label(version,'V2.3',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
+local vLabel=label(version,'V2.4',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
 local function topButton(symbol,x)
     local btn=round(new('TextButton',{AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,x,0,23),Size=UDim2.fromOffset(37,37),BackgroundColor3=palette.card,Text=symbol,TextColor3=palette.white,TextSize=18,Font=Enum.Font.GothamBold,AutoButtonColor=false,BorderSizePixel=0},header),10)
     border(btn)
@@ -761,6 +774,8 @@ track(RS.RenderStepped:Connect(function(dt)
                     rec.name.Visible=state.NameESP
                     rec.user.Visible=state.NameESP
                     rec.name.TextColor3=teamColors(p)
+                    rec.user.TextColor3=state.TeamVisual and teamColors(p) or palette.white
+                    rec.info.TextColor3=state.TeamVisual and teamColors(p) or palette.white
                     rec.hi.Enabled=state.OutlineESP and visible
                     rec.hi.OutlineColor=teamColors(p)
                     rec.hi.DepthMode=state.ThroughWalls and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
