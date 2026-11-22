@@ -447,6 +447,7 @@ local toggleInProgress=false
 local function setMenu(open)
     if not active then return end
     menuOpen=open
+    if not open then state.Preview=false; refreshFOV() end
     applyBackground()
     if open then
         mouseWasIcon=UIS.MouseIconEnabled
