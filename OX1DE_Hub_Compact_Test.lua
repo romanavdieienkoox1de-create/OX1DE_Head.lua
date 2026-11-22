@@ -39,16 +39,16 @@ local function txt(parent,value,size,color)
 end
 local gui=make("ScreenGui",{Name="OX1DE_CompactSafe",ResetOnSpawn=false,IgnoreGuiInset=true,
  DisplayOrder=120,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
-local panel=corner(make("Frame",{AnchorPoint=Vector2.new(0,.5),Position=UDim2.new(0,12,.5,0),
+local panel=corner(make("Frame",{AnchorPoint=Vector2.new(0,.5),Position=UDim2.new(0,8,.5,0),
  Size=UDim2.fromOffset(310,490),BackgroundColor3=bg,BorderSizePixel=0},gui),15)
 make("UIStroke",{Color=Color3.fromRGB(85,88,98),Thickness=1},panel)
-local panelScale=make("UIScale",{Scale=.72},panel)
+local panelScale=make("UIScale",{Scale=.23},panel)
 local function smooth(object,properties,duration)
  if not object or not object.Parent then return end
  T:Create(object,TweenInfo.new(duration or .2,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),properties):Play()
 end
-panelScale.Scale=.66
-smooth(panelScale,{Scale=.72},.3)
+panelScale.Scale=.18
+smooth(panelScale,{Scale=.23},.3)
 local translucent=false
 local header=make("Frame",{Size=UDim2.new(1,0,0,56),BackgroundColor3=Color3.fromRGB(25,27,32),BorderSizePixel=0},panel)
 local title=txt(header,"OX1DE Hub",19,white);title.Position=UDim2.fromOffset(16,8);title.Size=UDim2.fromOffset(245,26)
