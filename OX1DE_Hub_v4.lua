@@ -33,7 +33,7 @@ local s={
  NameESP=false,DistanceESP=false,TeamVisual=false,SkeletonESP=false,OutlineESP=false,
  WeaponESP=false,ThroughWalls=false,PumpkinESP=false,
  Fly=false,Noclip=false,Speed=16,Jump=50,
- Background="Dark",Shadows=false,Opacity=1
+ Background="Dark",Shadows=false,Opacity=1,UISize=.82
 }
 local binds={Aim=Enum.KeyCode.E,Fly=Enum.KeyCode.X,Noclip=Enum.KeyCode.Z}
 local cfgName="OX1DE_Hub_v4_settings.json"
@@ -44,7 +44,7 @@ local function applySaved(payload)
       if s[key]~=nil and type(s[key])==type(val) then
         if type(val)=="boolean" then s[key]=val
         elseif type(val)=="number" and val==val then
-          local limits={AimSpeed={0,1},FOVRadius={30,400},Speed={8,100},Jump={20,120},Opacity={.3,1}}
+          local limits={AimSpeed={0,1},FOVRadius={30,400},Speed={8,100},Jump={20,120},Opacity={.3,1},UISize={.6,1.15}}
           local v=limits[key]
           if v then s[key]=math.clamp(val,v[1],v[2]) end
         elseif key=="AimPart" and (val=="Head" or val=="Body" or val=="Legs") then s[key]=val
@@ -140,19 +140,23 @@ local shell=corner(make("CanvasGroup",{Name="OX1DE_Hub",AnchorPoint=Vector2.new(
  BorderSizePixel=0,ClipsDescendants=true},menu),22)
 stroke(shell,c.border,1.2,.08)
 local scale=make("UIScale",{Scale=1},shell)
-local function rescale()
+local function rescale(animated)
   local cam=workspace.CurrentCamera
-  if cam then
-    local vp=cam.ViewportSize
-    scale.Scale=math.clamp(math.min((vp.X-26)/1010,(vp.Y-26)/680),.35,1)
-  end
+  if not cam then return end
+  local vp=cam.ViewportSize
+  local fit=math.min((vp.X-28)/1010,(vp.Y-28)/680)
+  local final=math.clamp(math.min(fit,s.UISize),.3,1.15)
+  if animated then animate(scale,{Scale=final},.18) else scale.Scale=final end
 end
-rescale()
-connect(workspace:GetPropertyChangedSignal("CurrentCamera"),rescale)
-connect(RS.RenderStepped,function() if running and shell and shell.Parent then
+local viewportConnection
+local function bindViewport()
+  if viewportConnection then viewportConnection:Disconnect() end
   local cam=workspace.CurrentCamera
-  if cam and (cam.ViewportSize.X<1010 or cam.ViewportSize.Y<680) then rescale() end
-end end)
+  if cam then viewportConnection=connect(cam:GetPropertyChangedSignal("ViewportSize"),function()rescale(false)end) end
+  rescale(false)
+end
+bindViewport()
+connect(workspace:GetPropertyChangedSignal("CurrentCamera"),bindViewport)
 local head=make("Frame",{Size=UDim2.new(1,0,0,76),BackgroundColor3=c.panel,BorderSizePixel=0},shell)
 make("UIGradient",{Color=ColorSequence.new(Color3.fromRGB(34,36,41),Color3.fromRGB(11,12,15)),Rotation=0},head)
 make("Frame",{Position=UDim2.new(0,0,1,-1),Size=UDim2.new(1,0,0,1),BorderSizePixel=0,BackgroundColor3=c.border},head)
@@ -164,7 +168,7 @@ local logo2=corner(make("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.f
 stroke(logo2,c.white,2.6)
 local hTitle=text(head,"OX1DE Hub",27,c.white,true)
 hTitle.Position=UDim2.fromOffset(82,18);hTitle.Size=UDim2.fromOffset(245,42)
-local version=text(head,"V4",12,c.muted,true)
+local version=text(head,"V4.1",12,c.muted,true)
 version.Position=UDim2.fromOffset(280,31);version.Size=UDim2.fromOffset(35,17)
 local function exitBtn(symbol,x)
   local b=corner(make("TextButton",{AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,x,0,20),
@@ -184,7 +188,7 @@ navCaption.Position=UDim2.fromOffset(23,20);navCaption.Size=UDim2.fromOffset(210
 local nav={Player="◯",Visual="◉",Combat="⊕",Setting="⚙"}
 navButtons={}
 chosen="Player"
-content=make("Frame",{Position=UDim2.fromOffset(243,76),Size=UDim2.new(1,-243,1,-76),BackgroundTransparency=1},shell)
+content=make("CanvasGroup",{GroupTransparency=0,Position=UDim2.fromOffset(243,76),Size=UDim2.new(1,-243,1,-76),BackgroundTransparency=1},shell)
 local pageIcon=text(content,nav.Player,28,c.white,true)
 pageIcon.Position=UDim2.fromOffset(30,22);pageIcon.Size=UDim2.fromOffset(35,37)
 local heading=text(content,"Player",27,c.white,true)
@@ -340,6 +344,10 @@ end
 local pageNames={"Player","Visual","Combat","Setting"}
 local subtitles={Player="Character & movement",Visual="Player overlays & Halloween",Combat="Aim controls & field of view",Setting="Appearance & keybinds"}
 local function drawPage(which)
+  if which~=chosen then
+    content.GroupTransparency=1
+    content.Position=UDim2.fromOffset(255,76)
+  end
   chosen=which
   clearTemp()
   for _,child in ipairs(scroll:GetChildren()) do if child:IsA("GuiObject") then child:Destroy() end end
@@ -351,6 +359,7 @@ local function drawPage(which)
     animate(b,{BackgroundColor3=selected and c.white or c.card,
       TextColor3=selected and c.bg or c.white},.2)
   end
+  animate(content,{GroupTransparency=0,Position=UDim2.fromOffset(243,76)},.26)
   if which=="Player" then
     section("Movement")
     slider("Walk Speed","Character movement speed","Speed",8,100,0,speed)
@@ -410,8 +419,38 @@ for i,name in ipairs(pageNames) do
   connect(b.MouseEnter,function()if chosen~=name then animate(b,{BackgroundColor3=c.hover},.17) end end)
   connect(b.MouseLeave,function()if chosen~=name then animate(b,{BackgroundColor3=c.card},.17) end end)
 end
+local resizeHint=text(side,"DRAG CORNER TO RESIZE",10,c.muted,true)
+resizeHint.Position=UDim2.new(0,21,1,-75);resizeHint.Size=UDim2.fromOffset(213,22)
 local foot=text(side,"OX1DE HUB  •  RIGHT SHIFT",10,c.muted,true)
 foot.Position=UDim2.new(0,22,1,-47);foot.Size=UDim2.fromOffset(207,26)
+-- Drag the bottom-right handle to scale the menu without clipping its fixed layout.
+local grip=corner(make("TextButton",{Name="ResizeGrip",AnchorPoint=Vector2.new(1,1),
+  Position=UDim2.new(1,-7,1,-7),Size=UDim2.fromOffset(36,36),BackgroundColor3=c.card,
+  Text="↘",TextColor3=c.white,TextSize=21,Font=Enum.Font.GothamBold,AutoButtonColor=false,
+  ZIndex=40},shell),10)
+stroke(grip,c.border,1,.1)
+connect(grip.MouseEnter,function()animate(grip,{BackgroundColor3=c.hover},.15)end)
+connect(grip.MouseLeave,function()animate(grip,{BackgroundColor3=c.card},.15)end)
+local resizing=false
+local resizeStart=nil
+local sizeStart=.82
+connect(grip.InputBegan,function(i)
+  if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+    resizing=true;resizeStart=i.Position;sizeStart=s.UISize
+  end
+end)
+connect(UIS.InputChanged,function(i)
+  if resizing and resizeStart and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+    local diff=i.Position-resizeStart
+    s.UISize=math.clamp(sizeStart+(diff.X+diff.Y)/1050,.6,1.15)
+    rescale(false)
+  end
+end)
+connect(UIS.InputEnded,function(i)
+  if resizing and (i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch) then
+    resizing=false;resizeStart=nil;save()
+  end
+end)
 local function setOpen(show)
   if show==open then return end
   open=show
@@ -699,6 +738,7 @@ local function cleanup()
   running=false
   pcall(function() RS:UnbindFromRenderStep("OX1DE_V4_Aim") end)
   stopFly();restoreCollision();clearTemp()
+  if viewportConnection then viewportConnection:Disconnect() end
   for _,co in ipairs(links) do co:Disconnect() end
   for p,_ in pairs(overlayPlayers) do erase(p) end
   for _,h in pairs(pumpkins) do if h.Parent then h:Destroy() end end
