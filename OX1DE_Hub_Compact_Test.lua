@@ -1,4 +1,4 @@
--- OX1DE Hub Compact v1 | isolated interface test
+-- OX1DE Hub Compact v1.1 | isolated interface test
 -- LocalScript interface. Runtime features can be restricted by individual Roblox experiences.
 local Players=game:GetService("Players")
 local UIS=game:GetService("UserInputService")
@@ -645,7 +645,7 @@ connect(UIS.InputBegan,function(input,processed)
     drawPage(chosen)
     return
   end
-  if key==Enum.KeyCode.RightShift then setOpen(not open);return end
+  if key==Enum.KeyCode.RightShift then return end
   if processed then return end
   for kind,bind in pairs(binds) do
     if key==bind then
@@ -767,7 +767,7 @@ local compactTitle=text(compactTop,"OX1DE Hub",18,c.white,true)
 compactTitle.Position=UDim2.fromOffset(17,7);compactTitle.Size=UDim2.fromOffset(235,27)
 local compactTag=text(compactTop,"COMPACT",9,c.muted,true)
 compactTag.Position=UDim2.fromOffset(18,33);compactTag.Size=UDim2.fromOffset(110,15)
-local indicator={};local keyLabels={}
+local indicator={};local keyLabels={};local toggleButtons={}
 local compactY=64
 local function compactRow(name,key,bind)
  local box=corner(make("TextButton",{Name=name,Position=UDim2.fromOffset(11,compactY),
@@ -778,14 +778,14 @@ local function compactRow(name,key,bind)
   BackgroundColor3=c.red,BorderSizePixel=0},box),8)
  local caption=text(box,name,13,c.white,true)
  caption.Position=UDim2.fromOffset(35,9)
- caption.Size=UDim2.fromOffset(bind and 167 or 228,30)
+ caption.Size=UDim2.fromOffset(bind and 106 or 172,30)
  indicator[key]=dot
  connect(box.MouseEnter,function()animate(box,{BackgroundColor3=c.hover},.14)end)
  connect(box.MouseLeave,function()animate(box,{BackgroundColor3=c.card},.14)end)
  if bind then
   local b=corner(make("TextButton",{
-   AnchorPoint=Vector2.new(1,.5),Position=UDim2.new(1,-10,.5,0),
-   Size=UDim2.fromOffset(51,29),BackgroundColor3=c.bg,
+   AnchorPoint=Vector2.new(1,.5),Position=UDim2.new(1,-72,.5,0),
+   Size=UDim2.fromOffset(48,29),BackgroundColor3=c.bg,
    Text=binds[bind].Name,TextColor3=c.white,TextSize=12,
    Font=Enum.Font.GothamBold,AutoButtonColor=false
   },box),7)
@@ -796,6 +796,16 @@ local function compactRow(name,key,bind)
    b.Text="..."
   end)
  end
+ local track=corner(make("TextButton",{
+  Name="PowerToggle",AnchorPoint=Vector2.new(1,.5),Position=UDim2.new(1,-10,.5,0),
+  Size=UDim2.fromOffset(53,27),BackgroundColor3=Color3.fromRGB(61,64,71),
+  Text="",AutoButtonColor=false
+ },box),14)
+ local thumb=corner(make("Frame",{
+  Name="Thumb",Position=UDim2.fromOffset(4,4),Size=UDim2.fromOffset(19,19),
+  BackgroundColor3=c.white,BorderSizePixel=0
+ },track),10)
+ toggleButtons[key]={track=track,thumb=thumb}
  compactY=compactY+53
  return box
 end
@@ -815,9 +825,14 @@ local radiusTrack=corner(make("TextButton",{Position=UDim2.fromOffset(15,416),Si
 local radiusFill=corner(make("Frame",{Size=UDim2.fromScale(0,1),BackgroundColor3=c.red,BorderSizePixel=0},radiusTrack),4)
 local radiusDot=corner(make("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(0,.5),
  Size=UDim2.fromOffset(14,14),BackgroundColor3=c.white,BorderSizePixel=0},radiusTrack),8)
-local compactFooter=text(compact,"RIGHT SHIFT  ·  OPEN / CLOSE",10,c.muted,true)
+local compactFooter=text(compact,"PANEL ALWAYS VISIBLE",10,c.muted,true)
 compactFooter.Position=UDim2.fromOffset(16,450);compactFooter.Size=UDim2.fromOffset(275,27)
 local function syncCompact()
+ for key,ui in pairs(toggleButtons) do
+  local on=s[key] == true
+  animate(ui.track,{BackgroundColor3=on and c.green or Color3.fromRGB(65,68,76)},.16)
+  animate(ui.thumb,{Position=UDim2.fromOffset(on and 30 or 4,4)},.16)
+ end
  indicator.AllESP.BackgroundColor3=s.AllESP and c.green or c.red
  indicator.Aim.BackgroundColor3=s.Aim and c.green or c.red
  indicator.FOV.BackgroundColor3=s.FOV and c.green or c.red
@@ -847,20 +862,31 @@ local function setTeam(val)
  s.TeamVisual=val
  s.TeamAim=val
 end
-connect(allBox.MouseButton1Click,function()setAllESP(not s.AllESP);save();syncCompact()end)
-connect(aimBox.MouseButton1Click,function()s.Aim=not s.Aim;save();syncCompact()end)
-connect(fovBox.MouseButton1Click,function()s.FOV=not s.FOV;updateFOV();save();syncCompact()end)
-connect(teamBox.MouseButton1Click,function()setTeam(not s.TeamCheck);save();syncCompact()end)
-connect(clipBox.MouseButton1Click,function()
+local function toggleAll() setAllESP(not s.AllESP);save();syncCompact()end
+local function toggleAim() s.Aim=not s.Aim;save();syncCompact()end
+local function toggleFov() s.FOV=not s.FOV;updateFOV();save();syncCompact()end
+local function toggleTeam() setTeam(not s.TeamCheck);save();syncCompact()end
+local function toggleNoclip()
  s.Noclip=not s.Noclip
  if not s.Noclip then restoreCollision() end
  save();syncCompact()
-end)
-connect(flyBox.MouseButton1Click,function()
+end
+local function toggleFly()
  s.Fly=not s.Fly
  if s.Fly then startFly() else stopFly() end
  save();syncCompact()
-end)
+end
+-- The right-hand switches are the primary controls; binds remain optional.
+for key,fn in pairs({AllESP=toggleAll,Aim=toggleAim,FOV=toggleFov,
+ TeamCheck=toggleTeam,Noclip=toggleNoclip,Fly=toggleFly}) do
+ connect(toggleButtons[key].track.MouseButton1Click,fn)
+end
+connect(allBox.MouseButton1Click,toggleAll)
+connect(aimBox.MouseButton1Click,toggleAim)
+connect(fovBox.MouseButton1Click,toggleFov)
+connect(teamBox.MouseButton1Click,toggleTeam)
+connect(clipBox.MouseButton1Click,toggleNoclip)
+connect(flyBox.MouseButton1Click,toggleFly)
 local radiusDrag=false
 local function setRadiusFromX(x)
  local fraction=math.clamp((x-radiusTrack.AbsolutePosition.X)/math.max(1,radiusTrack.AbsoluteSize.X),0,1)
@@ -900,22 +926,9 @@ end)
 -- Keep the old full menu hidden. Existing hotkey callbacks now refresh compact indicators.
 drawPage=function(_) syncCompact() end
 setOpen=function(show)
- if open==show then return end
- open=show
- if show then
-  mouseIcon=UIS.MouseIconEnabled
-  mouseBehavior=UIS.MouseBehavior
-  UIS.MouseBehavior=Enum.MouseBehavior.Default
-  UIS.MouseIconEnabled=true
-  compact.Visible=true
-  compact.GroupTransparency=1
-  animate(compact,{GroupTransparency=0},.18)
- else
-  animate(compact,{GroupTransparency=1},.14)
-  task.delay(.15,function()if running and not open then compact.Visible=false end end)
-  if mouseBehavior then UIS.MouseBehavior=mouseBehavior end
-  if mouseIcon~=nil then UIS.MouseIconEnabled=mouseIcon end
- end
+ -- This compact edition stays visible; do not modify the game's mouse state.
+ open=false
+ compact.Visible=true
 end
 -- Team color is controlled by one independent switch; a saved Aim value never turns it on.
 setTeam(s.TeamCheck)
