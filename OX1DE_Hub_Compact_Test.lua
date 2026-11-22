@@ -1,4 +1,4 @@
--- OX1DE Hub Compact v1.3 - small left panel, fly vertical controls, wall check.
+-- OX1DE Hub Compact v1.4 - skeleton overlay frame sync; aim unchanged.
 -- No legacy GUI, no automatic world scanning, no auto-enabled gameplay functions.
 local P=game:GetService("Players")
 local U=game:GetService("UserInputService")
@@ -39,7 +39,7 @@ local function txt(parent,value,size,color)
 end
 local gui=make("ScreenGui",{Name="OX1DE_CompactSafe",ResetOnSpawn=false,IgnoreGuiInset=true,
  DisplayOrder=120,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
-local panel=corner(make("Frame",{AnchorPoint=Vector2.new(0,.5),Position=UDim2.new(0,20,.5,0),
+local panel=corner(make("Frame",{AnchorPoint=Vector2.new(0,.5),Position=UDim2.new(0,12,.5,0),
  Size=UDim2.fromOffset(310,490),BackgroundColor3=bg,BorderSizePixel=0},gui),15)
 make("UIStroke",{Color=Color3.fromRGB(85,88,98),Thickness=1},panel)
 local panelScale=make("UIScale",{Scale=.72},panel)
@@ -193,6 +193,17 @@ local function updateOverlay(p,rec)
  rec.meta.Text=table.concat(a," • ")
  local hum=ch:FindFirstChildOfClass("Humanoid")
  local links=hum and hum.RigType==Enum.HumanoidRigType.R15 and bonesR15 or bonesR6
+
+end
+local function updateSkeleton(p,rec)
+ if not rec or not rec.char or not rec.char.Parent then return end
+ local ch=rec.char
+ local cam=workspace.CurrentCamera
+ if not cam then return end
+ local tint=white
+ if states.TeamCheck then tint=(player.Team~=nil and p.Team~=nil and player.Team==p.Team) and green or red end
+ local hum=ch:FindFirstChildOfClass("Humanoid")
+ local links=hum and hum.RigType==Enum.HumanoidRigType.R15 and bonesR15 or bonesR6
  for i,line in ipairs(rec.lines) do
   line.Visible=false
   local parts=links[i]
@@ -283,6 +294,12 @@ local function unobstructed(target,character)
  local hit=workspace:Raycast(camera.CFrame.Position,direction,params)
  return hit==nil or hit.Instance:IsDescendantOf(character)
 end
+-- Update skeleton lines every rendered frame instead of the old 120 ms refresh loop.
+-- No target selection or camera movement is changed here.
+conn(R.RenderStepped,function()
+ if not alive or not states.AllESP then return end
+ for p,rec in pairs(overlays) do updateSkeleton(p,rec) end
+end)
 conn(R.RenderStepped,function()
  if not alive or not states.Aim then return end
  local cam=workspace.CurrentCamera
