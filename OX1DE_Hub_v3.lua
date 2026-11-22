@@ -168,7 +168,7 @@ new('UIStroke',{Color=palette.white,Thickness=3},logoInner)
 label(header,'OX1DE Hub',84,19,250,46,25,palette.white,true)
 local version=round(new('Frame',{Position=UDim2.fromOffset(241,31),Size=UDim2.fromOffset(49,22),BackgroundColor3=palette.top,BorderSizePixel=0},header),13)
 border(version)
-local vLabel=label(version,'V2.1',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
+local vLabel=label(version,'V2.2',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
 local function topButton(symbol,x)
     local btn=round(new('TextButton',{AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,x,0,23),Size=UDim2.fromOffset(37,37),BackgroundColor3=palette.card,Text=symbol,TextColor3=palette.white,TextSize=18,Font=Enum.Font.GothamBold,AutoButtonColor=false,BorderSizePixel=0},header),10)
     border(btn)
@@ -219,8 +219,17 @@ local function row(icon,name,sub,height)
     local h=height or 62
     local card=round(new('Frame',{Size=UDim2.new(1,-5,0,h),BackgroundColor3=Color3.fromRGB(28,30,34),BorderSizePixel=0,LayoutOrder=nextOrder()},list),13)
     new('UIGradient',{Rotation=0,Color=ColorSequence.new(Color3.fromRGB(31,33,37),Color3.fromRGB(22,24,27))},card)
-    border(card,Color3.fromRGB(67,71,78))
-    vectorIcon(card,icon,24,math.floor((h-22)/2),22)
+    border(card,Color3.fromRGB(92,95,103))
+    local shine=new('Frame',{Name='HighlightLine',Size=UDim2.new(.92,0,0,1),Position=UDim2.fromScale(.04,0),BackgroundColor3=Color3.fromRGB(195,198,207),BackgroundTransparency=.82,BorderSizePixel=0},card)
+    pageTrack(card.MouseEnter:Connect(function()
+        tween(card,{BackgroundColor3=Color3.fromRGB(49,52,58)},.2)
+        tween(shine,{BackgroundTransparency=.32},.2)
+    end))
+    pageTrack(card.MouseLeave:Connect(function()
+        tween(card,{BackgroundColor3=Color3.fromRGB(28,30,34)},.2)
+        tween(shine,{BackgroundTransparency=.82},.2)
+    end))
+    vectorIcon(card,icon,24,math.floor((h-26)/2),26)
     local yName=h>=85 and 9 or math.floor((h-45)/2)
     label(card,name,70,yName,380,24,14,palette.white,true)
     label(card,sub or '',70,yName+25,435,19,12,palette.gray)
@@ -335,7 +344,7 @@ local function setMenuPage(page)
     clearList()
     for key,btn in pairs(navBtns)do
         local selected=key==page
-        tween(btn,{BackgroundColor3=selected and palette.white or palette.card},.18)
+        tween(btn,{BackgroundColor3=selected and palette.white or palette.card},.24)
         local txt=btn:FindFirstChild('Text')
         if txt then txt.TextColor3=selected and palette.bg or palette.white end
         local iconHolder=btn:FindFirstChild('Vector')
@@ -343,7 +352,7 @@ local function setMenuPage(page)
             -- Icons are redrawn on page change to keep a crisp, matching monochrome line weight.
             iconHolder:Destroy()
         end
-        local holder=vectorIcon(btn,navIcons[key],19,21,23,selected and palette.bg or palette.white)
+        local holder=vectorIcon(btn,navIcons[key],17,19,27,selected and palette.bg or palette.white)
         holder.Name='Vector'
     end
     if sectionIcon then sectionIcon:Destroy()end
@@ -426,6 +435,12 @@ for i,page in ipairs(navKeys)do
     local titleLabel=label(btn,page,56,18,130,31,15,palette.white,true);titleLabel.Name='Text'
     local arrow=label(btn,'›',193,15,22,34,26,palette.gray,true);arrow.TextXAlignment=Enum.TextXAlignment.Center
     navBtns[page]=btn
+    track(btn.MouseEnter:Connect(function()
+        if currentPage~=page then tween(btn,{BackgroundColor3=Color3.fromRGB(63,65,72)},.17) end
+    end))
+    track(btn.MouseLeave:Connect(function()
+        if currentPage~=page then tween(btn,{BackgroundColor3=palette.card},.17) end
+    end))
     track(btn.MouseButton1Click:Connect(function()setMenuPage(page)end))
 end
 setMenuPage('Player')
