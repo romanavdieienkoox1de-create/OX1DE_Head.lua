@@ -1,4 +1,4 @@
--- OX1DE Hub v2.5
+-- OX1DE Hub v2.6
 -- UI matches OX1DE Hub screenshot series: Player / Visual / Combat / Setting.
 -- RightShift: menu; E: Aim; X: Fly; Z: Noclip (rebindable in the UI).
 -- Client-side local features; experience-specific server checks may limit effects.
@@ -33,6 +33,57 @@ local savedFocus=nil
 local palette={bg=Color3.fromRGB(9,10,12),side=Color3.fromRGB(17,18,20),top=Color3.fromRGB(22,23,26),card=Color3.fromRGB(27,29,32),line=Color3.fromRGB(65,69,76),white=Color3.fromRGB(245,246,248),gray=Color3.fromRGB(157,164,175),dark=Color3.fromRGB(19,20,24),red=Color3.fromRGB(255,37,49),green=Color3.fromRGB(68,231,122),enemy=Color3.fromRGB(248,94,94)}
 local state={Speed=16,Jump=50,Fly=false,Noclip=false,NameESP=false,DistanceESP=false,TeamVisual=false,SkeletonESP=false,OutlineESP=false,WeaponESP=false,ThroughWalls=false,PumpkinESP=false,Aim=false,WallCheck=false,TeamAim=false,AimPart='Head',AimSpeed=1,FOV=false,FOVRadius=190,Background='Dark',Shadows=false,Opacity=1,Preview=false}
 local binds={Aim=Enum.KeyCode.E,Fly=Enum.KeyCode.X,Noclip=Enum.KeyCode.Z}
+-- Keep settings across reinjections; persistent disk storage is optional and executor-dependent.
+local HttpService=game:GetService('HttpService')
+local settingsFile='OX1DE_Hub_settings.json'
+local savePending=false
+local allowedAimParts={Head=true,Body=true,Legs=true}
+local allowedBackgrounds={Dark=true,Frost=true,Clear=true}
+local numberRanges={Speed={8,100},Jump={20,120},AimSpeed={0,1},FOVRadius={40,400},Opacity={.2,1}}
+local function importSettings(saved)
+    if type(saved)~='table' then return end
+    local savedState=type(saved.state)=='table' and saved.state or {}
+    for k,current in pairs(state) do
+        local v=savedState[k]
+        if k~='Preview' and type(v)==type(current) then
+            if type(v)=='boolean' then state[k]=v
+            elseif type(v)=='number' and v==v then
+                local limit=numberRanges[k]
+                if limit then state[k]=math.clamp(v,limit[1],limit[2]) end
+            elseif k=='AimPart' and allowedAimParts[v] then state[k]=v
+            elseif k=='Background' and allowedBackgrounds[v] then state[k]=v end
+        end
+    end
+    if type(saved.binds)=='table' then
+        for action,_ in pairs(binds) do
+            local name=saved.binds[action]
+            if type(name)=='string' and name~='RightShift' and name~='Unknown' then
+                local ok,key=pcall(function() return Enum.KeyCode[name] end)
+                if ok and key then binds[action]=key end
+            end
+        end
+    end
+end
+local stored
+if type(readfile)=='function' then
+    local ok,raw=pcall(readfile,settingsFile)
+    if ok and type(raw)=='string' then
+        local decoded,parsed=pcall(HttpService.JSONDecode,HttpService,raw)
+        if decoded and type(parsed)=='table' then stored=parsed end
+    end
+end
+if not stored and type(G.OX1DE_SETTINGS_CACHE)=='table' then stored=G.OX1DE_SETTINGS_CACHE end
+importSettings(stored)
+local function saveSettings()
+    local data={state={},binds={}}
+    for k,v in pairs(state) do if k~='Preview' then data.state[k]=v end end
+    for action,key in pairs(binds) do data.binds[action]=key.Name end
+    G.OX1DE_SETTINGS_CACHE=data
+    if type(writefile)=='function' then
+        local ok,encoded=pcall(HttpService.JSONEncode,HttpService,data)
+        if ok then pcall(writefile,settingsFile,encoded) end
+    end
+end
 local bindLabels={}
 local teamColors=function(p)
     -- Team Check OFF always means neutral white; never infer a team color.
@@ -191,7 +242,7 @@ new('UIStroke',{Color=palette.white,Thickness=3},logoInner)
 label(header,'OX1DE Hub',84,19,250,46,25,palette.white,true)
 local version=round(new('Frame',{Position=UDim2.fromOffset(241,31),Size=UDim2.fromOffset(49,22),BackgroundColor3=palette.top,BorderSizePixel=0},header),13)
 border(version)
-local vLabel=label(version,'V2.5',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
+local vLabel=label(version,'V2.6',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
 local function topButton(symbol,x)
     local btn=round(new('TextButton',{AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,x,0,23),Size=UDim2.fromOffset(37,37),BackgroundColor3=palette.card,Text=symbol,TextColor3=palette.white,TextSize=18,Font=Enum.Font.GothamBold,AutoButtonColor=false,BorderSizePixel=0},header),10)
     border(btn)
@@ -270,6 +321,7 @@ local function makeToggle(card,key,callback,offset)
         state[key]=not state[key]
         refresh()
         if callback then callback(state[key])end
+        saveSettings()
     end))
     refresh()
     return btn
@@ -311,6 +363,7 @@ local function addSlider(icon,name,sub,key,minimum,maximum,decimals,callback)
         fill.Size=UDim2.fromScale(ratio,1)
         knob.Position=UDim2.fromScale(ratio,.5)
         if callback then callback(state[key])end
+        saveSettings()
     end
     local function fromX(x)
         set(minimum+(maximum-minimum)*math.clamp((x-bar.AbsolutePosition.X)/math.max(1,bar.AbsoluteSize.X),0,1))
@@ -350,6 +403,7 @@ local function choiceRow(icon,name,info,choices,key,callback)
                 tween(b,{BackgroundColor3=selected and palette.white or palette.bg,TextColor3=selected and palette.bg or palette.gray},.17)
             end
             if callback then callback(text)end
+            saveSettings()
         end))
     end
     for _,b in ipairs(holders)do
@@ -425,6 +479,7 @@ local function setMenuPage(page)
             knob.Position=UDim2.fromScale(ratio,.5)
             value.Text=tostring(state.FOVRadius)
             if state.Preview or state.FOV then refreshFOV()end
+            saveSettings()
         end
         local drag=false
         pageTrack(bar.InputBegan:Connect(function(i)if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=true;setRadius(40+360*math.clamp((i.Position.X-bar.AbsolutePosition.X)/math.max(1,bar.AbsoluteSize.X),0,1))end end))
@@ -565,6 +620,7 @@ restoreCollision=function()
 end
 local function toggleFeature(k)
     state[k]=not state[k]
+    saveSettings()
     if k=='Fly' then if state.Fly then beginFly() else stopFly() end end
     if k=='Noclip' and not state.Noclip then restoreCollision() end
     -- Refresh the currently displayed page so the switches reflect hotkeys.
@@ -586,6 +642,7 @@ track(UIS.InputBegan:Connect(function(input,gameProcessed)
         waitingBind=nil
         if key~=Enum.KeyCode.Escape and key~=Enum.KeyCode.RightShift and key~=Enum.KeyCode.Unknown then
             binds[which]=key
+            saveSettings()
         end
         local b=bindLabels[which]
         if b and b.Parent then
@@ -835,6 +892,7 @@ end)
 
 local function cleanup()
     if not active then return end
+    saveSettings()
     active=false
     pcall(function() RS:UnbindFromRenderStep('OX1DE_V3_Aim') end)
     stopFly();restoreCollision()
@@ -856,6 +914,7 @@ G.OX1DE_HUB_CLEANUP=cleanup
 applyBackground()
 refreshFOV()
 changeWalk()
+if state.Fly then task.defer(function() if active then beginFly() end end) end
 window.Position=UDim2.new(.5,0,.5,15)
 window.GroupTransparency=1
 shadow.BackgroundTransparency=1
