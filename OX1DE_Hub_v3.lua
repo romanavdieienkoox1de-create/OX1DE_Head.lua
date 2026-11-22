@@ -1,4 +1,4 @@
--- OX1DE Hub v2.2
+-- OX1DE Hub v2.3
 -- UI matches OX1DE Hub screenshot series: Player / Visual / Combat / Setting.
 -- RightShift: menu; E: Aim; X: Fly; Z: Noclip (rebindable in the UI).
 -- Client-side local features; experience-specific server checks may limit effects.
@@ -31,7 +31,7 @@ local beginFly,stopFly,restoreCollision
 local menuOpen=true
 local savedFocus=nil
 local palette={bg=Color3.fromRGB(9,10,12),side=Color3.fromRGB(17,18,20),top=Color3.fromRGB(22,23,26),card=Color3.fromRGB(27,29,32),line=Color3.fromRGB(65,69,76),white=Color3.fromRGB(245,246,248),gray=Color3.fromRGB(157,164,175),dark=Color3.fromRGB(19,20,24),red=Color3.fromRGB(255,37,49),green=Color3.fromRGB(68,231,122),enemy=Color3.fromRGB(248,94,94)}
-local state={Speed=16,Jump=50,Fly=false,Noclip=false,NameESP=false,DistanceESP=false,TeamVisual=false,SkeletonESP=false,OutlineESP=false,WeaponESP=false,ThroughWalls=true,PumpkinESP=false,Aim=false,WallCheck=true,TeamAim=true,AimPart='Head',AimSpeed=1,FOV=false,FOVRadius=190,Background='Dark',Shadows=true,Opacity=1,Preview=false}
+local state={Speed=16,Jump=50,Fly=false,Noclip=false,NameESP=false,DistanceESP=false,TeamVisual=false,SkeletonESP=false,OutlineESP=false,WeaponESP=false,ThroughWalls=false,PumpkinESP=false,Aim=false,WallCheck=false,TeamAim=false,AimPart='Head',AimSpeed=1,FOV=false,FOVRadius=190,Background='Dark',Shadows=false,Opacity=1,Preview=false}
 local binds={Aim=Enum.KeyCode.E,Fly=Enum.KeyCode.X,Noclip=Enum.KeyCode.Z}
 local bindLabels={}
 local teamColors=function(p)
@@ -70,7 +70,7 @@ local function refreshFOV()
     fovGui.DisplayOrder=state.Preview and 150 or 90
     tween(circle,{Size=UDim2.fromOffset(state.FOVRadius*2,state.FOVRadius*2)},.14)
 end
-local shadow=round(new('Frame',{Name='WindowShadow',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,15),Size=UDim2.fromOffset(1106,765),BackgroundColor3=Color3.new(0,0,0),BackgroundTransparency=.65,BorderSizePixel=0},gui),26)
+local shadow=round(new('Frame',{Name='WindowShadow',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,15),Size=UDim2.fromOffset(1082,744),BackgroundColor3=Color3.new(0,0,0),BackgroundTransparency=1,BorderSizePixel=0},gui),26)
 local window=round(new('CanvasGroup',{Name='OX1DE_Hub_Window',AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),Size=UDim2.fromOffset(1082,744),BackgroundColor3=palette.bg,BorderSizePixel=0,ClipsDescendants=true,GroupTransparency=0},gui),23)
 border(window,Color3.fromRGB(89,93,99))
 local winScale=new('UIScale',{Scale=1},window)
@@ -168,7 +168,7 @@ new('UIStroke',{Color=palette.white,Thickness=3},logoInner)
 label(header,'OX1DE Hub',84,19,250,46,25,palette.white,true)
 local version=round(new('Frame',{Position=UDim2.fromOffset(241,31),Size=UDim2.fromOffset(49,22),BackgroundColor3=palette.top,BorderSizePixel=0},header),13)
 border(version)
-local vLabel=label(version,'V2.2',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
+local vLabel=label(version,'V2.3',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
 local function topButton(symbol,x)
     local btn=round(new('TextButton',{AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,x,0,23),Size=UDim2.fromOffset(37,37),BackgroundColor3=palette.card,Text=symbol,TextColor3=palette.white,TextSize=18,Font=Enum.Font.GothamBold,AutoButtonColor=false,BorderSizePixel=0},header),10)
     border(btn)
@@ -197,7 +197,7 @@ local previewBadge=round(new('Frame',{AnchorPoint=Vector2.new(1,0),Position=UDim
 border(previewBadge)
 local badgeTxt=label(previewBadge,'UI / PREVIEW',0,0,109,30,10,palette.white,true);badgeTxt.TextXAlignment=Enum.TextXAlignment.Center
 local list=new('ScrollingFrame',{Name='PageRows',Position=UDim2.fromOffset(31,84),Size=UDim2.new(1,-62,1,-103),CanvasSize=UDim2.fromOffset(0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=palette.line,ScrollingDirection=Enum.ScrollingDirection.Y},content)
-new('UIListLayout',{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},list)
+new('UIListLayout',{Padding=UDim.new(0,5),SortOrder=Enum.SortOrder.LayoutOrder},list)
 new('UIPadding',{PaddingBottom=UDim.new(0,12)},list)
 local pageConnections={}
 local function pageTrack(c)pageConnections[#pageConnections+1]=c;return c end
@@ -212,11 +212,11 @@ local function clearList()
 end
 local function nextOrder()order=order+1;return order end
 local function sectionText(text)
-    local wrapper=new('Frame',{Size=UDim2.new(1,-4,0,17),BackgroundTransparency=1,LayoutOrder=nextOrder()},list)
-    label(wrapper,string.upper(text),2,0,730,17,10,palette.gray,true)
+    local wrapper=new('Frame',{Size=UDim2.new(1,-4,0,14),BackgroundTransparency=1,LayoutOrder=nextOrder()},list)
+    label(wrapper,string.upper(text),2,0,730,14,10,palette.gray,true)
 end
 local function row(icon,name,sub,height)
-    local h=height or 62
+    local h=height or 54
     local card=round(new('Frame',{Size=UDim2.new(1,-5,0,h),BackgroundColor3=Color3.fromRGB(28,30,34),BorderSizePixel=0,LayoutOrder=nextOrder()},list),13)
     new('UIGradient',{Rotation=0,Color=ColorSequence.new(Color3.fromRGB(31,33,37),Color3.fromRGB(22,24,27))},card)
     border(card,Color3.fromRGB(92,95,103))
@@ -229,10 +229,10 @@ local function row(icon,name,sub,height)
         tween(card,{BackgroundColor3=Color3.fromRGB(28,30,34)},.2)
         tween(shine,{BackgroundTransparency=.82},.2)
     end))
-    vectorIcon(card,icon,24,math.floor((h-26)/2),26)
-    local yName=h>=85 and 9 or math.floor((h-45)/2)
-    label(card,name,70,yName,380,24,14,palette.white,true)
-    label(card,sub or '',70,yName+25,435,19,12,palette.gray)
+    vectorIcon(card,icon,23,math.floor((h-30)/2),30)
+    local yName=h>=85 and 9 or 8
+    label(card,name,70,yName,380,21,14,palette.white,true)
+    label(card,sub or '',70,yName+21,435,17,11,palette.gray)
     return card
 end
 local function makeToggle(card,key,callback,offset)
@@ -305,13 +305,13 @@ local function addSlider(icon,name,sub,key,minimum,maximum,decimals,callback)
     return card
 end
 local function switchRow(icon,name,info,key,bind,callback)
-    local card=row(icon,name,info,62)
+    local card=row(icon,name,info,54)
     if bind then bindButton(card,bind)end
     makeToggle(card,key,callback)
     return card
 end
 local function choiceRow(icon,name,info,choices,key,callback)
-    local card=row(icon,name,info,62)
+    local card=row(icon,name,info,54)
     local holders={}
     local choiceWidth=key=='AimPart' and 80 or 76
     local total=#choices*(choiceWidth+3)+6
@@ -474,12 +474,12 @@ local function setMenu(open)
         UIS.MouseBehavior=Enum.MouseBehavior.Default
         UIS.MouseIconEnabled=true
         window.Visible=true
-        shadow.Visible=state.Shadows
+        shadow.Visible=false
         window.GroupTransparency=1
         tween(window,{GroupTransparency=1-state.Opacity,Position=UDim2.new(.5,0,.5,0)},.23)
         tween(winScale,{Scale=math.clamp(winScale.Scale, .4,1.08)},.2)
         shadow.BackgroundTransparency=1
-        tween(shadow,{BackgroundTransparency=.57},.21)
+        shadow.BackgroundTransparency=1
     else
         blur.Enabled=false
         tween(window,{GroupTransparency=1,Position=UDim2.new(.5,0,.5,12)},.2)
