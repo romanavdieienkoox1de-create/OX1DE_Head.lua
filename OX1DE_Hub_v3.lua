@@ -1,4 +1,4 @@
--- OX1DE Hub v2.1
+-- OX1DE Hub v2.2
 -- UI matches OX1DE Hub screenshot series: Player / Visual / Combat / Setting.
 -- RightShift: menu; E: Aim; X: Fly; Z: Noclip (rebindable in the UI).
 -- Client-side local features; experience-specific server checks may limit effects.
@@ -31,7 +31,7 @@ local beginFly,stopFly,restoreCollision
 local menuOpen=true
 local savedFocus=nil
 local palette={bg=Color3.fromRGB(9,10,12),side=Color3.fromRGB(17,18,20),top=Color3.fromRGB(22,23,26),card=Color3.fromRGB(27,29,32),line=Color3.fromRGB(65,69,76),white=Color3.fromRGB(245,246,248),gray=Color3.fromRGB(157,164,175),dark=Color3.fromRGB(19,20,24),red=Color3.fromRGB(255,37,49),green=Color3.fromRGB(68,231,122),enemy=Color3.fromRGB(248,94,94)}
-local state={Speed=16,Jump=50,Fly=false,Noclip=false,NameESP=false,DistanceESP=false,TeamVisual=false,SkeletonESP=false,OutlineESP=false,WeaponESP=false,ThroughWalls=false,PumpkinESP=false,Aim=false,WallCheck=true,TeamAim=true,AimPart='Head',AimSpeed=.25,FOV=false,FOVRadius=190,Background='Dark',Shadows=true,Opacity=1,Preview=false}
+local state={Speed=16,Jump=50,Fly=false,Noclip=false,NameESP=false,DistanceESP=false,TeamVisual=false,SkeletonESP=false,OutlineESP=false,WeaponESP=false,ThroughWalls=true,PumpkinESP=false,Aim=false,WallCheck=true,TeamAim=true,AimPart='Head',AimSpeed=1,FOV=false,FOVRadius=190,Background='Dark',Shadows=true,Opacity=1,Preview=false}
 local binds={Aim=Enum.KeyCode.E,Fly=Enum.KeyCode.X,Noclip=Enum.KeyCode.Z}
 local bindLabels={}
 local teamColors=function(p)
@@ -444,14 +444,18 @@ local function applyBackground()
 end
 _G.OX1DE_BG_REFRESH=applyBackground
 local toggleInProgress=false
+local originalInputCaptured=false
 local function setMenu(open)
     if not active then return end
     menuOpen=open
     if not open then state.Preview=false; refreshFOV() end
     applyBackground()
     if open then
-        mouseWasIcon=UIS.MouseIconEnabled
-        mouseWasBehavior=UIS.MouseBehavior
+        if not originalInputCaptured then
+            mouseWasIcon=UIS.MouseIconEnabled
+            mouseWasBehavior=UIS.MouseBehavior
+            originalInputCaptured=true
+        end
         UIS.MouseBehavior=Enum.MouseBehavior.Default
         UIS.MouseIconEnabled=true
         window.Visible=true
@@ -468,8 +472,13 @@ local function setMenu(open)
         task.delay(.2,function()
             if active and not menuOpen then window.Visible=false;shadow.Visible=false end
         end)
-        if mouseWasIcon~=nil then UIS.MouseIconEnabled=mouseWasIcon end
-        if mouseWasBehavior~=nil then UIS.MouseBehavior=mouseWasBehavior end
+        -- Restore game-side mouse control without retaining a GUI cursor lock.
+        task.defer(function()
+            if active and not menuOpen then
+                if mouseWasBehavior~=nil then UIS.MouseBehavior=mouseWasBehavior end
+                if mouseWasIcon~=nil then UIS.MouseIconEnabled=mouseWasIcon end
+            end
+        end)
     end
 end
 track(minimize.MouseButton1Click:Connect(function()setMenu(false)end))
@@ -636,7 +645,7 @@ local function drawSkeleton(p,rec)
     local char=rec.char
     local hum=char:FindFirstChildOfClass('Humanoid')
     local links=hum and hum.RigType==Enum.HumanoidRigType.R15 and skeletonLinksR15 or skeletonLinksR6
-    local ok=state.SkeletonESP and (state.ThroughWalls or visiblePoint(char:FindFirstChild('HumanoidRootPart') or char:FindFirstChild('Head'),char))
+    local ok=state.SkeletonESP and char and char.Parent~=nil
     for i,ln in ipairs(rec.lines) do
         local a=char:FindFirstChild(links[i][1]);local b=char:FindFirstChild(links[i][2])
         if ok and a and b and camera then
@@ -711,7 +720,9 @@ track(RS.RenderStepped:Connect(function(dt)
                     local char=rec.char
                     local root=char:FindFirstChild('HumanoidRootPart')
                     local localRoot=LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('HumanoidRootPart')
-                    local distance=root and localRoot and math.floor((root.Position-localRoot.Position).Magnitude+.5) or nil
+                    local cameraRoot=workspace.CurrentCamera
+                    local origin=localRoot and localRoot.Position or (cameraRoot and cameraRoot.CFrame.Position)
+                    local distance=root and origin and math.floor((root.Position-origin).Magnitude+.5) or nil
                     local tool=char:FindFirstChildOfClass('Tool')
                     rec.name.Text=p.DisplayName
                     rec.user.Text='@'..p.Name
@@ -721,7 +732,7 @@ track(RS.RenderStepped:Connect(function(dt)
                     rec.info.Text=table.concat(info,'  •  ')
                     local charRoot=root or char:FindFirstChild('Head')
                     local visible=state.ThroughWalls or visiblePoint(charRoot,char)
-                    rec.bill.Enabled=visible and (state.NameESP or #info>0)
+                    rec.bill.Enabled=(state.ThroughWalls or visible or state.DistanceESP) and (state.NameESP or #info>0)
                     rec.name.Visible=state.NameESP
                     rec.user.Visible=state.NameESP
                     rec.name.TextColor3=teamColors(p)
@@ -753,6 +764,8 @@ local function targetPart(char)
 end
 RS:BindToRenderStep('OX1DE_V3_Aim',Enum.RenderPriority.Camera.Value+5,function(dt)
     if not active or not state.Aim or menuOpen then return end
+    -- Require right mouse held: never fight manual camera controls just because Aim is enabled.
+    if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
     local cam=workspace.CurrentCamera
     if not cam then return end
     local midpoint=cam.ViewportSize/2
@@ -776,7 +789,7 @@ RS:BindToRenderStep('OX1DE_V3_Aim',Enum.RenderPriority.Camera.Value+5,function(d
     if closest then
         local goal=CFrame.lookAt(cam.CFrame.Position,closest.Position)
         local smoothing=math.clamp(state.AimSpeed,0,1)
-        local alpha=smoothing>=.995 and 1 or (0.018+math.pow(smoothing,2)*.982)
+        local alpha=smoothing>=.995 and 1 or (0.04+math.pow(smoothing,2)*.96)
         cam.CFrame=cam.CFrame:Lerp(goal,alpha)
     end
 end)
