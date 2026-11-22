@@ -128,11 +128,17 @@ local function vectorIcon(parent,kind,x,y,size,color)
     elseif kind=='jump' then
         line(12,23,12,5,2.3);line(12,5,6,11,2.3);line(12,5,18,11,2.3)
     elseif kind=='fly' then
-        line(3,14,21,4);line(3,14,7,21);line(7,21,15,13)
-        line(7,15,17,10);line(6,18,12,15)
+        -- Feathered wing silhouette, with three separated feathers.
+        line(3,14,12,7,2.6);line(12,7,22,4,2.6)
+        line(4,14,6,20,2.7);line(6,20,14,15,2.7)
+        line(14,15,19,10,2.5);line(6,17,13,12,1.6)
+        line(8,20,13,19,1.6);line(13,19,17,15,1.6)
+        line(12,8,18,6,1.5)
     elseif kind=='noclip' then
-        line(2,8,12,2);line(12,2,22,8);line(22,8,12,14);line(12,14,2,8)
-        line(2,13,12,19);line(12,19,22,13);line(2,18,12,24);line(12,24,22,18)
+        -- Door frame with an opening and a forward motion arrow.
+        line(4,22,4,3,2.5);line(4,3,20,3,2.5);line(20,3,20,22,2.5)
+        line(4,22,10,22,2.3);line(19,22,20,22,2.3)
+        line(8,14,17,14,2.4);line(17,14,13,10,2.4);line(17,14,13,18,2.4)
     elseif kind=='distance' then
         line(3,8,21,8);line(3,16,21,16);line(3,8,7,4);line(3,8,7,12);line(21,16,17,12);line(21,16,17,20)
     elseif kind=='team' then
@@ -146,8 +152,12 @@ local function vectorIcon(parent,kind,x,y,size,color)
     elseif kind=='wall' or kind=='background' then
         oval(2,4,20,16);line(2,12,22,12);line(9,4,9,12);line(16,12,16,20)
     elseif kind=='pumpkin' then
-        oval(2,7,20,15);oval(5,7,14,15);line(12,7,13,3);line(13,3,17,2)
-        line(6,13,9,13);line(15,13,18,13);line(9,19,15,19)
+        -- Halloween lantern: lobes, curved stem, triangular eyes, smile.
+        oval(2,7,20,15,2.3);oval(7,7,10,15,1.25)
+        line(11,7,11,3,2.4);line(11,3,15,2,2)
+        line(5,14,8,12,2);line(8,12,9,15,2)
+        line(15,15,16,12,2);line(16,12,19,14,2)
+        line(7,18,11,20,2);line(11,20,16,18,2)
     elseif kind=='opacity' then
         oval(5,5,14,17);line(12,2,5,13);line(12,2,19,13)
     elseif kind=='shadow' then
