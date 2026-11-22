@@ -42,7 +42,13 @@ local gui=make("ScreenGui",{Name="OX1DE_CompactSafe",ResetOnSpawn=false,IgnoreGu
 local panel=corner(make("Frame",{AnchorPoint=Vector2.new(0,.5),Position=UDim2.new(0,20,.5,0),
  Size=UDim2.fromOffset(310,490),BackgroundColor3=bg,BorderSizePixel=0},gui),15)
 make("UIStroke",{Color=Color3.fromRGB(85,88,98),Thickness=1},panel)
-local panelScale=make("UIScale",{Scale=.78},panel)
+local panelScale=make("UIScale",{Scale=.72},panel)
+local function smooth(object,properties,duration)
+ if not object or not object.Parent then return end
+ T:Create(object,TweenInfo.new(duration or .2,Enum.EasingStyle.Quint,Enum.EasingDirection.Out),properties):Play()
+end
+panelScale.Scale=.66
+smooth(panelScale,{Scale=.72},.3)
 local translucent=false
 local header=make("Frame",{Size=UDim2.new(1,0,0,56),BackgroundColor3=Color3.fromRGB(25,27,32),BorderSizePixel=0},panel)
 local title=txt(header,"OX1DE Hub",19,white);title.Position=UDim2.fromOffset(16,8);title.Size=UDim2.fromOffset(245,26)
@@ -74,6 +80,8 @@ for i,item in ipairs(names) do
  local thumb=corner(make("Frame",{Position=UDim2.fromOffset(4,4),Size=UDim2.fromOffset(19,19),
   BackgroundColor3=white,BorderSizePixel=0},sw),10)
  entries[key]={led=led,sw=sw,thumb=thumb,kb=kb}
+ conn(sw.MouseEnter,function()smooth(row,{BackgroundColor3=Color3.fromRGB(46,48,56)},.15)end)
+ conn(sw.MouseLeave,function()smooth(row,{BackgroundColor3=Color3.fromRGB(30,32,37)},.16)end)
  conn(sw.MouseButton1Click,function()flip(key)end)
 end
 local fovLabel=txt(panel,"FOV RADIUS",10,gray)
@@ -105,8 +113,8 @@ local function updateSwitches()
  for k,row in pairs(entries) do
   local on=states[k]
   row.led.BackgroundColor3=on and green or red
-  row.sw.BackgroundColor3=on and green or Color3.fromRGB(70,73,81)
-  row.thumb.Position=UDim2.fromOffset(on and 28 or 4,4)
+  smooth(row.sw,{BackgroundColor3=on and green or Color3.fromRGB(70,73,81)},.18)
+  smooth(row.thumb,{Position=UDim2.fromOffset(on and 28 or 4,4)},.18)
   if row.kb and awaiting~=k then row.kb.Text=binds[k].Name end
  end
 end
