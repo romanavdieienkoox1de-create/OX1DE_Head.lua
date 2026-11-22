@@ -1,4 +1,4 @@
--- OX1DE Hub Compact v1.2 - crash mitigation rebuild.
+-- OX1DE Hub Compact v1.3 - small left panel, fly vertical controls, wall check.
 -- No legacy GUI, no automatic world scanning, no auto-enabled gameplay functions.
 local P=game:GetService("Players")
 local U=game:GetService("UserInputService")
@@ -17,7 +17,7 @@ end
 local alive=true
 local conns,overlays={},{}
 local states={AllESP=false,Aim=false,FOV=false,TeamCheck=false,Noclip=false,Fly=false}
-local binds={Aim=Enum.KeyCode.E,Noclip=Enum.KeyCode.Z,Fly=Enum.KeyCode.X}
+local binds={Aim=Enum.KeyCode.R,Noclip=Enum.KeyCode.Z,Fly=Enum.KeyCode.X}
 local red=Color3.fromRGB(243,65,68)
 local green=Color3.fromRGB(58,221,132)
 local white=Color3.fromRGB(243,245,248)
@@ -39,12 +39,14 @@ local function txt(parent,value,size,color)
 end
 local gui=make("ScreenGui",{Name="OX1DE_CompactSafe",ResetOnSpawn=false,IgnoreGuiInset=true,
  DisplayOrder=120,ZIndexBehavior=Enum.ZIndexBehavior.Sibling},pg)
-local panel=corner(make("Frame",{AnchorPoint=Vector2.new(1,.5),Position=UDim2.new(1,-22,.5,0),
+local panel=corner(make("Frame",{AnchorPoint=Vector2.new(0,.5),Position=UDim2.new(0,20,.5,0),
  Size=UDim2.fromOffset(310,490),BackgroundColor3=bg,BorderSizePixel=0},gui),15)
 make("UIStroke",{Color=Color3.fromRGB(85,88,98),Thickness=1},panel)
+local panelScale=make("UIScale",{Scale=.78},panel)
+local translucent=false
 local header=make("Frame",{Size=UDim2.new(1,0,0,56),BackgroundColor3=Color3.fromRGB(25,27,32),BorderSizePixel=0},panel)
 local title=txt(header,"OX1DE Hub",19,white);title.Position=UDim2.fromOffset(16,8);title.Size=UDim2.fromOffset(245,26)
-local subtitle=txt(header,"COMPACT • STABLE BUILD",10,gray);subtitle.Position=UDim2.fromOffset(17,34);subtitle.Size=UDim2.fromOffset(270,15)
+local subtitle=txt(header,"E UP / Q DOWN  •  AIM R",10,gray);subtitle.Position=UDim2.fromOffset(17,34);subtitle.Size=UDim2.fromOffset(270,15)
 local line=make("Frame",{Position=UDim2.new(0,0,1,-1),Size=UDim2.new(1,0,0,1),
  BackgroundColor3=Color3.fromRGB(70,73,80),BorderSizePixel=0},header)
 local entries={}
@@ -84,8 +86,14 @@ local bar=corner(make("TextButton",{Position=UDim2.fromOffset(16,424),Size=UDim2
 local fill=corner(make("Frame",{Size=UDim2.fromScale(.31,1),BackgroundColor3=red,BorderSizePixel=0},bar),4)
 local dot=corner(make("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.31,.5),
  Size=UDim2.fromOffset(14,14),BackgroundColor3=white,BorderSizePixel=0},bar),8)
-local hint=txt(panel,"Binds are optional • panel stays open",10,gray)
+local hint=txt(panel,"BACKGROUND: DARK  •  CLICK TO CHANGE",10,gray)
 hint.Position=UDim2.fromOffset(17,452);hint.Size=UDim2.fromOffset(280,18)
+local backgroundToggle=corner(make("TextButton",{Position=UDim2.fromOffset(16,448),Size=UDim2.fromOffset(278,28),BackgroundColor3=Color3.fromRGB(28,30,35),Text="BACKGROUND  ·  DARK",TextColor3=white,TextSize=11,Font=Enum.Font.GothamBold,AutoButtonColor=false},panel),7)
+conn(backgroundToggle.MouseButton1Click,function()
+ translucent=not translucent
+ panel.BackgroundTransparency=translucent and .26 or 0
+ backgroundToggle.Text=translucent and "BACKGROUND  ·  TRANSPARENT" or "BACKGROUND  ·  DARK"
+end)
 local circle=corner(make("Frame",{AnchorPoint=Vector2.new(.5,.5),Position=UDim2.fromScale(.5,.5),
  Size=UDim2.fromOffset(radius*2,radius*2),BackgroundTransparency=1,Visible=false},gui),9999)
 make("UIStroke",{Color=red,Thickness=2},circle)
@@ -241,7 +249,8 @@ conn(R.Heartbeat,function(dt)
   if U:IsKeyDown(Enum.KeyCode.S) then d=d-cam.CFrame.LookVector end
   if U:IsKeyDown(Enum.KeyCode.A) then d=d-cam.CFrame.RightVector end
   if U:IsKeyDown(Enum.KeyCode.D) then d=d+cam.CFrame.RightVector end
-  if U:IsKeyDown(Enum.KeyCode.Space) then d=d+Vector3.yAxis end
+  if U:IsKeyDown(Enum.KeyCode.E) then d=d+Vector3.yAxis end
+  if U:IsKeyDown(Enum.KeyCode.Q) then d=d-Vector3.yAxis end
   velocity.Velocity=d.Magnitude>0 and d.Unit*40 or Vector3.zero
   gyro.CFrame=cam.CFrame
  end
@@ -254,6 +263,18 @@ conn(R.Heartbeat,function(dt)
   end
  end
 end)
+local function unobstructed(target,character)
+ local camera=workspace.CurrentCamera
+ if not camera then return false end
+ local direction=target.Position-camera.CFrame.Position
+ if direction.Magnitude<.01 then return true end
+ local params=RaycastParams.new()
+ params.FilterType=Enum.RaycastFilterType.Exclude
+ params.FilterDescendantsInstances={player.Character or camera}
+ params.IgnoreWater=true
+ local hit=workspace:Raycast(camera.CFrame.Position,direction,params)
+ return hit==nil or hit.Instance:IsDescendantOf(character)
+end
 conn(R.RenderStepped,function()
  if not alive or not states.Aim then return end
  local cam=workspace.CurrentCamera
@@ -263,7 +284,7 @@ conn(R.RenderStepped,function()
   if p~=player and (not states.TeamCheck or not (player.Team and p.Team and player.Team==p.Team)) then
    local ch=p.Character;local hum=ch and ch:FindFirstChildOfClass("Humanoid")
    local hd=ch and ch:FindFirstChild("Head")
-   if hum and hum.Health>0 and hd then
+   if hum and hum.Health>0 and hd and unobstructed(hd,ch) then
     local xy,on=cam:WorldToViewportPoint(hd.Position)
     if on and xy.Z>0 then
      local dist=(Vector2.new(xy.X,xy.Y)-cam.ViewportSize/2).Magnitude
