@@ -1,4 +1,4 @@
--- OX1DE Hub v2.4
+-- OX1DE Hub v2.5
 -- UI matches OX1DE Hub screenshot series: Player / Visual / Combat / Setting.
 -- RightShift: menu; E: Aim; X: Fly; Z: Noclip (rebindable in the UI).
 -- Client-side local features; experience-specific server checks may limit effects.
@@ -191,7 +191,7 @@ new('UIStroke',{Color=palette.white,Thickness=3},logoInner)
 label(header,'OX1DE Hub',84,19,250,46,25,palette.white,true)
 local version=round(new('Frame',{Position=UDim2.fromOffset(241,31),Size=UDim2.fromOffset(49,22),BackgroundColor3=palette.top,BorderSizePixel=0},header),13)
 border(version)
-local vLabel=label(version,'V2.4',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
+local vLabel=label(version,'V2.5',0,0,49,22,11,palette.gray,true);vLabel.TextXAlignment=Enum.TextXAlignment.Center
 local function topButton(symbol,x)
     local btn=round(new('TextButton',{AnchorPoint=Vector2.new(1,0),Position=UDim2.new(1,x,0,23),Size=UDim2.fromOffset(37,37),BackgroundColor3=palette.card,Text=symbol,TextColor3=palette.white,TextSize=18,Font=Enum.Font.GothamBold,AutoButtonColor=false,BorderSizePixel=0},header),10)
     border(btn)
@@ -804,8 +804,7 @@ local function targetPart(char)
 end
 RS:BindToRenderStep('OX1DE_V3_Aim',Enum.RenderPriority.Camera.Value+5,function(dt)
     if not active or not state.Aim or menuOpen then return end
-    -- Require right mouse held: never fight manual camera controls just because Aim is enabled.
-    if not UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then return end
+    -- Aim activates directly with the Aim toggle (default E); no right mouse required.
     local cam=workspace.CurrentCamera
     if not cam then return end
     local midpoint=cam.ViewportSize/2
